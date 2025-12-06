@@ -6,11 +6,12 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "127.0.0.1",
-    port: 8080,
-    // @ts-ignore
-    allowedHosts: process.env.TEMPO === "true" ? true : undefined,
-
+    host: "0.0.0.0", // Listen on all network interfaces
+    port: 9002,      // Match the port from the error message
+    hmr: {
+      // Tell the client to connect to the public-facing port for HMR
+      clientPort: 9000,
+    },
     // Optimize for faster startup
     warmup: {
       clientFiles: ["./src/main.tsx", "./src/App.tsx"],
@@ -25,10 +26,9 @@ export default defineConfig(({ mode }) => ({
       "@tanstack/react-query",
       "@supabase/supabase-js",
     ],
-
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(
-    Boolean,
+    Boolean
   ),
   resolve: {
     alias: {

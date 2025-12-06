@@ -1,9 +1,8 @@
 {
-  "mcpServers": {
-    "organiza_supabase": {
-      "displayName": "Supabase (Organiza)",
-      "url": "https://deipytqxqkmyadabtjnd.supabase.co",
-      "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlaXB5dHF4cWtteWFkYWJ0am5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3MzY0NzcsImV4cCI6MjA3MTMxMjQ3N30.p4j6kY61Giu3YIE0huyPjxh59JV6lYnOTsenbcyuAUM"
+  "servers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=deipytqxqkmyadabtjnd&features=database%2Cdebugging%2Caccount%2Cdocs%2Cdevelopment%2Cfunctions%2Cbranching%2Cstorage"
     }
   }
 }

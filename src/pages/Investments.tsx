@@ -1,14 +1,11 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useB3Data } from "@/hooks/useB3Data";
-import { useAuth } from "@/hooks/useAuth";
 import EnhancedAssetTable from "@/components/EnhancedAssetTable";
 import PortfolioEvolutionChart from "@/components/charts/PortfolioEvolutionChart";
-import AssetAllocationChart from "@/components/charts/AssetAllocationChart";
 import DividendHistoryChart from "@/components/charts/DividendHistoryChart";
 import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { RefreshCcw } from "lucide-react";
 
 const Investments = () => {
@@ -21,7 +18,6 @@ const Investments = () => {
     getDividendHistoryData,
     loading,
   } = useB3Data();
-  const { user } = useAuth();
 
   // Load data on mount
   useEffect(() => {
@@ -95,9 +91,8 @@ const Investments = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="mb-6">
         <PortfolioEvolutionChart data={portfolioEvolution} isLoading={loading} />
-        <AssetAllocationChart data={enhancedAssets} isLoading={loading} />
       </div>
 
       <div className="mb-6">
