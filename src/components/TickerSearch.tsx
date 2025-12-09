@@ -64,7 +64,7 @@ export function TickerSearch({ value, onValueChange, onSelect }: TickerSearchPro
 
   return (
     <div className="relative">
-      <Command className="overflow-visible">
+      <Command className="overflow-visible bg-transparent" shouldFilter={false}>
         <CommandInput
           placeholder="Digite para buscar um ativo..."
           value={value}
@@ -72,28 +72,28 @@ export function TickerSearch({ value, onValueChange, onSelect }: TickerSearchPro
           onFocus={() => setIsOpen(true)}
           onBlur={handleInputBlur}
         />
+        {isOpen && value.length > 0 && (
+          <CommandList className="absolute top-full left-0 right-0 z-50 bg-popover border border-border rounded-md shadow-lg mt-1 max-h-60">
+            {loading && <CommandEmpty>Buscando...</CommandEmpty>}
+            {!loading && results.length === 0 && debouncedSearch.length > 1 && (
+              <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+            )}
+            {results.map((ticker) => (
+              <CommandItem
+                key={ticker.symbol}
+                onSelect={() => handleSelect(ticker)}
+                value={ticker.symbol}
+                className="cursor-pointer hover:bg-accent"
+              >
+                <div className="flex justify-between w-full">
+                  <span className="font-bold">{ticker.symbol}</span>
+                  <span className="text-muted-foreground truncate ml-2">{ticker.name}</span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandList>
+        )}
       </Command>
-      {isOpen && value.length > 0 && (
-        <CommandList className="absolute top-full left-0 right-0 z-50 bg-popover border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
-          {loading && <CommandEmpty>Buscando...</CommandEmpty>}
-          {!loading && results.length === 0 && debouncedSearch.length > 1 && (
-            <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
-          )}
-          {results.map((ticker) => (
-            <CommandItem
-              key={ticker.symbol}
-              onSelect={() => handleSelect(ticker)}
-              value={ticker.symbol}
-              className="cursor-pointer hover:bg-accent"
-            >
-              <div className="flex justify-between w-full">
-                <span className="font-bold">{ticker.symbol}</span>
-                <span className="text-muted-foreground truncate ml-2">{ticker.name}</span>
-              </div>
-            </CommandItem>
-          ))}
-        </CommandList>
-      )}
     </div>
   );
 }
