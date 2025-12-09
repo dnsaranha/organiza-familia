@@ -24,7 +24,7 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [newAvatar, setNewAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [monthStartDay, setMonthStartDay] = useState(1);
+  const [monthStartDay, setMonthStartDay] = useState<number | string>(1);
   const [carryOverBalance, setCarryOverBalance] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const navigate = useNavigate();
@@ -89,7 +89,7 @@ export default function Profile() {
           setAvatarUrl(profileData.avatar_url || "");
         }
 
-        // Fetch preferences using raw SQL
+        // Fetch preferences
         const { data: preferencesData, error: preferencesError } =
           await supabase
             .from("user_preferences")
@@ -103,7 +103,7 @@ export default function Profile() {
         }
 
         if (preferencesData) {
-          setMonthStartDay(preferencesData.month_start_day);
+          setMonthStartDay(preferencesData.month_start_day || 1);
           setCarryOverBalance(preferencesData.carry_over_balance);
           const theme = preferencesData.theme || "system";
           const prefersDark =
@@ -172,7 +172,7 @@ export default function Profile() {
 
       const preferencesUpdates = {
         user_id: user.id,
-        month_start_day: monthStartDay,
+        month_start_day: Number(monthStartDay), // Convert back to number on save
         carry_over_balance: carryOverBalance,
         theme: darkMode ? "dark" : "light",
         updated_at: new Date().toISOString(),
@@ -271,9 +271,7 @@ export default function Profile() {
                     min="1"
                     max="28"
                     value={monthStartDay}
-                    onChange={(e) =>
-                      setMonthStartDay(parseInt(e.target.value, 10))
-                    }
+                    onChange={(e) => setMonthStartDay(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
                     Defina o dia em que seu mês financeiro começa (ex: 1 para o

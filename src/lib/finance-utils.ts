@@ -1,8 +1,8 @@
-
 export interface Transaction {
   id: string;
   ticker: string;
   asset_name: string;
+  asset_type: string;
   transaction_type: "buy" | "sell";
   quantity: number;
   price: number;
@@ -15,6 +15,7 @@ export interface Transaction {
 export interface Position {
   ticker: string;
   asset_name: string;
+  asset_type: string;
   quantity: number;
   totalCost: number;
   averagePrice: number;
@@ -41,10 +42,12 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
     let quantity = 0;
     let totalCostBasis = 0;
     let assetName = txs[0]?.asset_name || ticker;
+    let assetType = txs[0]?.asset_type || 'OTHER'; // Default to 'OTHER' if not specified
 
     for (const t of txs) {
-      // Update asset name to the most recent one if available
+      // Update asset name and type to the most recent one if available
       if (t.asset_name) assetName = t.asset_name;
+      if (t.asset_type) assetType = t.asset_type;
 
       if (t.transaction_type === 'buy') {
         const cost = (t.quantity * t.price) + t.fees;
@@ -66,6 +69,7 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
         positions.push({
             ticker,
             asset_name: assetName,
+            asset_type: assetType, // Include asset_type
             quantity,
             totalCost: totalCostBasis,
             averagePrice: totalCostBasis / quantity

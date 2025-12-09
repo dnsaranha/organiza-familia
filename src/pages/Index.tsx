@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FinancialCard } from "@/components/FinancialCard";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -43,6 +43,7 @@ const Index = () => {
     accounts,
     transactions: bankTransactions,
     loading: bankLoading,
+    refreshAllData: refetchBankData,
   } = useOpenBanking();
 
   useEffect(() => {
@@ -55,34 +56,30 @@ const Index = () => {
     if (user) {
       fetchFinancialData();
     }
-  }, [user, refreshKey, scope]);
+  }, [user, refreshKey, scope, bankTransactions, accounts]);
 
   const fetchFinancialData = async () => {
     if (!user) return;
 
     setLoadingData(true);
     try {
-      // 1. Fetch user preferences using raw SQL
       const { data: preferences } = await supabase
         .from("user_preferences")
-        .select("month_start_day, carry_over_balance")
+        .select("month_start_day")
         .eq("user_id", user.id)
         .maybeSingle();
 
       const monthStartDay = preferences?.month_start_day || 1;
-      const carryOverBalance = preferences?.carry_over_balance || false;
 
-      // 2. Fetch transactions
       let query = supabase.from("transactions").select("type, amount, date");
       if (scope === "personal") {
         query = query.is("group_id", null).eq("user_id", user.id);
       } else {
         query = query.eq("group_id", scope);
       }
-      const { data: transactions, error } = await query;
+      const { data: manualTransactions, error } = await query;
       if (error) throw error;
 
-      // 3. Define date range based on preferences
       const now = new Date();
       let monthStartDate = new Date(
         now.getFullYear(),
@@ -98,48 +95,63 @@ const Index = () => {
         monthStartDay - 1,
       );
       monthEndDate.setHours(23, 59, 59, 999);
+      
+      let prevMonthStartDate = new Date(monthStartDate);
+      prevMonthStartDate.setMonth(prevMonthStartDate.getMonth() - 1);
+      let prevMonthEndDate = new Date(monthStartDate);
+      prevMonthEndDate.setDate(prevMonthEndDate.getDate() - 1);
+      prevMonthEndDate.setHours(23, 59, 59, 999);
 
-      // 4. Calculate financial data
-      let balance = 0;
+      const combinedTransactions = [
+        ...(manualTransactions || []).map((t) => ({ ...t, source: "manual" })),
+        ...(bankTransactions || []).map((t) => ({
+          ...t,
+          type: t.amount > 0 ? "income" : "expense",
+          source: "open_banking",
+        })),
+      ];
+
       let monthlyIncome = 0;
       let monthlyExpenses = 0;
-      let periodBalance = 0;
+      let previousMonthIncome = 0;
+      let previousMonthExpenses = 0;
 
-      for (const t of transactions) {
+      for (const t of combinedTransactions) {
         const transactionDate = new Date(t.date);
-        const amount = t.type === "income" ? t.amount : -t.amount;
-
-        // Always calculate total balance
-        balance += amount;
-
-        // Check if transaction is within the current financial period
         if (
           transactionDate >= monthStartDate &&
           transactionDate <= monthEndDate
         ) {
           if (t.type === "income") {
-            monthlyIncome += t.amount;
+            monthlyIncome += Math.abs(t.amount);
           } else {
-            monthlyExpenses += t.amount;
+            monthlyExpenses += Math.abs(t.amount);
           }
-          periodBalance += amount;
+        } else if (
+            transactionDate >= prevMonthStartDate &&
+            transactionDate <= prevMonthEndDate
+        ) {
+            if (t.type === "income") {
+                previousMonthIncome += Math.abs(t.amount);
+            } else {
+                previousMonthExpenses += Math.abs(t.amount);
+            }
         }
       }
-
-      // 5. Set final balance based on carry_over_balance preference
-      const finalBalance = carryOverBalance ? balance : periodBalance;
+      
+      const previousMonthBalance = previousMonthIncome - previousMonthExpenses;
+      const monthlyBalance = previousMonthBalance + monthlyIncome - monthlyExpenses;
 
       setFinancialData({
-        balance: finalBalance,
+        balance: monthlyBalance,
         monthlyIncome,
         monthlyExpenses,
       });
+
     } catch (err) {
-      // Only log non-network errors
-      if (err instanceof Error && !err.message.includes("Failed to fetch") && !err.message.includes("aborted")) {
+      if (err instanceof Error && !err.message.includes("aborted")) {
         console.error("Erro ao buscar dados financeiros:", err);
       }
-      // Handle error state in UI if necessary
     } finally {
       setLoadingData(false);
     }
@@ -147,6 +159,7 @@ const Index = () => {
 
   const handleDataRefresh = () => {
     setRefreshKey((prevKey) => prevKey + 1);
+    refetchBankData();
   };
 
   if (authLoading || (loadingData && !financialData)) {
@@ -161,13 +174,14 @@ const Index = () => {
   }
 
   if (!user) {
-    return null; // Will redirect to auth
+    return null;
   }
+
+  const monthlyBalance = financialData?.balance ?? 0;
 
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
-        {/* Welcome Section */}
         <div className="mb-4 sm:mb-6 md:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             Olá, bem-vindo de volta! 👋
@@ -177,36 +191,39 @@ const Index = () => {
           </p>
         </div>
 
-        {/* PWA Install Prompt */}
         <PWAInstallPrompt />
 
-        {/* Financial Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <FinancialCard
-            title="Saldo Atual"
-            value={financialData?.balance ?? 0}
-            type="balance"
+            title="Saldo do Mês"
+            amount={monthlyBalance}
+            isCurrency
+            isLoading={loadingData || bankLoading}
+            isPositive={monthlyBalance >= 0}
+            isNegative={monthlyBalance < 0}
             icon={Wallet}
           />
           <FinancialCard
             title="Receitas do Mês"
-            value={financialData?.monthlyIncome ?? 0}
-            type="income"
+            amount={financialData?.monthlyIncome ?? 0}
+            isCurrency
+            isLoading={loadingData || bankLoading}
+            isPositive={true}
             icon={TrendingUp}
           />
           <FinancialCard
             title="Gastos do Mês"
-            value={financialData?.monthlyExpenses ?? 0}
-            type="expense"
+            amount={financialData?.monthlyExpenses ?? 0}
+            isCurrency
+            isLoading={loadingData || bankLoading}
+            isNegative={true}
             icon={TrendingDown}
           />
         </div>
 
-        {/* Banking Overview - Show when connected */}
         {bankConnected && accounts.length > 0 && (
           <div className="mb-6 sm:mb-8">
             <div className="space-y-4 sm:space-y-6">
-              {/* Contas Bancárias Section */}
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
                   <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
@@ -240,7 +257,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Cartões de Crédito Section */}
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
                   <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
@@ -277,7 +293,6 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Recent Transactions */}
             {bankTransactions.length > 0 && (
               <Card className="mt-4 sm:mt-6">
                 <CardHeader className="pb-3">
@@ -324,14 +339,11 @@ const Index = () => {
           </div>
         )}
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          {/* Transaction Form */}
           <div className="w-full">
             <TransactionForm onSave={handleDataRefresh} />
           </div>
 
-          {/* Recent Transactions */}
           <div className="w-full">
             <TransactionList
               key={refreshKey}
@@ -340,7 +352,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Family Groups and Scheduled Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
           <div className="w-full">
             <FamilyGroups />
@@ -350,12 +361,10 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Subscription Status */}
         <div className="mb-6 sm:mb-8">
           <SubscriptionStatus />
         </div>
 
-        {/* Success Notice */}
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-success/10 border border-success/20 rounded-lg">
           <div className="flex items-start gap-2 sm:gap-3">
             <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-success mt-0.5 sm:mt-1 flex-shrink-0" />

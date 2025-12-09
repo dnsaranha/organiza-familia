@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.yfinance-data]
 verify_jwt = false
+
+[functions.yfinance-search]
+verify_jwt = false

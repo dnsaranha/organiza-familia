@@ -21,6 +21,7 @@ import { Download, Search, ArrowUpDown } from "lucide-react";
 import { useState, useMemo } from "react";
 import { mapInvestmentType, investmentMapping } from "@/lib/investment-mapping";
 
+// Add asset_type to AssetData
 interface AssetData {
   symbol: string;
   name: string;
@@ -35,6 +36,7 @@ interface AssetData {
   accumulatedDividends: number;
   profitLoss: number;
   profitability: number;
+  asset_type?: string; // Manual asset type
 }
 
 interface EnhancedAssetTableProps {
@@ -44,6 +46,15 @@ interface EnhancedAssetTableProps {
 
 type SortField = keyof AssetData | "mappedType";
 type SortDirection = "asc" | "desc";
+
+const assetTypeLabels: { [key: string]: string } = {
+  STOCK: "Ação",
+  FII: "FII",
+  FIXED_INCOME: "Renda Fixa",
+  CRYPTO: "Cripto",
+  OTHER: "Outro",
+};
+
 
 const EnhancedAssetTable = ({
   assets,
@@ -59,16 +70,22 @@ const EnhancedAssetTable = ({
     const subtypes = investmentMapping.flatMap((item) =>
       item.subtypes.map((sub) => sub.label_pt),
     );
-    return ["Todos", ...new Set([...mainTypes, ...subtypes])];
+    // Add manual asset types to filter options
+    const manualTypes = Object.values(assetTypeLabels);
+    return ["Todos", ...new Set([...mainTypes, ...subtypes, ...manualTypes])];
   }, []);
+
+  const getAssetDisplayType = (asset: AssetData) => {
+    if (asset.asset_type) {
+      return assetTypeLabels[asset.asset_type] || asset.asset_type;
+    }
+    return mapInvestmentType(asset.type, asset.subtype).label_pt;
+  };
 
   const filteredAndSortedAssets = useMemo(() => {
     let filtered = assets.filter((asset) => {
-      const mapped = mapInvestmentType(asset.type, asset.subtype);
-      const matchesFilter =
-        assetFilter === "all" ||
-        assetFilter === "Todos" ||
-        mapped.label_pt === assetFilter;
+      const displayType = getAssetDisplayType(asset);
+      const matchesFilter = assetFilter === "all" || assetFilter === "Todos" || displayType === assetFilter;
 
       const matchesSearch =
         asset.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -81,8 +98,8 @@ const EnhancedAssetTable = ({
       let aValue, bValue;
 
       if (sortField === "mappedType") {
-        aValue = mapInvestmentType(a.type, a.subtype).label_pt;
-        bValue = mapInvestmentType(b.type, b.subtype).label_pt;
+        aValue = getAssetDisplayType(a);
+        bValue = getAssetDisplayType(b);
       } else {
         aValue = a[sortField as keyof AssetData];
         bValue = b[sortField as keyof AssetData];
@@ -126,11 +143,20 @@ const EnhancedAssetTable = ({
     return `${value.toFixed(2)}%`;
   };
 
-  const getAssetTypeColor = (type: string, subtype: string | null) => {
-    const mapped = mapInvestmentType(type, subtype);
-    const mainType =
-      investmentMapping.find((t) => t.type === type)?.label_pt || "Outros";
+  const getAssetTypeColor = (asset: AssetData) => {
+    const displayType = getAssetDisplayType(asset);
 
+    if (asset.asset_type) {
+        switch (asset.asset_type) {
+            case "STOCK": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+            case "FII": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+            case "FIXED_INCOME": return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+            case "CRYPTO": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+            default: return "bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-300";
+        }
+    }
+
+    const mainType = investmentMapping.find((t) => t.type === asset.type)?.label_pt || "Outros";
     switch (mainType) {
       case "Renda Fixa":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
@@ -166,11 +192,11 @@ const EnhancedAssetTable = ({
         "Rentabilidade (%)",
       ].join(","),
       ...filteredAndSortedAssets.map((asset) => {
-        const mapped = mapInvestmentType(asset.type, asset.subtype);
+        const displayType = getAssetDisplayType(asset);
         return [
           asset.symbol,
           asset.name,
-          mapped.label_pt,
+          displayType,
           asset.currentPrice,
           asset.quantity,
           asset.marketValue,
@@ -302,7 +328,7 @@ const EnhancedAssetTable = ({
                 </TableRow>
               ) : (
                 filteredAndSortedAssets.map((asset) => {
-                  const mapped = mapInvestmentType(asset.type, asset.subtype);
+                  const displayType = getAssetDisplayType(asset);
                   return (
                     <TableRow key={asset.symbol} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
@@ -315,12 +341,9 @@ const EnhancedAssetTable = ({
                       </TableCell>
                       <TableCell>
                         <Badge
-                          className={getAssetTypeColor(
-                            asset.type,
-                            asset.subtype,
-                          )}
+                          className={getAssetTypeColor(asset)}
                         >
-                          {mapped.label_pt || "N/A"}
+                          {displayType || "N/A"}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">

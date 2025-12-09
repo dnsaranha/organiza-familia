@@ -1,100 +1,73 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { LucideIcon } from "lucide-react";
-import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
 
 interface FinancialCardProps {
   title: string;
-  value: number;
-  type: "balance" | "income" | "expense";
-  icon: LucideIcon;
+  amount?: number; // Make amount optional
+  isCurrency?: boolean;
+  isPercentage?: boolean;
+  isLoading?: boolean;
+  isPositive?: boolean;
+  isNegative?: boolean;
+  icon?: LucideIcon;
   className?: string;
 }
 
 export const FinancialCard = ({
   title,
-  value,
-  type,
+  amount = 0, // Provide a default value for amount
+  isCurrency = false,
+  isPercentage = false,
+  isLoading = false,
+  isPositive = false,
+  isNegative = false,
   icon: Icon,
   className,
 }: FinancialCardProps) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(amount);
+  const formatValue = (value: number) => {
+    if (isCurrency) {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(value);
+    }
+    if (isPercentage) {
+      return `${value.toFixed(2)}%`;
+    }
+    return value.toString();
   };
 
-  const getCardStyles = () => {
-    switch (type) {
-      case "income":
-        return "bg-gradient-success text-success-foreground shadow-success border-success/20";
-      case "expense":
-        return "bg-gradient-expense text-expense-foreground shadow-expense border-expense/20";
-      default:
-        return "bg-gradient-primary text-primary-foreground shadow-button border-primary/20";
-    }
-  };
+  const valueColor = isPositive
+    ? "text-success"
+    : isNegative
+    ? "text-destructive"
+    : "text-foreground";
 
-  const getValueColor = () => {
-    switch (type) {
-      case "income":
-        return "text-success";
-      case "expense":
-        return "text-expense";
-      default:
-        return "text-foreground";
-    }
-  };
+  if (isLoading) {
+    return (
+      <Card className={cn("w-full", className)}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-8 w-3/4 mt-1" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card
-      className={cn(
-        "relative overflow-hidden transition-smooth hover:scale-105",
-        type !== "balance" ? "bg-gradient-card" : getCardStyles(),
-        "shadow-card border w-full",
-        className,
-      )}
-    >
-      <CardContent className="p-4 sm:p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
-            <p
-              className={cn(
-                "text-xs sm:text-sm font-medium truncate",
-                type === "balance"
-                  ? "text-primary-foreground/80"
-                  : "text-muted-foreground",
-              )}
-            >
-              {title}
-            </p>
-            <p
-              className={cn(
-                "text-lg sm:text-xl md:text-2xl font-bold truncate",
-                type === "balance"
-                  ? "text-primary-foreground"
-                  : getValueColor(),
-              )}
-            >
-              {formatCurrency(value)}
-            </p>
-          </div>
-          <div
-            className={cn(
-              "rounded-full p-2 sm:p-3 ml-2 sm:ml-4 flex-shrink-0",
-              type === "balance" ? "bg-primary-foreground/10" : "bg-muted/50",
-            )}
-          >
-            <Icon
-              className={cn(
-                "h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6",
-                type === "balance"
-                  ? "text-primary-foreground"
-                  : "text-muted-foreground",
-              )}
-            />
-          </div>
+    <Card className={cn("w-full", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+      </CardHeader>
+      <CardContent>
+        <div className={cn("text-2xl font-bold", valueColor)}>
+          {formatValue(amount)}
         </div>
       </CardContent>
     </Card>

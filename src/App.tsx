@@ -20,12 +20,13 @@ import { PWASettings } from "./pages/PWASettings";
 import AppShell from "./components/AppShell";
 import { BudgetScopeProvider } from "./contexts/BudgetScopeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
+import YFinanceTestPage from "./pages/YFinanceTest";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -78,12 +79,23 @@ const App = () => {
           <BudgetScopeProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/success" element={<Success />} />
 
+                {/* Test Route */}
+                <Route
+                  path="/yfinance-test"
+                  element={
+                    <AppShell>
+                      <YFinanceTestPage />
+                    </AppShell>
+                  }
+                />
+
+                {/* App Routes */}
                 <Route
                   path="/"
                   element={
@@ -157,6 +169,7 @@ const App = () => {
                   }
                 />
 
+                {/* Not Found Route */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

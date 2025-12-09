@@ -61,7 +61,7 @@ export const useB3Data = () => {
               "Erro ao buscar cotações via Supabase, usando fallback:",
               error,
             );
-            freshQuotes = await b3Client.getAssetQuotes(symbolsToFetch);
+            freshQuotes = await b3Client.getQuotes(symbolsToFetch);
           } else {
             freshQuotes = data.quotes || [];
           }
@@ -559,7 +559,7 @@ export const useB3Data = () => {
              return {
                symbol: pos.ticker,
                name: yfinanceAsset?.nome || pos.asset_name,
-               type: "MANUAL", // Marker for manual
+               type: pos.asset_type, // Use the asset_type from the manual position
                subtype: null,
                currentPrice,
                quantity: pos.quantity,
@@ -621,18 +621,9 @@ export const useB3Data = () => {
   }, [toast, user]);
 
   // Buscar histórico de dividendos
-  const getDividendHistoryData = useCallback(async (hasManualData: boolean = false) => {
+  const getDividendHistoryData = useCallback(async () => {
     setLoading(true);
     try {
-      // Only return empty array if has manual data, otherwise return mock
-      if (hasManualData) {
-        setDividendHistory([]);
-        return [];
-      }
-
-      // For now, use mock data as Pluggy doesn't provide dividend history directly
-      // In a real implementation, you would need to track dividends separately
-      // or use a different data provider that includes dividend information
       const historyData = await b3Client.getDividendHistoryData();
       setDividendHistory(historyData);
       return historyData;
@@ -643,13 +634,11 @@ export const useB3Data = () => {
         description: "Não foi possível carregar histórico de dividendos.",
         variant: "destructive",
       });
-      const fallbackData = await b3Client.getDividendHistoryData();
-      setDividendHistory(fallbackData);
-      return fallbackData;
+      return [];
     } finally {
       setLoading(false);
     }
-  }, [toast, user]);
+  }, [toast]);
 
   // Buscar dados de benchmark
   const getBenchmarkData = useCallback(

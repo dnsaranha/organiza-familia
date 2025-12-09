@@ -109,6 +109,7 @@ export type Database = {
       investment_transactions: {
         Row: {
           asset_name: string
+          asset_type: string | null
           category: string | null
           created_at: string
           fees: number | null
@@ -125,6 +126,7 @@ export type Database = {
         }
         Insert: {
           asset_name: string
+          asset_type?: string | null
           category?: string | null
           created_at?: string
           fees?: number | null
@@ -141,6 +143,7 @@ export type Database = {
         }
         Update: {
           asset_name?: string
+          asset_type?: string | null
           category?: string | null
           created_at?: string
           fees?: number | null
