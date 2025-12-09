@@ -109,4 +109,61 @@ export const b3Client = {
       return mockDividendHistory;
     }
   },
+
+  // Buscar carteira de investimentos (mock)
+  async getPortfolio(brokerId: string, accessToken: string): Promise<any> {
+    try {
+      // Mock portfolio data
+      return {
+        totalValue: 100000,
+        assets: mockEnhancedAssets,
+      };
+    } catch (error) {
+      console.error("Erro ao buscar carteira:", error);
+      return null;
+    }
+  },
+
+  // Buscar dividendos (mock)
+  async getDividends(
+    brokerId: string,
+    accessToken: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<any[]> {
+    try {
+      // Mock dividends data
+      return mockDividendHistory;
+    } catch (error) {
+      console.error("Erro ao buscar dividendos:", error);
+      return [];
+    }
+  },
+
+  // Buscar ativos (mock)
+  async searchAssets(query: string, assetType?: string): Promise<any[]> {
+    try {
+      // Mock search results
+      return mockEnhancedAssets.filter(
+        (asset) =>
+          asset.symbol.toLowerCase().includes(query.toLowerCase()) ||
+          asset.name.toLowerCase().includes(query.toLowerCase()),
+      );
+    } catch (error) {
+      console.error("Erro ao buscar ativos:", error);
+      return [];
+    }
+  },
+
+  // Buscar detalhes de ativo (mock)
+  async getAssetDetails(symbol: string): Promise<any> {
+    try {
+      // Mock asset details
+      const asset = mockEnhancedAssets.find((a) => a.symbol === symbol);
+      return asset || null;
+    } catch (error) {
+      console.error("Erro ao buscar detalhes do ativo:", error);
+      return null;
+    }
+  },
 };

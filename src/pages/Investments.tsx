@@ -44,10 +44,9 @@ const Investments = () => {
   const totalProfitability = totalCost > 0 ? (totalProfitLoss / totalCost) * 100 : 0;
 
   const handleRefresh = async () => {
-    // O parâmetro `true` força a busca de dados da B3, ignorando o cache
-    await getEnhancedAssetsData(true, true);
-    await getPortfolioEvolutionData("12m", true, true);
-    await getDividendHistoryData(true);
+    await getEnhancedAssetsData(true);
+    await getPortfolioEvolutionData("12m", true);
+    await getDividendHistoryData();
   };
 
   return (
@@ -92,7 +91,7 @@ const Investments = () => {
       </div>
 
       <div className="mb-6">
-        <PortfolioEvolutionChart data={portfolioEvolution} isLoading={loading} />
+        <PortfolioEvolutionChart data={portfolioEvolution} loading={loading} />
       </div>
 
       <div className="mb-6">
@@ -100,11 +99,11 @@ const Investments = () => {
       </div>
 
       <div className="mb-6">
-        <EnhancedAssetTable assets={enhancedAssets} isLoading={loading} />
+        <EnhancedAssetTable assets={enhancedAssets} loading={loading} />
       </div>
 
       <div className="mb-6">
-        <DividendHistoryChart data={dividendHistory} isLoading={loading} />
+        <DividendHistoryChart data={dividendHistory} loading={loading} />
       </div>
     </div>
   );

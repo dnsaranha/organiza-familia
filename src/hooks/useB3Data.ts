@@ -643,7 +643,7 @@ export const useB3Data = () => {
   // Buscar dados de benchmark
   const getBenchmarkData = useCallback(
     async (benchmark: string = "CDI") => {
-      setLoading.ts
+      setLoading(true);
       try {
         const data = await b3Client.getBenchmarkData(benchmark);
         setBenchmarkData(data);

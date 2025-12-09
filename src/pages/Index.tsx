@@ -43,7 +43,7 @@ const Index = () => {
     accounts,
     transactions: bankTransactions,
     loading: bankLoading,
-    refetch: refetchBankData,
+    refreshAllData: refetchBankData,
   } = useOpenBanking();
 
   useEffect(() => {
