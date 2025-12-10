@@ -135,7 +135,7 @@ export function ManualInvestmentTransactions({
   }, [editingTransaction]);
 
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, ticker?: string) => {
     try {
       const { error } = await supabase
         .from("investment_transactions")
@@ -179,6 +179,82 @@ export function ManualInvestmentTransactions({
     }));
   };
 
+  // Função para buscar e salvar dados do yfinance para um ticker
+  const fetchAndSaveYfinanceData = async (ticker: string) => {
+    try {
+      // Formatar ticker para yfinance
+      const yfinanceTicker = ticker.match(/^[A-Z]{4}\d{1,2}$/) 
+        ? `${ticker}.SA` 
+        : (ticker.endsWith(".SA") ? ticker : `${ticker}.SA`);
+
+      // Verificar se já existe no banco
+      const { data: existing } = await supabase
+        .from("financial_assets")
+        .select("ticker")
+        .eq("ticker", yfinanceTicker)
+        .single();
+
+      if (existing) {
+        console.log(`Ativo ${yfinanceTicker} já existe no banco.`);
+        return;
+      }
+
+      // Buscar dados via Edge Function
+      const { data, error } = await supabase.functions.invoke("yfinance-data", {
+        body: { tickers: [yfinanceTicker] },
+      });
+
+      if (error) throw error;
+
+      if (data?.assets && data.assets.length > 0) {
+        const asset = data.assets[0];
+        
+        // Salvar no banco usando a função bulk_upsert_assets
+        const assetData = [{
+          ticker: asset.ticker,
+          name: asset.nome,
+          sector: asset.setor,
+          current_price: asset.preco_atual,
+          dividends_12m: asset.dividendos_12m,
+          price_history: asset.historico_precos,
+          dividend_history: asset.historico_dividendos
+        }];
+
+        await supabase.rpc("bulk_upsert_assets", {
+          assets_data: assetData
+        });
+
+        console.log(`Dados do ativo ${yfinanceTicker} salvos com sucesso.`);
+      }
+    } catch (err) {
+      console.warn(`Erro ao buscar dados yfinance para ${ticker}:`, err);
+    }
+  };
+
+  // Função para verificar e limpar dados de ativos não utilizados
+  const cleanupUnusedAssetData = async (deletedTicker: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Verificar se ainda existem transações com este ticker
+      const { data: remainingTransactions } = await supabase
+        .from("investment_transactions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("ticker", deletedTicker)
+        .limit(1);
+
+      // Se não houver mais transações com este ticker, podemos manter os dados
+      // pois outros usuários podem usar. Mas registramos o log.
+      if (!remainingTransactions || remainingTransactions.length === 0) {
+        console.log(`Nenhuma transação restante para ${deletedTicker}. Dados mantidos no financial_assets para outros usuários.`);
+      }
+    } catch (err) {
+      console.warn(`Erro ao verificar cleanup para ${deletedTicker}:`, err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -218,6 +294,11 @@ export function ManualInvestmentTransactions({
           .from("investment_transactions")
           .insert([dataToSubmit]);
         error = insertError;
+
+        // Se é uma nova transação, buscar dados do yfinance em background
+        if (!insertError) {
+          fetchAndSaveYfinanceData(dataToSubmit.ticker);
+        }
       }
 
       if (error) throw error;
