@@ -620,11 +620,49 @@ export const useB3Data = () => {
     }
   }, [toast, user]);
 
-  // Buscar histórico de dividendos
+  // Buscar histórico de dividendos dos ativos do usuário
   const getDividendHistoryData = useCallback(async () => {
     setLoading(true);
     try {
-      const historyData = await b3Client.getDividendHistoryData();
+      if (!user) {
+        setDividendHistory([]);
+        return [];
+      }
+
+      // 1. Buscar transações manuais do usuário para obter os tickers
+      const { data: manualTransactions } = await supabase
+        .from("investment_transactions")
+        .select("ticker")
+        .eq("user_id", user.id);
+
+      if (!manualTransactions || manualTransactions.length === 0) {
+        setDividendHistory([]);
+        return [];
+      }
+
+      // 2. Obter tickers únicos
+      const uniqueTickers = [...new Set(
+        manualTransactions.map(t => {
+          const ticker = t.ticker;
+          if (ticker.match(/^[A-Z]{4}\d{1,2}$/)) return `${ticker}.SA`;
+          return ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+        })
+      )];
+
+      // 3. Buscar dados de dividendos do financial_assets
+      const { data: assetsData, error } = await supabase
+        .from("financial_assets")
+        .select("ticker, dividend_history")
+        .in("ticker", uniqueTickers);
+
+      if (error) throw error;
+
+      // 4. Formatar os dados para o componente
+      const historyData = (assetsData || []).map(asset => ({
+        ticker: asset.ticker,
+        dividendHistory: (asset.dividend_history as any[]) || []
+      }));
+
       setDividendHistory(historyData);
       return historyData;
     } catch (error) {
@@ -638,7 +676,7 @@ export const useB3Data = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, user]);
 
   // Buscar dados de benchmark
   const getBenchmarkData = useCallback(
