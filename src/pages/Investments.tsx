@@ -3,6 +3,7 @@ import { useB3Data } from "@/hooks/useB3Data";
 import EnhancedAssetTable from "@/components/EnhancedAssetTable";
 import PortfolioEvolutionChart from "@/components/charts/PortfolioEvolutionChart";
 import DividendHistoryChart from "@/components/charts/DividendHistoryChart";
+import { DividendMonthlyTable } from "@/components/DividendMonthlyTable";
 import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,11 @@ const Investments = () => {
       </div>
 
       <div className="mb-6">
-        <DividendHistoryChart data={dividendHistory} loading={loading} />
+        <DividendMonthlyTable assetsData={dividendHistory} loading={loading} />
+      </div>
+
+      <div className="mb-6">
+        <DividendHistoryChart data={[]} loading={loading} />
       </div>
     </div>
   );
