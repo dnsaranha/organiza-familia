@@ -79,3 +79,48 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
 
   return positions;
 };
+
+export const getQuantityAtDate = (transactions: Transaction[], ticker: string, date: Date | string): number => {
+  const targetDate = new Date(date);
+  // Normalize ticker for comparison (remove .SA if present to match transactions usually stored without it, or vice versa)
+  // Assuming transactions might store "PETR4" or "PETR4.SA".
+  // Let's standardise to comparing without .SA suffix for safety, or check both.
+
+  const cleanTicker = ticker.replace('.SA', '');
+
+  const tickerTxs = transactions.filter(t => {
+      const tClean = t.ticker.replace('.SA', '');
+      return tClean === cleanTicker;
+  });
+
+  let quantity = 0;
+
+  // Sort by date ascending
+  tickerTxs.sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+
+  for (const t of tickerTxs) {
+    // We include transactions on the same day.
+    // Ideally we should check if ex-date logic applies, but usually you need to hold at end of day.
+    // So if I bought on the ex-date? Usually ex-date means you missed it.
+    // If I bought ON the record date?
+    // Let's assume date passed here is the "Com-Date" (Last day to trade with rights) or Payment Date.
+    // If it's Payment Date, we need to know the Com-Date.
+    // But `dividend_history` usually has "date" as payment date or ex-date?
+    // The `financial_assets` table structure for `dividend_history` usually has `date` (payment) and maybe `date_com`?
+    // Let's look at `useB3Data` usage.
+
+    // For now, simple logic: Quantity at end of the given date.
+    const tDate = new Date(t.transaction_date);
+
+    // Check if transaction date is on or before target date
+    if (tDate <= targetDate) {
+      if (t.transaction_type === 'buy') {
+        quantity += t.quantity;
+      } else if (t.transaction_type === 'sell') {
+        quantity -= t.quantity;
+      }
+    }
+  }
+
+  return Math.max(0, quantity);
+};

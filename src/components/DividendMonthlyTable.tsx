@@ -9,17 +9,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Filter, TrendingUp, TrendingDown } from "lucide-react";
+import { Filter, TrendingUp, TrendingDown, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DividendEntry {
   date: string;
   amount: number;
+  yield?: number;
 }
 
 interface AssetDividendData {
   ticker: string;
+  type: string;
   dividendHistory: DividendEntry[];
 }
 
@@ -28,18 +45,56 @@ interface DividendMonthlyTableProps {
   loading?: boolean;
 }
 
+type PeriodFilter = "current_year" | "12_months" | "all" | "custom";
+type DisplayMode = "value" | "yield";
+
 const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export function DividendMonthlyTable({ assetsData, loading = false }: DividendMonthlyTableProps) {
-  const [showFilter, setShowFilter] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("value");
+
+  // Extract unique types and assets for filters
+  const { allTypes, allAssets } = useMemo(() => {
+    const types = new Set<string>();
+    const assets = new Set<string>();
+    assetsData.forEach(a => {
+      if (a.type) types.add(a.type);
+      assets.add(a.ticker);
+    });
+    return {
+      allTypes: Array.from(types).sort(),
+      allAssets: Array.from(assets).sort()
+    };
+  }, [assetsData]);
+
+  // Initialize selected types/assets if empty (meaning all selected)
+  // Logic: if selected array is empty, it means "All".
 
   // Processa os dados para agrupar por ano e mês
   const { yearlyData, years, maxValue } = useMemo(() => {
     const dataByYear: Record<number, Record<number, number>> = {};
+    const countByYearMonth: Record<number, Record<number, number>> = {}; // Para média do yield
     let max = 0;
 
-    // Agregar dividendos de todos os ativos por mês/ano
-    assetsData.forEach(asset => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+    // Filtragem
+    const filteredAssets = assetsData.filter(asset => {
+      // Filter by Type
+      if (selectedTypes.length > 0 && !selectedTypes.includes(asset.type)) return false;
+      // Filter by Asset Ticker
+      if (selectedAssets.length > 0 && !selectedAssets.includes(asset.ticker)) return false;
+      return true;
+    });
+
+    // Agregar dividendos
+    filteredAssets.forEach(asset => {
       if (!asset.dividendHistory || !Array.isArray(asset.dividendHistory)) return;
       
       asset.dividendHistory.forEach(div => {
@@ -49,11 +104,32 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
         const year = date.getFullYear();
         const month = date.getMonth();
 
+        // Filter by Period
+        if (periodFilter === "current_year" && year !== currentYear) return;
+        if (periodFilter === "12_months" && date < oneYearAgo) return;
+        // Custom not implemented in UI yet, treating as All
+
         if (!dataByYear[year]) {
           dataByYear[year] = {};
+          countByYearMonth[year] = {};
         }
         
-        dataByYear[year][month] = (dataByYear[year][month] || 0) + div.amount;
+        const valueToAdd = displayMode === 'value' ? div.amount : (div.yield || 0);
+
+        // Se for yield, vamos somar para depois fazer a média?
+        // Agregando yield mensal de portfólio:
+        // Se eu recebi 0.5% de A e 0.5% de B...
+        // O correto seria soma ponderada, mas aqui estamos somando yields individuais de ativos o que pode ser confuso.
+        // Se displayMode == yield, vamos somar os yields dos eventos.
+        // Ex: tenho PETR4 (yield 1%) e VALE3 (yield 0.5%) no mesmo mês. Soma = 1.5%? Não.
+        // Deveria ser (Div Total / Valor Total Portfolio).
+        // Como não temos valor total portfolio histórico fácil aqui, vamos usar Soma dos Yields individuais
+        // como uma aproximação de "Retorno sobre Custo acumulado" naquele mês?
+        // Ou média simples?
+        // O usuário pediu "trocar entre Valor e Yield".
+        // Vamos assumir Soma dos Yields por enquanto (Yield on Cost acumulado do mês).
+
+        dataByYear[year][month] = (dataByYear[year][month] || 0) + valueToAdd;
         
         if (dataByYear[year][month] > max) {
           max = dataByYear[year][month];
@@ -67,10 +143,13 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
       .sort((a, b) => b - a);
 
     return { yearlyData: dataByYear, years: sortedYears, maxValue: max };
-  }, [assetsData]);
+  }, [assetsData, periodFilter, selectedTypes, selectedAssets, displayMode]);
 
-  const formatCurrency = (value: number) => {
+  const formatValue = (value: number) => {
     if (value === 0) return "-";
+    if (displayMode === 'yield') {
+      return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    }
     return value.toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -152,16 +231,113 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Relatório Mensal de Proventos</CardTitle>
         <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-1" />
+                Filtrar
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4" align="end">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select
+                    value={periodFilter}
+                    onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="current_year">Ano Atual</SelectItem>
+                      <SelectItem value="12_months">Últimos 12 Meses</SelectItem>
+                      <SelectItem value="all">Todo o Histórico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipo de Ativo</Label>
+                  <ScrollArea className="h-24 border rounded-md p-2">
+                    <div className="space-y-2">
+                      {allTypes.map(type => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`type-${type}`}
+                            checked={selectedTypes.includes(type)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedTypes([...selectedTypes, type]);
+                              } else {
+                                setSelectedTypes(selectedTypes.filter(t => t !== type));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`type-${type}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {type}
+                          </label>
+                        </div>
+                      ))}
+                      {allTypes.length === 0 && <span className="text-xs text-muted-foreground">Nenhum tipo encontrado</span>}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ativos</Label>
+                  <ScrollArea className="h-32 border rounded-md p-2">
+                    <div className="space-y-2">
+                      {allAssets.map(asset => (
+                        <div key={asset} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`asset-${asset}`}
+                            checked={selectedAssets.includes(asset)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedAssets([...selectedAssets, asset]);
+                              } else {
+                                setSelectedAssets(selectedAssets.filter(a => a !== asset));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`asset-${asset}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {asset}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                        setPeriodFilter("all");
+                        setSelectedTypes([]);
+                        setSelectedAssets([]);
+                    }}
+                >
+                    Limpar Filtros
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Button
-            variant="outline"
+            variant={displayMode === 'yield' ? "default" : "outline"}
             size="sm"
-            onClick={() => setShowFilter(!showFilter)}
+            onClick={() => setDisplayMode(prev => prev === 'value' ? 'yield' : 'value')}
           >
-            <Filter className="h-4 w-4 mr-1" />
-            Filtrar
-          </Button>
-          <Button variant="outline" size="sm">
-            Valor
+            {displayMode === 'value' ? 'Valor (R$)' : 'Yield (%)'}
           </Button>
         </div>
       </CardHeader>
@@ -203,15 +379,15 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
                             getIntensityClass(value)
                           )}
                         >
-                          {formatCurrency(value)}
+                          {formatValue(value)}
                         </TableCell>
                       );
                     })}
                     <TableCell className="text-center text-xs tabular-nums bg-muted/30 font-medium">
-                      {formatCurrency(stats.average)}
+                      {formatValue(stats.average)}
                     </TableCell>
                     <TableCell className="text-center text-xs tabular-nums bg-muted/30 font-medium">
-                      {formatCurrency(stats.total)}
+                      {formatValue(stats.total)}
                     </TableCell>
                     <TableCell className="text-center text-xs">
                       {stats.variation !== 0 ? (

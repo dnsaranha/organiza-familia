@@ -4,7 +4,7 @@ import { B3Asset, B3Portfolio, B3Dividend } from "@/lib/open-banking/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
+import { calculateManualPositions, getQuantityAtDate, Transaction } from "@/lib/finance-utils";
 
 export const useB3Data = () => {
   const [assets, setAssets] = useState<B3Asset[]>([]);
@@ -629,10 +629,10 @@ export const useB3Data = () => {
         return [];
       }
 
-      // 1. Buscar transações manuais do usuário para obter os tickers
+      // 1. Buscar todas as transações manuais do usuário
       const { data: manualTransactions } = await supabase
         .from("investment_transactions")
-        .select("ticker")
+        .select("*")
         .eq("user_id", user.id);
 
       if (!manualTransactions || manualTransactions.length === 0) {
@@ -649,19 +649,54 @@ export const useB3Data = () => {
         })
       )];
 
-      // 3. Buscar dados de dividendos do financial_assets
+      // 3. Buscar dados de dividendos e preços do financial_assets
       const { data: assetsData, error } = await supabase
         .from("financial_assets")
-        .select("ticker, dividend_history")
+        .select("ticker, type, dividend_history, price_history")
         .in("ticker", uniqueTickers);
 
       if (error) throw error;
 
       // 4. Formatar os dados para o componente
-      const historyData = (assetsData || []).map(asset => ({
-        ticker: asset.ticker,
-        dividendHistory: (asset.dividend_history as any[]) || []
-      }));
+      const historyData = (assetsData || []).map(asset => {
+        const dividendHistory = (asset.dividend_history as any[]) || [];
+        const priceHistory = (asset.price_history as any[]) || [];
+
+        const enhancedHistory = dividendHistory.map(div => {
+           // Calcular quantidade na data do dividendo
+           const qty = getQuantityAtDate(manualTransactions as Transaction[], asset.ticker, div.date);
+
+           if (qty <= 0) return null; // Se não tinha posição, não recebe
+
+           // Encontrar preço na data (ou mais próximo antes) para cálculo de Yield
+           // O price_history pode não ter a data exata. Pegar o mais próximo <= data dividendo
+           const divDate = new Date(div.date).getTime();
+
+           // Ordenar histórico de preços decrescente para achar o mais recente <= divDate
+           // Assumindo que priceHistory pode não estar ordenado
+           const sortedPrices = [...priceHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+           const priceEntry = sortedPrices.find(p => new Date(p.date).getTime() <= divDate);
+           const price = priceEntry?.close || 0;
+
+           const totalReceived = div.amount * qty;
+           const yieldVal = price > 0 ? (div.amount / price) * 100 : 0;
+
+           return {
+             date: div.date,
+             amount: totalReceived,
+             amountPerShare: div.amount,
+             quantity: qty,
+             price: price,
+             yield: yieldVal
+           };
+        }).filter(Boolean); // Remover nulos
+
+        return {
+          ticker: asset.ticker,
+          type: asset.type || 'Ação', // Fallback type
+          dividendHistory: enhancedHistory
+        };
+      });
 
       setDividendHistory(historyData);
       return historyData;
