@@ -16,6 +16,8 @@ import InvestmentsPage from "./pages/Investments";
 import NotificationSettingsPage from "./pages/NotificationSettings";
 import OpenFinanceConnectPage from "./pages/OpenFinanceConnect";
 import TasksPage from "./pages/Tasks";
+import GoalsPage from "./pages/Goals";
+import ForecastPage from "./pages/Forecast";
 import { PWASettings } from "./pages/PWASettings";
 import AppShell from "./components/AppShell";
 import { BudgetScopeProvider } from "./contexts/BudgetScopeContext";
@@ -157,6 +159,22 @@ const App = () => {
                   element={
                     <AppShell>
                       <TasksPage />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/goals"
+                  element={
+                    <AppShell>
+                      <GoalsPage />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/forecast"
+                  element={
+                    <AppShell>
+                      <ForecastPage />
                     </AppShell>
                   }
                 />
