@@ -23,6 +23,7 @@ import AppShell from "./components/AppShell";
 import { BudgetScopeProvider } from "./contexts/BudgetScopeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import YFinanceTestPage from "./pages/YFinanceTest";
+import BudgetPage from "./pages/Budget"; // Importa a nova página
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,6 +112,14 @@ const App = () => {
                   element={
                     <AppShell>
                       <Profile />
+                    </AppShell>
+                  }
+                />
+                 <Route
+                  path="/budget"
+                  element={
+                    <AppShell>
+                      <BudgetPage />
                     </AppShell>
                   }
                 />

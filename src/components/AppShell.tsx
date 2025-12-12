@@ -14,6 +14,7 @@ import {
   CheckSquare,
   Target,
   CalendarDays,
+  PieChart, // Ícone adicionado
 } from "lucide-react";
 
 import {
@@ -83,6 +84,9 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <NavLink to="/goals">Metas</NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/budget">Orçamento</NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <NavLink to="/forecast">Previsões</NavLink>
@@ -203,6 +207,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <SidebarMenuButton isActive={isActive}>
                       <Target className="size-4" />
                       <span>Metas</span>
+                    </SidebarMenuButton>
+                  )}
+                </NavLink>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <NavLink to="/budget" className="w-full">
+                  {({ isActive }) => (
+                    <SidebarMenuButton isActive={isActive}>
+                      <PieChart className="size-4" />
+                      <span>Orçamento</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
