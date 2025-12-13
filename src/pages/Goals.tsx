@@ -10,28 +10,31 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, GraduationCap, Heart, ChevronDown, ChevronUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, GraduationCap, Heart, ChevronDown, ChevronUp, CalendarClock, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, addMonths, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 
 interface Goal {
-  id: string; user_id: string; group_id: string | null; title: string; description: string | null; target_amount: number; current_amount: number; deadline: string | null; category: string; icon: string; color: string; created_at: string; updated_at: string;
+  id: string; user_id: string; group_id: string | null; title: string; description: string | null; target_amount: number; current_amount: number; deadline: string | null; category: string; icon: string; color: string; created_at: string; updated_at: string; monthly_contribution: number | null;
 }
 
 interface HistoryData {
     date: string;
+    rawDate: Date;
     value: number;
     cumulative: number;
+    target?: number;
+    trend?: number;
 }
 
 const GOAL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = { wallet: Wallet, piggy: PiggyBank, car: Car, home: Home, plane: Plane, education: GraduationCap, health: Heart, target: Target };
 const GOAL_COLORS = [ { name: "Azul", value: "hsl(var(--primary))" }, { name: "Verde", value: "hsl(142, 76%, 36%)" }, { name: "Roxo", value: "hsl(262, 83%, 58%)" }, { name: "Laranja", value: "hsl(25, 95%, 53%)" }, { name: "Rosa", value: "hsl(330, 81%, 60%)" }, { name: "Ciano", value: "hsl(186, 94%, 41%)" } ];
 const GOAL_CATEGORIES = [ "Reserva de Emergência", "Viagem", "Veículo", "Imóvel", "Educação", "Saúde", "Aposentadoria", "Outro" ];
 
-const GoalHistoryChart = ({ goalId, color }: { goalId: string, color: string }) => {
+const GoalHistoryChart = ({ goalId, color, targetAmount, currentAmount, monthlyContribution }: { goalId: string, color: string, targetAmount: number, currentAmount: number, monthlyContribution: number | null }) => {
     const [historyData, setHistoryData] = useState<HistoryData[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -41,11 +44,70 @@ const GoalHistoryChart = ({ goalId, color }: { goalId: string, color: string }) 
             try {
                 const { data, error } = await supabase.from('transactions').select('date, amount').eq('goal_id', goalId).order('date', { ascending: true });
                 if (error) throw error;
+                
                 let cumulativeAmount = 0;
-                const processedData = data.map(tx => {
+                const processedData: HistoryData[] = data.map(tx => {
                     cumulativeAmount += tx.amount;
-                    return { date: format(new Date(tx.date), 'dd/MM'), value: tx.amount, cumulative: cumulativeAmount };
+                    return { 
+                        date: format(new Date(tx.date), 'MM/yy'), 
+                        rawDate: new Date(tx.date),
+                        value: tx.amount, 
+                        cumulative: cumulativeAmount,
+                        target: targetAmount
+                    };
                 });
+
+                // Add trend projection if we have contribution data
+                if (processedData.length > 0 && monthlyContribution && monthlyContribution > 0) {
+                    const lastDataPoint = processedData[processedData.length - 1];
+                    const remaining = targetAmount - lastDataPoint.cumulative;
+                    const monthsToGoal = Math.ceil(remaining / monthlyContribution);
+                    
+                    // Add future projections
+                    let projectedAmount = lastDataPoint.cumulative;
+                    for (let i = 1; i <= Math.min(monthsToGoal, 24); i++) {
+                        projectedAmount += monthlyContribution;
+                        if (projectedAmount >= targetAmount) projectedAmount = targetAmount;
+                        const futureDate = addMonths(lastDataPoint.rawDate, i);
+                        processedData.push({
+                            date: format(futureDate, 'MM/yy'),
+                            rawDate: futureDate,
+                            value: 0,
+                            cumulative: lastDataPoint.cumulative,
+                            target: targetAmount,
+                            trend: projectedAmount
+                        });
+                        if (projectedAmount >= targetAmount) break;
+                    }
+                } else if (processedData.length >= 2) {
+                    // Calculate average contribution rate for trend
+                    const firstPoint = processedData[0];
+                    const lastPoint = processedData[processedData.length - 1];
+                    const monthsDiff = Math.max(1, differenceInMonths(lastPoint.rawDate, firstPoint.rawDate));
+                    const avgMonthlyRate = lastPoint.cumulative / monthsDiff;
+                    
+                    if (avgMonthlyRate > 0) {
+                        const remaining = targetAmount - lastPoint.cumulative;
+                        const monthsToGoal = Math.ceil(remaining / avgMonthlyRate);
+                        
+                        let projectedAmount = lastPoint.cumulative;
+                        for (let i = 1; i <= Math.min(monthsToGoal, 24); i++) {
+                            projectedAmount += avgMonthlyRate;
+                            if (projectedAmount >= targetAmount) projectedAmount = targetAmount;
+                            const futureDate = addMonths(lastPoint.rawDate, i);
+                            processedData.push({
+                                date: format(futureDate, 'MM/yy'),
+                                rawDate: futureDate,
+                                value: 0,
+                                cumulative: lastPoint.cumulative,
+                                target: targetAmount,
+                                trend: projectedAmount
+                            });
+                            if (projectedAmount >= targetAmount) break;
+                        }
+                    }
+                }
+                
                 setHistoryData(processedData);
             } catch (error: any) {
                 console.error("Error fetching goal history:", error);
@@ -55,27 +117,41 @@ const GoalHistoryChart = ({ goalId, color }: { goalId: string, color: string }) 
             }
         };
         fetchHistory();
-    }, [goalId]);
+    }, [goalId, targetAmount, monthlyContribution]);
 
     if (loading) return <div className="h-24 flex items-center justify-center text-sm">Carregando gráfico...</div>;
     if (historyData.length === 0) return <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">Nenhum histórico de contribuição.</div>;
 
+    const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value);
+
     return (
-        <div className="h-40 w-full mt-4">
+        <div className="h-48 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={historyData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <ComposedChart data={historyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
                     <defs>
                         <linearGradient id={`colorCumulative-${goalId}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                            <stop offset="95%" stopColor={color} stopOpacity={0.1}/>
                         </linearGradient>
                     </defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                    <Tooltip contentStyle={{ fontSize: '12px', borderRadius: '0.5rem' }} formatter={(value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)} />
-                    <Area type="monotone" dataKey="cumulative" stroke={color} fillOpacity={1} fill={`url(#colorCumulative-${goalId})`} strokeWidth={2} name="Acumulado" />
-                </AreaChart>
+                    <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value)} domain={[0, targetAmount * 1.1]} />
+                    <Tooltip 
+                        contentStyle={{ fontSize: '12px', borderRadius: '0.5rem', backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} 
+                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'cumulative' ? 'Acumulado' : name === 'trend' ? 'Projeção' : 'Meta']} 
+                    />
+                    <ReferenceLine y={targetAmount} stroke="hsl(var(--destructive))" strokeDasharray="5 5" strokeWidth={2} label={{ value: 'Meta', position: 'right', fontSize: 10, fill: 'hsl(var(--destructive))' }} />
+                    <Area type="monotone" dataKey="cumulative" stroke={color} fillOpacity={1} fill={`url(#colorCumulative-${goalId})`} strokeWidth={2} name="cumulative" />
+                    <Line type="monotone" dataKey="trend" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} name="trend" />
+                </ComposedChart>
             </ResponsiveContainer>
+            {historyData.some(d => d.trend) && (
+                <p className="text-xs text-muted-foreground text-center mt-1 flex items-center justify-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    Projeção: meta atingida em {historyData.filter(d => d.trend && d.trend >= targetAmount)[0]?.date || 'N/A'}
+                </p>
+            )}
         </div>
     );
 };
@@ -92,7 +168,7 @@ export default function GoalsPage() {
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))",
+    title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))", monthly_contribution: "", auto_contribution: false,
   });
 
   useEffect(() => { if (user) { fetchGoals(); } }, [user, scope]);
@@ -116,16 +192,73 @@ export default function GoalsPage() {
     if (!user) return;
     if (!formData.title || !formData.target_amount) { toast.error("Preencha o título e valor da meta"); return; }
     try {
-      const goalData = { user_id: user.id, group_id: scope === "personal" ? null : scope, title: formData.title, description: formData.description || null, target_amount: parseFloat(formData.target_amount), current_amount: parseFloat(formData.current_amount) || 0, deadline: formData.deadline || null, category: formData.category, icon: formData.icon, color: formData.color };
+      const monthlyContribution = formData.monthly_contribution ? parseFloat(formData.monthly_contribution) : null;
+      const goalData = { 
+        user_id: user.id, 
+        group_id: scope === "personal" ? null : scope, 
+        title: formData.title, 
+        description: formData.description || null, 
+        target_amount: parseFloat(formData.target_amount), 
+        current_amount: parseFloat(formData.current_amount) || 0, 
+        deadline: formData.deadline || null, 
+        category: formData.category, 
+        icon: formData.icon, 
+        color: formData.color,
+        monthly_contribution: monthlyContribution
+      };
+      
+      let goalId = editingGoal?.id;
+      
       if (editingGoal) {
         const { error } = await supabase.from("savings_goals").update(goalData).eq("id", editingGoal.id);
         if (error) throw error;
+        
+        // Delete existing auto contribution task if auto_contribution is disabled
+        if (!formData.auto_contribution) {
+          await supabase.from("scheduled_tasks").delete().eq("description", `Auto-contribuição: ${editingGoal.title}`).eq("user_id", user.id);
+        }
+        
         toast.success("Meta atualizada!");
       } else {
-        const { error } = await supabase.from("savings_goals").insert(goalData);
+        const { data, error } = await supabase.from("savings_goals").insert(goalData).select().single();
         if (error) throw error;
+        goalId = data.id;
         toast.success("Meta criada!");
       }
+      
+      // Create/Update scheduled task for auto contribution
+      if (formData.auto_contribution && monthlyContribution && monthlyContribution > 0 && goalId) {
+        const taskDescription = `Auto-contribuição: ${formData.title}`;
+        
+        // Check if task already exists
+        const { data: existingTask } = await supabase.from("scheduled_tasks")
+          .select("id")
+          .eq("description", taskDescription)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        
+        const taskData = {
+          user_id: user.id,
+          group_id: scope === "personal" ? null : scope,
+          title: `Contribuição: ${formData.title}`,
+          description: taskDescription,
+          task_type: "expense",
+          value: monthlyContribution,
+          schedule_date: new Date().toISOString(),
+          is_recurring: true,
+          recurrence_pattern: "monthly",
+          recurrence_interval: 1,
+          category: "Metas",
+        };
+        
+        if (existingTask) {
+          await supabase.from("scheduled_tasks").update(taskData).eq("id", existingTask.id);
+        } else {
+          await supabase.from("scheduled_tasks").insert(taskData);
+        }
+        toast.success("Tarefa de contribuição automática criada!");
+      }
+      
       setIsDialogOpen(false); setEditingGoal(null); resetForm(); fetchGoals();
     } catch (error: any) { console.error("Error saving goal:", error); toast.error("Erro ao salvar meta"); }
   };
@@ -156,8 +289,30 @@ export default function GoalsPage() {
     } catch (error: any) { console.error("Error adding value to goal:", error); toast.error("Erro ao adicionar valor."); }
   };
 
-  const resetForm = () => setFormData({ title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))" });
-  const openEditDialog = (goal: Goal) => { setEditingGoal(goal); setFormData({ title: goal.title, description: goal.description || "", target_amount: goal.target_amount.toString(), current_amount: goal.current_amount.toString(), deadline: goal.deadline || "", category: goal.category, icon: goal.icon, color: goal.color, }); setIsDialogOpen(true); };
+  const resetForm = () => setFormData({ title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))", monthly_contribution: "", auto_contribution: false });
+  const openEditDialog = async (goal: Goal) => { 
+    // Check if auto contribution task exists
+    const { data: existingTask } = await supabase.from("scheduled_tasks")
+      .select("id")
+      .eq("description", `Auto-contribuição: ${goal.title}`)
+      .eq("user_id", goal.user_id)
+      .maybeSingle();
+    
+    setEditingGoal(goal); 
+    setFormData({ 
+      title: goal.title, 
+      description: goal.description || "", 
+      target_amount: goal.target_amount.toString(), 
+      current_amount: goal.current_amount.toString(), 
+      deadline: goal.deadline || "", 
+      category: goal.category, 
+      icon: goal.icon, 
+      color: goal.color, 
+      monthly_contribution: goal.monthly_contribution?.toString() || "",
+      auto_contribution: !!existingTask
+    }); 
+    setIsDialogOpen(true); 
+  };
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   const getProgress = (current: number, target: number) => target === 0 ? 0 : Math.min((current / target) * 100, 100);
 
@@ -182,6 +337,18 @@ export default function GoalsPage() {
                 <div><Label>Valor Atual (R$)</Label><Input type="number" value={formData.current_amount} onChange={(e) => setFormData({ ...formData, current_amount: e.target.value })} placeholder="0"/></div>
               </div>
               <div><Label>Data Limite</Label><Input type="date" value={formData.deadline} onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}/></div>
+              <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-primary" />
+                  <Label className="font-medium">Contribuição Automática</Label>
+                </div>
+                <div><Label className="text-sm text-muted-foreground">Valor mensal (R$)</Label><Input type="number" value={formData.monthly_contribution} onChange={(e) => setFormData({ ...formData, monthly_contribution: e.target.value })} placeholder="500"/></div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Criar tarefa automática</Label>
+                  <Switch checked={formData.auto_contribution} onCheckedChange={(checked) => setFormData({ ...formData, auto_contribution: checked })} />
+                </div>
+                <p className="text-xs text-muted-foreground">Ao ativar, será criada uma tarefa recorrente mensal para lembrar da contribuição.</p>
+              </div>
               <div><Label>Categoria</Label><Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{GOAL_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select></div>
               <div><Label>Ícone</Label><div className="flex gap-2 flex-wrap mt-2">{Object.entries(GOAL_ICONS).map(([key, Icon]) => (<Button key={key} type="button" variant={formData.icon === key ? "default" : "outline"} size="icon" onClick={() => setFormData({ ...formData, icon: key })}><Icon className="h-4 w-4" /></Button>))}</div></div>
               <div><Label>Cor</Label><div className="flex gap-2 flex-wrap mt-2">{GOAL_COLORS.map((color) => (<Button key={color.value} type="button" variant="outline" size="icon" className="relative" style={{ backgroundColor: color.value }} onClick={() => setFormData({ ...formData, color: color.value })}>{formData.color === color.value && (<div className="absolute inset-0 flex items-center justify-center"><div className="w-2 h-2 bg-white rounded-full" /></div>)}</Button>))}</div></div>
@@ -229,7 +396,13 @@ export default function GoalsPage() {
                     <div className="flex justify-between text-xs text-muted-foreground"><span>{progress.toFixed(1)}% completo</span><span>Faltam {formatCurrency(remaining > 0 ? remaining : 0)}</span></div>
                   </div>
                   {goal.deadline && (<p className="text-xs text-muted-foreground">Prazo: {format(new Date(goal.deadline), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>)}
-                  {isExpanded && <GoalHistoryChart goalId={goal.id} color={goal.color} />}
+                  {goal.monthly_contribution && goal.monthly_contribution > 0 && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CalendarClock className="h-3 w-3" />
+                      Contribuição mensal: {formatCurrency(goal.monthly_contribution)}
+                    </p>
+                  )}
+                  {isExpanded && <GoalHistoryChart goalId={goal.id} color={goal.color} targetAmount={goal.target_amount} currentAmount={goal.current_amount} monthlyContribution={goal.monthly_contribution} />}
                   <div className="flex-grow" />
                   <div className="mt-auto pt-4">
                     {isAddingValue === goal.id ? (

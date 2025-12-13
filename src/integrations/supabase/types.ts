@@ -317,6 +317,7 @@ export type Database = {
           group_id: string | null
           icon: string
           id: string
+          monthly_contribution: number | null
           target_amount: number
           title: string
           updated_at: string
@@ -332,6 +333,7 @@ export type Database = {
           group_id?: string | null
           icon?: string
           id?: string
+          monthly_contribution?: number | null
           target_amount?: number
           title: string
           updated_at?: string
@@ -347,6 +349,7 @@ export type Database = {
           group_id?: string | null
           icon?: string
           id?: string
+          monthly_contribution?: number | null
           target_amount?: number
           title?: string
           updated_at?: string
@@ -573,6 +576,7 @@ export type Database = {
           created_at: string
           date: string
           description: string | null
+          goal_id: string | null
           group_id: string | null
           id: string
           type: Database["public"]["Enums"]["transaction_type"]
@@ -585,6 +589,7 @@ export type Database = {
           created_at?: string
           date: string
           description?: string | null
+          goal_id?: string | null
           group_id?: string | null
           id?: string
           type: Database["public"]["Enums"]["transaction_type"]
@@ -597,6 +602,7 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string | null
+          goal_id?: string | null
           group_id?: string | null
           id?: string
           type?: Database["public"]["Enums"]["transaction_type"]
@@ -604,6 +610,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_savings_goals"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_group_id_fkey"
             columns: ["group_id"]
