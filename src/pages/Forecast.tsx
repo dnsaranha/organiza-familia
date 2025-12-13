@@ -13,7 +13,7 @@ import IncomeExpenseBarChart from "@/components/charts/IncomeExpenseBarChart";
 import { toast } from "sonner";
 
 // Interfaces
-interface ScheduledTask { id: string; title: string; task_type: string; schedule_date: string; value: number | null; is_completed: boolean; is_recurring: boolean; recurrence_pattern: string | null; group_id: string | null; user_id: string; }
+interface ScheduledTask { id: string; title: string; task_type: string; schedule_date: string; value: number | null; is_completed: boolean | null; is_recurring: boolean | null; recurrence_pattern: string | null; recurrence_interval: number | null; group_id: string | null; user_id: string; }
 interface Transaction { id: string; type: "income" | "expense"; amount: number; date: string; category: string; description: string | null; }
 interface Goal { id: string; target_amount: number; current_amount: number; }
 interface MonthForecast { month: Date; label: string; projectedIncome: number; projectedExpense: number; monthBalance: number; cumulativeBalance: number; status: "positive" | "negative" | "neutral"; scheduledIncome: ScheduledTask[]; scheduledExpense: ScheduledTask[]; }
@@ -39,29 +39,28 @@ export default function ForecastPage() {
     if (!user) return;
     setDataLoading(true);
     try {
-      const baseQuery = (table: string) => {
-        let query = supabase.from(table).select("*");
-        if (scope === "personal") {
-          query = query.is("group_id", null).eq("user_id", user.id);
-        } else {
-          query = query.eq("group_id", scope);
-        }
-        return query;
-      };
-
-      const [tasksResult, transactionsResult, goalsResult] = await Promise.all([
-        baseQuery("scheduled_tasks").order("schedule_date", { ascending: true }),
-        baseQuery("transactions").order("date", { ascending: false }).limit(200),
-        baseQuery("savings_goals").select('id, target_amount, current_amount'),
-      ]);
+      const tasksResult = await supabase.from("scheduled_tasks").select("*").order("schedule_date", { ascending: true });
+      const transactionsResult = await supabase.from("transactions").select("*").order("date", { ascending: false }).limit(200);
+      const goalsResult = await supabase.from("savings_goals").select("id, target_amount, current_amount, group_id, user_id");
 
       if (tasksResult.error) throw tasksResult.error;
       if (transactionsResult.error) throw transactionsResult.error;
       if (goalsResult.error) throw goalsResult.error;
 
-      setTasks(tasksResult.data || []);
-      setTransactions(transactionsResult.data || []);
-      setGoals(goalsResult.data || []);
+      // Filter by scope
+      type WithScope = { group_id: string | null; user_id: string };
+      const filterByScope = <T extends WithScope>(data: T[]): T[] => {
+        if (scope === "personal") return data.filter(d => d.group_id === null && d.user_id === user.id);
+        return data.filter(d => d.group_id === scope);
+      };
+
+      const filteredTasks = filterByScope(tasksResult.data || []);
+      const filteredTransactions = filterByScope(transactionsResult.data || []);
+      const filteredGoals = filterByScope(goalsResult.data || []);
+
+      setTasks(filteredTasks as ScheduledTask[]);
+      setTransactions(filteredTransactions.map(t => ({ id: t.id, type: t.type, amount: t.amount, date: t.date, category: t.category, description: t.description })));
+      setGoals(filteredGoals.map(g => ({ id: g.id, target_amount: g.target_amount, current_amount: g.current_amount })));
 
     } catch (error: any) {
       console.error("Error fetching forecast data:", error.message || error);
