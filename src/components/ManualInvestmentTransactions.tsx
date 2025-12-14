@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, Edit, TrendingUp, TrendingDown, PlusCircle } from "lucide-react";
+import { Trash2, Edit, TrendingUp, TrendingDown, PlusCircle, Upload, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
@@ -37,6 +37,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { TickerSearch } from "@/components/TickerSearch";
+import * as XLSX from "xlsx";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ export function ManualInvestmentTransactions({
 }: ManualInvestmentTransactionsProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -79,6 +81,7 @@ export function ManualInvestmentTransactions({
     price: "",
     fees: "",
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadTransactions = async () => {
     try {
@@ -108,6 +111,125 @@ export function ManualInvestmentTransactions({
   useEffect(() => {
     loadTransactions();
   }, []);
+
+  // Excel import handler
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        throw new Error("Planilha vazia");
+      }
+
+      const transactionsToInsert = jsonData.map((row) => {
+        // Support various column name formats
+        const ticker = row.ticker || row.Ticker || row.TICKER || row.codigo || row.Código || "";
+        const assetName = row.asset_name || row.nome || row.Nome || row.NOME || ticker;
+        const assetType = row.asset_type || row.tipo_ativo || row.Tipo || "STOCK";
+        const transactionType = (row.transaction_type || row.tipo || row.Tipo || "buy").toLowerCase();
+        const quantity = parseFloat(row.quantity || row.quantidade || row.Quantidade || 0);
+        const price = parseFloat(row.price || row.preco || row.Preço || row.valor || 0);
+        const fees = parseFloat(row.fees || row.taxas || row.Taxas || 0);
+        
+        // Parse date in various formats
+        let transactionDate = new Date().toISOString().split("T")[0];
+        const dateValue = row.transaction_date || row.data || row.Data || row.date;
+        if (dateValue) {
+          if (typeof dateValue === "number") {
+            // Excel serial date
+            const excelDate = XLSX.SSF.parse_date_code(dateValue);
+            transactionDate = `${excelDate.y}-${String(excelDate.m).padStart(2, "0")}-${String(excelDate.d).padStart(2, "0")}`;
+          } else {
+            const parsed = new Date(dateValue);
+            if (!isNaN(parsed.getTime())) {
+              transactionDate = parsed.toISOString().split("T")[0];
+            }
+          }
+        }
+
+        return {
+          user_id: user.id,
+          ticker: ticker.toUpperCase(),
+          asset_name: assetName,
+          asset_type: assetType.toUpperCase(),
+          transaction_type: transactionType === "compra" || transactionType === "buy" ? "buy" : "sell",
+          quantity,
+          price,
+          fees,
+          transaction_date: transactionDate,
+        };
+      }).filter(t => t.ticker && t.quantity > 0 && t.price > 0);
+
+      if (transactionsToInsert.length === 0) {
+        throw new Error("Nenhuma transação válida encontrada na planilha");
+      }
+
+      const { error } = await supabase
+        .from("investment_transactions")
+        .insert(transactionsToInsert);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso!",
+        description: `${transactionsToInsert.length} transações importadas.`,
+      });
+
+      loadTransactions();
+      if (onTransactionsUpdate) onTransactionsUpdate();
+    } catch (error: any) {
+      toast({
+        title: "Erro na importação",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Download template
+  const downloadTemplate = () => {
+    const template = [
+      {
+        ticker: "PETR4",
+        asset_name: "Petrobras PN",
+        asset_type: "STOCK",
+        transaction_date: "2024-01-15",
+        transaction_type: "buy",
+        quantity: 100,
+        price: 35.50,
+        fees: 5.00,
+      },
+      {
+        ticker: "HGLG11",
+        asset_name: "CSHG Logística FII",
+        asset_type: "FII",
+        transaction_date: "2024-02-01",
+        transaction_type: "buy",
+        quantity: 10,
+        price: 165.00,
+        fees: 0,
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "template_investimentos.xlsx");
+  };
 
   useEffect(() => {
     if (editingTransaction) {
@@ -386,18 +508,43 @@ export function ManualInvestmentTransactions({
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <CardTitle className="text-base sm:text-lg">Histórico de Transações</CardTitle>
-            <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
-              setIsDialogOpen(isOpen);
-              if (!isOpen) setEditingTransaction(null);
-            }}>
-              <DialogTrigger asChild>
-                 <Button size="sm" onClick={() => setEditingTransaction(null)}>
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Adicionar Transação
-                </Button>
-              </DialogTrigger>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleExcelImport}
+                ref={fileInputRef}
+                className="hidden"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={downloadTemplate}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Template
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {importing ? "Importando..." : "Importar Excel"}
+              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+                setIsDialogOpen(isOpen);
+                if (!isOpen) setEditingTransaction(null);
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={() => setEditingTransaction(null)}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>{editingTransaction ? 'Editar' : 'Adicionar'} Transação Manual</DialogTitle>
@@ -473,7 +620,8 @@ export function ManualInvestmentTransactions({
                   </DialogFooter>
                 </form>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
