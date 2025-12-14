@@ -13,35 +13,43 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Wallet, PiggyBank, Save } from "lucide-react";
+import { AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Wallet, PiggyBank, Save, Settings2 } from "lucide-react";
+import {
+  defaultBudgetCategories,
+  BudgetCategory,
+  groupExpensesByBudgetCategory,
+} from "@/lib/budget-categories";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
-interface BudgetCategory {
-  name: string;
+interface BudgetCategoryState extends BudgetCategory {
   value: number;
-  color: string;
   spent?: number;
 }
-
-const defaultBudgetCategories: BudgetCategory[] = [
-  { name: "Liberdade Financeira", value: 25, color: "hsl(var(--chart-1))" },
-  { name: "Custos Fixos", value: 30, color: "hsl(var(--chart-2))" },
-  { name: "Conforto", value: 15, color: "hsl(var(--chart-3))" },
-  { name: "Metas", value: 15, color: "hsl(var(--chart-4))" },
-  { name: "Prazeres", value: 10, color: "hsl(var(--chart-5))" },
-  { name: "Conhecimento", value: 5, color: "hsl(var(--primary))" },
-];
 
 const BudgetPage = () => {
   const { user } = useAuth();
   const { scope } = useBudgetScope();
   const { toast } = useToast();
-  const [categories, setCategories] = useState<BudgetCategory[]>(defaultBudgetCategories);
+  const [categories, setCategories] = useState<BudgetCategoryState[]>(
+    defaultBudgetCategories.map((c) => ({ ...c, value: c.defaultPercentage }))
+  );
   const [monthlyIncome, setMonthlyIncome] = useState<number>(0);
   const [currentMonthIncome, setCurrentMonthIncome] = useState<number>(0);
   const [currentMonthExpenses, setCurrentMonthExpenses] = useState<number>(0);
-  const [expensesByCategory, setExpensesByCategory] = useState<Record<string, number>>({});
+  const [expensesByBudgetCategory, setExpensesByBudgetCategory] = useState<Record<string, number>>({});
+  const [rawExpensesByCategory, setRawExpensesByCategory] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [categoryMappingOpen, setCategoryMappingOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<BudgetCategoryState | null>(null);
 
   // Load user preferences and transaction data
   useEffect(() => {
@@ -89,14 +97,22 @@ const BudgetPage = () => {
           setCurrentMonthIncome(income);
           setCurrentMonthExpenses(expenses);
 
-          // Group expenses by category
-          const byCategory: Record<string, number> = {};
+          // Group raw expenses by category
+          const rawByCategory: Record<string, number> = {};
           transactions
             .filter((t) => t.type === "expense")
             .forEach((t) => {
-              byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
+              rawByCategory[t.category] = (rawByCategory[t.category] || 0) + Number(t.amount);
             });
-          setExpensesByCategory(byCategory);
+          setRawExpensesByCategory(rawByCategory);
+
+          // Group expenses by budget category using mappings
+          const expensesList = Object.entries(rawByCategory).map(([category, amount]) => ({
+            category,
+            amount,
+          }));
+          const byBudgetCategory = groupExpensesByBudgetCategory(expensesList);
+          setExpensesByBudgetCategory(byBudgetCategory);
 
           // Use current month income or last 3 months average
           if (income > 0) {
@@ -176,7 +192,9 @@ const BudgetPage = () => {
   };
 
   const handleReset = () => {
-    setCategories(defaultBudgetCategories);
+    setCategories(
+      defaultBudgetCategories.map((c) => ({ ...c, value: c.defaultPercentage }))
+    );
     toast({
       title: "Valores resetados",
       description: "Os valores foram restaurados para o padrão.",
@@ -325,11 +343,11 @@ const BudgetPage = () => {
 
             <div className="space-y-4">
               {budgetAmounts.map((category, index) => {
-                const spent = expensesByCategory[category.name] || 0;
+                const spent = expensesByBudgetCategory[category.name] || 0;
                 const percentSpent = category.budgetAmount > 0 ? (spent / category.budgetAmount) * 100 : 0;
 
                 return (
-                  <div key={category.name} className="space-y-2">
+                  <div key={category.id} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <div
@@ -337,6 +355,17 @@ const BudgetPage = () => {
                           style={{ backgroundColor: category.color }}
                         />
                         <Label>{category.name}</Label>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setEditingCategory(category);
+                            setCategoryMappingOpen(true);
+                          }}
+                        >
+                          <Settings2 className="h-3 w-3" />
+                        </Button>
                       </div>
                       <div className="text-sm text-right">
                         <span className="font-medium">{category.value}%</span>
@@ -359,6 +388,18 @@ const BudgetPage = () => {
                         </span>
                       </div>
                     )}
+                    <div className="flex flex-wrap gap-1">
+                      {category.transactionCategories.slice(0, 3).map((tc) => (
+                        <Badge key={tc} variant="secondary" className="text-xs">
+                          {tc}
+                        </Badge>
+                      ))}
+                      {category.transactionCategories.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{category.transactionCategories.length - 3}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -377,21 +418,27 @@ const BudgetPage = () => {
         </Card>
       </div>
 
-      {/* Category Breakdown */}
-      {Object.keys(expensesByCategory).length > 0 && (
+      {/* Category Breakdown - Raw Transaction Categories */}
+      {Object.keys(rawExpensesByCategory).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Gastos por Categoria</CardTitle>
-            <CardDescription>Detalhamento dos gastos do mês atual</CardDescription>
+            <CardTitle>Gastos por Categoria de Transação</CardTitle>
+            <CardDescription>Detalhamento dos gastos do mês atual por categoria de transação</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(expensesByCategory)
+              {Object.entries(rawExpensesByCategory)
                 .sort(([, a], [, b]) => b - a)
                 .map(([category, amount]) => {
-                  const budgetCat = budgetAmounts.find((c) => c.name === category);
-                  const budget = budgetCat?.budgetAmount || 0;
-                  const percent = budget > 0 ? (amount / budget) * 100 : 0;
+                  // Find which budget category this transaction category belongs to
+                  const budgetCat = categories.find((c) =>
+                    c.transactionCategories.some(
+                      (tc) => tc.toLowerCase() === category.toLowerCase()
+                    )
+                  );
+                  const budgetAmount = budgetCat
+                    ? budgetAmounts.find((b) => b.id === budgetCat.id)
+                    : null;
 
                   return (
                     <div
@@ -400,16 +447,21 @@ const BudgetPage = () => {
                     >
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-medium">{category}</span>
-                        <Badge variant={percent > 100 ? "destructive" : "outline"}>
-                          {budget > 0 ? `${percent.toFixed(0)}%` : "Sem orçamento"}
-                        </Badge>
+                        {budgetCat && (
+                          <Badge
+                            variant="outline"
+                            style={{ borderColor: budgetCat.color, color: budgetCat.color }}
+                          >
+                            {budgetCat.name}
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-lg font-bold">
                         R$ {amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </div>
-                      {budget > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          de R$ {budget.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} orçados
+                      {!budgetCat && (
+                        <div className="text-xs text-warning">
+                          Categoria não mapeada
                         </div>
                       )}
                     </div>
@@ -419,6 +471,88 @@ const BudgetPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Category Mapping Dialog */}
+      <Dialog open={categoryMappingOpen} onOpenChange={setCategoryMappingOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Configurar Categorias</DialogTitle>
+            <DialogDescription>
+              Selecione quais categorias de transação pertencem a "{editingCategory?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          {editingCategory && (
+            <div className="space-y-3">
+              {Object.keys(rawExpensesByCategory).length > 0 ? (
+                [...new Set([
+                  ...Object.keys(rawExpensesByCategory),
+                  ...editingCategory.transactionCategories
+                ])].sort().map((tc) => {
+                  const isChecked = editingCategory.transactionCategories.some(
+                    (t) => t.toLowerCase() === tc.toLowerCase()
+                  );
+                  const isUsedElsewhere = categories.some(
+                    (c) =>
+                      c.id !== editingCategory.id &&
+                      c.transactionCategories.some((t) => t.toLowerCase() === tc.toLowerCase())
+                  );
+
+                  return (
+                    <div key={tc} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`tc-${tc}`}
+                        checked={isChecked}
+                        disabled={isUsedElsewhere && !isChecked}
+                        onCheckedChange={(checked) => {
+                          const updatedCategories = categories.map((c) => {
+                            if (c.id === editingCategory.id) {
+                              return {
+                                ...c,
+                                transactionCategories: checked
+                                  ? [...c.transactionCategories, tc]
+                                  : c.transactionCategories.filter(
+                                      (t) => t.toLowerCase() !== tc.toLowerCase()
+                                    ),
+                              };
+                            }
+                            return c;
+                          });
+                          setCategories(updatedCategories);
+                          setEditingCategory(
+                            updatedCategories.find((c) => c.id === editingCategory.id) || null
+                          );
+                        }}
+                      />
+                      <label htmlFor={`tc-${tc}`} className="text-sm flex-1">
+                        {tc}
+                        {rawExpensesByCategory[tc] && (
+                          <span className="text-muted-foreground ml-2">
+                            (R$ {rawExpensesByCategory[tc].toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                          </span>
+                        )}
+                      </label>
+                      {isUsedElsewhere && !isChecked && (
+                        <Badge variant="secondary" className="text-xs">
+                          {categories.find((c) =>
+                            c.transactionCategories.some((t) => t.toLowerCase() === tc.toLowerCase())
+                          )?.name}
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma transação encontrada neste mês. Adicione transações para ver as categorias disponíveis.
+                </p>
+              )}
+              <div className="pt-4 flex justify-end">
+                <Button onClick={() => setCategoryMappingOpen(false)}>Fechar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
