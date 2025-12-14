@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Tables } from "@/integrations/supabase/types";
 import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { incomeCategories, expenseCategories } from "@/lib/budget-categories";
 
 type Transaction = Tables<'transactions'>;
 
@@ -70,26 +71,6 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
       setGroupId(null);
     }
   }, [isEditMode, transactionToEdit]);
-
-  const incomeCategories = [
-    'Salário',
-    'Freelance',
-    'Investimentos',
-    'Presente',
-    'Outros'
-  ];
-
-  const expenseCategories = [
-    'Alimentação',
-    'Transporte',
-    'Casa',
-    'Saúde',
-    'Educação',
-    'Lazer',
-    'Compras',
-    'Contas',
-    'Outros'
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

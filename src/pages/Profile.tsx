@@ -17,9 +17,22 @@ import { Header } from "@/components/Header";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2, Loader2 } from "lucide-react";
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
+  const [clearingData, setClearingData] = useState(false);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [newAvatar, setNewAvatar] = useState<File | null>(null);
@@ -98,7 +111,6 @@ export default function Profile() {
             .maybeSingle();
 
         if (preferencesError && preferencesError.code !== "PGRST116") {
-          // Ignore 'no rows' error
           throw preferencesError;
         }
 
@@ -129,6 +141,33 @@ export default function Profile() {
       getProfileAndPreferences();
     }
   }, [user, toast]);
+
+  async function clearUserData() {
+    if (!user) return;
+
+    try {
+      setClearingData(true);
+
+      // Delete all user data from various tables
+      await supabase.from("transactions").delete().eq("user_id", user.id);
+      await supabase.from("investment_transactions").delete().eq("user_id", user.id);
+      await supabase.from("scheduled_tasks").delete().eq("user_id", user.id);
+      await supabase.from("savings_goals").delete().eq("user_id", user.id);
+
+      toast({
+        title: "Dados limpos!",
+        description: "Todos os seus dados financeiros foram removidos com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao limpar dados",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setClearingData(false);
+    }
+  }
 
   async function updateProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -172,7 +211,7 @@ export default function Profile() {
 
       const preferencesUpdates = {
         user_id: user.id,
-        month_start_day: Number(monthStartDay), // Convert back to number on save
+        month_start_day: Number(monthStartDay),
         carry_over_balance: carryOverBalance,
         theme: darkMode ? "dark" : "light",
         updated_at: new Date().toISOString(),
@@ -304,6 +343,49 @@ export default function Profile() {
                       applyTheme(checked ? "dark" : "light");
                     }}
                   />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-destructive">
+                  Zona de Perigo
+                </h3>
+                <div className="flex items-center justify-between rounded-lg border border-destructive/50 p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label>Limpar Dados</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Remove todas as transações, investimentos, tarefas e metas.
+                    </p>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" disabled={clearingData}>
+                        {clearingData ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        {clearingData ? "Limpando..." : "Limpar Dados"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. Isso irá excluir permanentemente 
+                          todas as suas transações, investimentos, tarefas agendadas e metas de economia.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={clearUserData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Sim, limpar tudo
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
 

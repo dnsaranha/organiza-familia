@@ -16,11 +16,14 @@ import InvestmentsPage from "./pages/Investments";
 import NotificationSettingsPage from "./pages/NotificationSettings";
 import OpenFinanceConnectPage from "./pages/OpenFinanceConnect";
 import TasksPage from "./pages/Tasks";
+import GoalsPage from "./pages/Goals";
+import ForecastPage from "./pages/Forecast";
 import { PWASettings } from "./pages/PWASettings";
 import AppShell from "./components/AppShell";
 import { BudgetScopeProvider } from "./contexts/BudgetScopeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import YFinanceTestPage from "./pages/YFinanceTest";
+import BudgetPage from "./pages/Budget"; // Importa a nova página
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +115,14 @@ const App = () => {
                     </AppShell>
                   }
                 />
+                 <Route
+                  path="/budget"
+                  element={
+                    <AppShell>
+                      <BudgetPage />
+                    </AppShell>
+                  }
+                />
                 <Route
                   path="/groups"
                   element={
@@ -157,6 +168,22 @@ const App = () => {
                   element={
                     <AppShell>
                       <TasksPage />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/goals"
+                  element={
+                    <AppShell>
+                      <GoalsPage />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/forecast"
+                  element={
+                    <AppShell>
+                      <ForecastPage />
                     </AppShell>
                   }
                 />
