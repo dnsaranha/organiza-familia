@@ -225,8 +225,13 @@ const TasksPage = () => {
 
       if (error) throw error;
 
-      const distinctCategories = [...new Set(data.map(item => item.category))];
-      setCategories(distinctCategories.map(c => ({ label: c, value: c })));
+      const transactionCategories = [...new Set(data.map(item => item.category))];
+      
+      // Import all categories from budget-categories
+      const { incomeCategories, expenseCategories } = await import('@/lib/budget-categories');
+      const allCategories = [...new Set([...incomeCategories, ...expenseCategories, ...transactionCategories])];
+      
+      setCategories(allCategories.sort().map(c => ({ label: c, value: c })));
 
     } catch (error) {
       // Only log non-network errors
@@ -699,10 +704,10 @@ const TasksPage = () => {
                                     if (value) setTransactionType(value);
                                 }}
                             >
-                                <ToggleGroupItem value="income" aria-label="Toggle income">
+                                <ToggleGroupItem value="income" aria-label="Toggle income" className="data-[state=on]:bg-green-500 data-[state=on]:text-white hover:bg-green-100">
                                     <PlusIcon className="h-4 w-4" />
                                 </ToggleGroupItem>
-                                <ToggleGroupItem value="expense" aria-label="Toggle expense">
+                                <ToggleGroupItem value="expense" aria-label="Toggle expense" className="data-[state=on]:bg-red-500 data-[state=on]:text-white hover:bg-red-100">
                                     <Minus className="h-4 w-4" />
                                 </ToggleGroupItem>
                             </ToggleGroup>
