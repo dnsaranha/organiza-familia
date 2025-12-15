@@ -24,27 +24,48 @@ const DEFAULT_NAV_IDS = ["home", "investments", "groups", "tasks", "reports"];
 const STORAGE_KEY = "organiza-bottom-nav-config";
 const MAX_ITEMS = 5;
 
-export function useBottomNavConfig() {
-  const [selectedIds, setSelectedIds] = useState<string[]>(DEFAULT_NAV_IDS);
+const NAV_CONFIG_EVENT = "nav-config-changed";
 
-  useEffect(() => {
+export function useBottomNavConfig() {
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length <= MAX_ITEMS) {
-          setSelectedIds(parsed);
+          return parsed;
         }
       } catch {
         // Keep default
       }
     }
+    return DEFAULT_NAV_IDS;
+  });
+
+  useEffect(() => {
+    const handleConfigChange = () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length <= MAX_ITEMS) {
+            setSelectedIds(parsed);
+          }
+        } catch {
+          // Keep current
+        }
+      }
+    };
+
+    window.addEventListener(NAV_CONFIG_EVENT, handleConfigChange);
+    return () => window.removeEventListener(NAV_CONFIG_EVENT, handleConfigChange);
   }, []);
 
   const saveConfig = (ids: string[]) => {
     const limitedIds = ids.slice(0, MAX_ITEMS);
     setSelectedIds(limitedIds);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(limitedIds));
+    window.dispatchEvent(new CustomEvent(NAV_CONFIG_EVENT));
   };
 
   const toggleItem = (id: string) => {
@@ -65,8 +86,6 @@ export function useBottomNavConfig() {
     saveConfig(DEFAULT_NAV_IDS);
   };
 
-  const activeNavItems = allNavItems.filter((item) => selectedIds.includes(item.id));
-  // Maintain order based on selectedIds
   const orderedNavItems = selectedIds
     .map((id) => allNavItems.find((item) => item.id === id))
     .filter((item): item is NavItem => item !== undefined);
