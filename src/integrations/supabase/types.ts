@@ -741,6 +741,12 @@ export type Database = {
           owner_id: string
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "family_groups"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       import_transactions: {
         Args: {
