@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { FinancialSummaryCard } from "@/components/FinancialSummaryCard";
 import { FinancialCard } from "@/components/FinancialCard";
 import { TransactionForm } from "@/components/TransactionForm";
 import { TransactionList } from "@/components/TransactionList";
@@ -193,31 +194,12 @@ const Index = () => {
 
         <PWAInstallPrompt />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <FinancialCard
-            title="Saldo do Mês"
-            amount={monthlyBalance}
-            isCurrency
+        <div className="mb-6 sm:mb-8">
+          <FinancialSummaryCard
+            balance={monthlyBalance}
+            income={financialData?.monthlyIncome ?? 0}
+            expenses={financialData?.monthlyExpenses ?? 0}
             isLoading={loadingData || bankLoading}
-            isPositive={monthlyBalance >= 0}
-            isNegative={monthlyBalance < 0}
-            icon={Wallet}
-          />
-          <FinancialCard
-            title="Receitas do Mês"
-            amount={financialData?.monthlyIncome ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isPositive={true}
-            icon={TrendingUp}
-          />
-          <FinancialCard
-            title="Gastos do Mês"
-            amount={financialData?.monthlyExpenses ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isNegative={true}
-            icon={TrendingDown}
           />
         </div>
 
