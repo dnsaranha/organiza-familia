@@ -71,7 +71,7 @@ export const FinancialSummaryCard = ({
               </button>
             </div>
 
-            <div className="text-4xl font-bold">
+            <div className="text-4xl font-bold" translate="no">
               {isVisible ? (
                 <span
                   className={
@@ -96,7 +96,7 @@ export const FinancialSummaryCard = ({
                 </div>
                 <span className="text-sm font-medium">Receitas</span>
               </div>
-              <div className="text-xl font-bold text-success">
+              <div className="text-xl font-bold text-success" translate="no">
                 {isVisible ? formatCurrency(income) : "R$ ••••••"}
               </div>
             </div>
@@ -109,7 +109,7 @@ export const FinancialSummaryCard = ({
                 </div>
                 <span className="text-sm font-medium">Gastos</span>
               </div>
-              <div className="text-xl font-bold text-destructive">
+              <div className="text-xl font-bold text-destructive" translate="no">
                 {isVisible ? formatCurrency(expenses) : "R$ ••••••"}
               </div>
             </div>
