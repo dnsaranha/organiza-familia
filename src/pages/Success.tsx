@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Home, CreditCard, Loader2 } from 'lucide-react';
-import { Header } from '@/components/Header';
 
 export default function Success() {
   const [searchParams] = useSearchParams();
@@ -23,7 +22,6 @@ export default function Success() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-2xl mx-auto">
             <Card className="bg-gradient-card shadow-card border text-center">
@@ -45,7 +43,6 @@ export default function Success() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">
           <Card className="bg-gradient-card shadow-card border text-center">

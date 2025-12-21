@@ -1,50 +1,28 @@
-import { PiggyBank, Settings, LogOut, LogIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
-import { BudgetScopeSwitcher } from "./BudgetScopeSwitcher";
-import { useNavigate } from "react-router-dom";
-import React from "react";
-import { useToast } from "@/hooks/use-toast";
+import { Bell, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-export const Header = () => {
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
-
-  // Safe navigation function that checks for router context
-  const navigate = (() => {
-    try {
-      const routerNavigate = useNavigate();
-      return routerNavigate;
-    } catch (error) {
-      // Fallback navigation using window.location if router context is not available
-      return (path: string) => {
-        if (path.startsWith("/")) {
-          window.location.href = window.location.origin + path;
-        } else {
-          window.location.href = path;
-        }
-      };
-    }
-  })();
-
-  const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível sair da conta.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Saiu da conta",
-        description: "Você foi desconectado com sucesso.",
-      });
-      navigate("/auth");
-    }
-  };
-
+const Header = () => {
   return (
-    <header className="border-b border-border bg-gradient-card shadow-card"></header>
+    <header className="flex items-start justify-between mb-8">
+      <div>
+        <h2 className="flex items-center text-2xl font-bold text-foreground">
+          Olá, bem-vindo de volta! <span className="ml-2 text-2xl">👋</span>
+        </h2>
+        <p className="mt-1 text-muted-foreground">
+          Aqui está um resumo das suas finanças hoje.
+        </p>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
+        </Button>
+        <Button variant="ghost" size="icon">
+          <Settings className="h-5 w-5" />
+        </Button>
+      </div>
+    </header>
   );
 };
+
+export default Header;

@@ -13,7 +13,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Header } from "@/components/Header";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -244,7 +243,6 @@ export default function Profile() {
 
   return (
     <div>
-      <Header />
       <div className="flex justify-center items-center min-h-screen py-8">
         <Card className="w-full max-w-2xl">
           <CardHeader>

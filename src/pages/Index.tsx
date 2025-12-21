@@ -22,7 +22,11 @@ import {
   DollarSign,
   Building2,
   CreditCard,
+  Bell,
+  Settings,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Header from "@/components/Header";
 
 interface FinancialData {
   balance: number;
@@ -182,98 +186,68 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Olá, bem-vindo de volta! 👋
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Aqui está um resumo das suas finanças
-          </p>
-        </div>
+      <main>
+        <Header />
 
         <PWAInstallPrompt />
 
-        <div className="mb-6 sm:mb-8">
-          <FinancialSummaryCard
-            balance={monthlyBalance}
-            income={financialData?.monthlyIncome ?? 0}
-            expenses={financialData?.monthlyExpenses ?? 0}
-            isLoading={loadingData || bankLoading}
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <section className="xl:col-span-2">
+            <FinancialSummaryCard
+              balance={monthlyBalance}
+              income={financialData?.monthlyIncome ?? 0}
+              expenses={financialData?.monthlyExpenses ?? 0}
+              isLoading={loadingData || bankLoading}
+            />
+          </section>
 
-        {bankConnected && accounts.length > 0 && (
-          <div className="mb-6 sm:mb-8">
-            <div className="space-y-4 sm:space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Contas Bancárias</h3>
+          {bankConnected && accounts.length > 0 && (
+            <section className="flex flex-col justify-center rounded-xl border bg-card p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-bold text-foreground">Contas Bancárias</h3>
                 </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
-                  {accounts
-                    .filter((acc) => acc.type === "BANK")
-                    .map((account) => (
-                      <div
-                        key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
-                            {account.marketingName || account.name}
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <CreditCard className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="scrollbar-hide flex snap-x snap-mandatory space-x-4 overflow-x-auto pb-2">
+                {accounts
+                  .filter((acc) => acc.type === 'BANK')
+                  .map((account) => (
+                    <div
+                      key={account.id}
+                      className="group relative h-28 w-64 flex-none snap-center rounded-lg bg-muted/30 p-4"
+                    >
+                      <div>
+                        <p className="flex items-center text-sm font-medium text-foreground">
+                          <Wallet className="mr-1 h-4 w-4 text-muted-foreground" />
+                          {account.marketingName || account.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
                           {mapAccountSubtype(account.subtype)}
                         </p>
-                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
-                          {account.balance.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: account.currency || "BRL",
-                          })}
-                        </p>
                       </div>
-                    ))}
-                </div>
+                      <p className="text-xl font-bold text-foreground" translate="no">
+                        {account.balance.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: account.currency || 'BRL',
+                        })}
+                      </p>
+                    </div>
+                  ))}
               </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Cartões de Crédito</h3>
-                </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
-                  {accounts
-                    .filter((acc) => acc.type === "CREDIT")
-                    .map((account) => (
-                      <div
-                        key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
-                            {account.marketingName || account.name}
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
-                          {account.brand
-                            ? `${account.brand} - ${mapAccountSubtype(account.subtype)}`
-                            : mapAccountSubtype(account.subtype)}
-                        </p>
-                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
-                          {account.balance.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: account.currency || "BRL",
-                          })}
-                        </p>
-                      </div>
-                    ))}
-                </div>
+              <div className="mt-2 flex justify-center space-x-1">
+                {Array.from({ length: accounts.filter(acc => acc.type === 'BANK').length }).map((_, i) => (
+                  <div key={i} className={`h-1.5 w-1.5 rounded-full ${i === 0 ? 'bg-primary' : 'bg-muted'}`} />
+                ))}
               </div>
-            </div>
+            </section>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2 space-y-6">
 
             {bankTransactions.length > 0 && (
               <Card className="mt-4 sm:mt-6">
@@ -320,32 +294,15 @@ const Index = () => {
               </Card>
             )}
           </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
-            <TransactionForm onTransactionChange={handleDataRefresh} />
-          </div>
-
-          <div className="w-full">
-            <TransactionList
-              key={refreshKey}
-              onTransactionChange={handleDataRefresh}
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <TransactionForm onTransactionChange={handleDataRefresh} />
+          <TransactionList key={refreshKey} onTransactionChange={handleDataRefresh} />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <FamilyGroups />
-          </div>
-          <div className="w-full">
             <ScheduledTasks />
-          </div>
         </div>
-
-        <div className="mb-6 sm:mb-8">
-          <SubscriptionStatus />
         </div>
 
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-success/10 border border-success/20 rounded-lg">
