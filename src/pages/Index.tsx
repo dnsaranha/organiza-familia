@@ -304,6 +304,9 @@ const Index = () => {
             <ScheduledTasks />
         </div>
         </div>
+        <div className="xl:col-span-1 space-y-6">
+            <SubscriptionStatus />
+        </div>
 
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-success/10 border border-success/20 rounded-lg">
           <div className="flex items-start gap-2 sm:gap-3">

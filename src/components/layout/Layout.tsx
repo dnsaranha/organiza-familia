@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { BottomNavBar } from '@/components/BottomNavBar';
 import { BudgetScopeSwitcher } from '@/components/BudgetScopeSwitcher';
 import { useAuth } from '@/hooks/useAuth';
