@@ -5,16 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Mail, Lock, PiggyBank } from "lucide-react";
+import { AlertCircle, Mail, Lock, PiggyBank, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SubscriptionPlans } from "@/components/SubscriptionPlans";
+import { Separator } from "@/components/ui/separator";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -23,11 +28,53 @@ export default function Auth() {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        // Check if user has a subscription
+        await checkSubscription(session.user.id);
       }
     };
     checkAuth();
   }, [navigate]);
+
+  const checkSubscription = async (userId: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('stripe_user_subscriptions')
+        .select('subscription_status')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // If no subscription or status is not_started, show subscription dialog
+      if (!data || data.subscription_status === 'not_started') {
+        setShowSubscriptionDialog(true);
+      } else {
+        navigate("/");
+      }
+    } catch (err) {
+      console.error('Erro ao verificar assinatura:', err);
+      // If error checking subscription, navigate anyway
+      navigate("/");
+    }
+  };
+
+  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+    setSocialLoading(provider);
+    setError("");
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth`
+        }
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      setError(error.message || `Erro ao fazer login com ${provider}`);
+      setSocialLoading(null);
+    }
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +96,12 @@ export default function Auth() {
         title: "Conta criada com sucesso!",
         description: "Verifique seu email para confirmar a conta.",
       });
+      
+      // After signup, show subscription dialog
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setShowSubscriptionDialog(true);
+      }
     } catch (error: any) {
       setError(error.message || "Erro ao criar conta");
     } finally {
@@ -74,7 +127,11 @@ export default function Auth() {
         description: "Bem-vindo ao Organiza!",
       });
       
-      navigate("/");
+      // Check subscription after login
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await checkSubscription(session.user.id);
+      }
     } catch (error: any) {
       setError(error.message === "Invalid login credentials" 
         ? "Email ou senha incorretos" 
@@ -86,6 +143,7 @@ export default function Auth() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo/Header */}
@@ -157,6 +215,73 @@ export default function Auth() {
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>
+
+                <div className="mt-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator className="w-full" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Ou continue com
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSocialLogin('google')}
+                      disabled={socialLoading !== null}
+                      className="w-full"
+                    >
+                      {socialLoading === 'google' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
+                            <path
+                              fill="currentColor"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            />
+                          </svg>
+                          Google
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSocialLogin('apple')}
+                      disabled={socialLoading !== null}
+                      className="w-full"
+                    >
+                      {socialLoading === 'apple' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                          </svg>
+                          Apple
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="signup">
@@ -201,6 +326,73 @@ export default function Auth() {
                     {loading ? "Criando conta..." : "Criar Conta"}
                   </Button>
                 </form>
+
+                <div className="mt-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator className="w-full" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Ou continue com
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSocialLogin('google')}
+                      disabled={socialLoading !== null}
+                      className="w-full"
+                    >
+                      {socialLoading === 'google' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
+                            <path
+                              fill="currentColor"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            />
+                            <path
+                              fill="currentColor"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            />
+                          </svg>
+                          Google
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSocialLogin('apple')}
+                      disabled={socialLoading !== null}
+                      className="w-full"
+                    >
+                      {socialLoading === 'apple' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                          </svg>
+                          Apple
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -217,5 +409,16 @@ export default function Auth() {
         </div>
       </div>
     </div>
+
+    {/* Subscription Plans Dialog */}
+    <Dialog open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-center text-2xl">Escolha seu Plano</DialogTitle>
+        </DialogHeader>
+        <SubscriptionPlans />
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

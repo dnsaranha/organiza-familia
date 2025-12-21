@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { FinancialSummaryCard } from "@/components/FinancialSummaryCard";
 import { FinancialCard } from "@/components/FinancialCard";
 import { TransactionForm } from "@/components/TransactionForm";
 import { TransactionList } from "@/components/TransactionList";
@@ -193,31 +194,12 @@ const Index = () => {
 
         <PWAInstallPrompt />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <FinancialCard
-            title="Saldo do Mês"
-            amount={monthlyBalance}
-            isCurrency
+        <div className="mb-6 sm:mb-8">
+          <FinancialSummaryCard
+            balance={monthlyBalance}
+            income={financialData?.monthlyIncome ?? 0}
+            expenses={financialData?.monthlyExpenses ?? 0}
             isLoading={loadingData || bankLoading}
-            isPositive={monthlyBalance >= 0}
-            isNegative={monthlyBalance < 0}
-            icon={Wallet}
-          />
-          <FinancialCard
-            title="Receitas do Mês"
-            amount={financialData?.monthlyIncome ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isPositive={true}
-            icon={TrendingUp}
-          />
-          <FinancialCard
-            title="Gastos do Mês"
-            amount={financialData?.monthlyExpenses ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isNegative={true}
-            icon={TrendingDown}
           />
         </div>
 
@@ -246,7 +228,7 @@ const Index = () => {
                         <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
                           {mapAccountSubtype(account.subtype)}
                         </p>
-                        <p className="text-base sm:text-lg font-bold truncate">
+                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
                           {account.balance.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: account.currency || "BRL",
@@ -281,7 +263,7 @@ const Index = () => {
                             ? `${account.brand} - ${mapAccountSubtype(account.subtype)}`
                             : mapAccountSubtype(account.subtype)}
                         </p>
-                        <p className="text-base sm:text-lg font-bold truncate">
+                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
                           {account.balance.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: account.currency || "BRL",
@@ -311,7 +293,7 @@ const Index = () => {
                           <p className="text-xs sm:text-sm font-medium truncate">
                             {transaction.description}
                           </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
+                          <p className="text-[10px] sm:text-xs text-muted-foreground" translate="no">
                             {new Date(transaction.date).toLocaleDateString(
                               "pt-BR",
                             )}
@@ -323,6 +305,7 @@ const Index = () => {
                               ? "text-green-600"
                               : "text-red-600"
                           }`}
+                          translate="no"
                         >
                           {transaction.amount >= 0 ? "+" : ""}
                           {transaction.amount.toLocaleString("pt-BR", {
@@ -341,13 +324,13 @@ const Index = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
           <div className="w-full">
-            <TransactionForm onSave={handleDataRefresh} />
+            <TransactionForm onTransactionChange={handleDataRefresh} />
           </div>
 
           <div className="w-full">
             <TransactionList
               key={refreshKey}
-              onDataChange={handleDataRefresh}
+              onTransactionChange={handleDataRefresh}
             />
           </div>
         </div>
