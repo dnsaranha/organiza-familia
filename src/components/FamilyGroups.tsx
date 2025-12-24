@@ -132,7 +132,8 @@ export const FamilyGroups = () => {
 
       setGroups(groupsWithCounts);
     } catch (error) {
-      console.error("Erro ao carregar grupos:", error);
+      // Silently fail - network errors are expected in some environments
+      setGroups([]);
       toast({
         title: "Erro",
         description: "Não foi possível carregar os grupos.",

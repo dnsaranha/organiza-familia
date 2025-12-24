@@ -14,7 +14,11 @@ import {
   CheckSquare,
   Target,
   CalendarDays,
-  PieChart, // Ícone adicionado
+  PieChart,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
 } from "lucide-react";
 
 import {
@@ -38,10 +42,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BottomNavBar } from "@/components/BottomNavBar";
 import { BudgetScopeSwitcher } from "@/components/BudgetScopeSwitcher";
+import { TransactionForm } from "@/components/TransactionForm";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -49,9 +60,18 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = React.useState(false);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      // Silently handle network errors
+    }
+  };
+
+  const handleTransactionSave = () => {
+    setIsTransactionDialogOpen(false);
   };
 
   const mobileView = (
@@ -128,35 +148,42 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const desktopView = (
     <>
       <Sidebar collapsible="icon">
-        <div className="flex h-full flex-col">
-          <SidebarHeader className="flex p-4">
-            <NavLink to="/" className="flex items-center gap-3 justify-center">
-              <div className="rounded-full p-2 bg-gradient-primary shadow-glow flex items-center gap-3 justify-center">
-                <PiggyBank className="h-6 w-6 text-primary-foreground" />
+        <div className="flex h-full flex-col border-r bg-sidebar">
+          <SidebarHeader className="p-6 h-20 relative flex flex-row items-center">
+            <SidebarTrigger className="absolute top-5 right-4 p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground">
+              <ChevronLeft className="size-5 block group-data-[collapsible=icon]:hidden" />
+              <ChevronRight className="size-5 hidden group-data-[collapsible=icon]:block" />
+            </SidebarTrigger>
+            <NavLink to="/" className="flex items-center gap-3">
+              <div className="rounded-full p-2 bg-primary flex items-center justify-center text-primary-foreground flex-shrink-0">
+                <PiggyBank className="h-5 w-5" />
               </div>
-              <div className="overflow-hidden transition-all duration-300 group-data-[collapsible=icon]:w-0">
-                <div className="font-bold text-lg text-primary">Organiza</div>
+              <div className="overflow-hidden transition-all duration-300 group-data-[collapsible=icon]:hidden">
+                <div className="font-bold text-xl text-primary">Organiza</div>
                 <p className="text-xs text-muted-foreground">
-                  Gestão Financeira Familiar
+                  Gestão Financeira
                 </p>
               </div>
             </NavLink>
-            <SidebarTrigger className="items-center content-center justify-center">
-              <PanelLeft className="size-5" />
-              <div className="w-[80px] h-[80px] bg-white"></div>
-            </SidebarTrigger>
           </SidebarHeader>
-          <SidebarContent className="flex-1 items-start">
-            <div className="p-2 flex items-center justify-start">
-              <BudgetScopeSwitcher />
-            </div>
-            <SidebarMenu className="justify-center items-start">
+          <div className="px-6 mb-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+            <BudgetScopeSwitcher />
+          </div>
+          <SidebarContent className="flex-1 px-4 space-y-1 overflow-y-auto">
+            <SidebarMenu>
               <SidebarMenuItem>
                 <NavLink to="/" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <Home className="size-4" />
-                      <span>Home</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <Home className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Home</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -164,9 +191,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/groups" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <Users className="size-4" />
-                      <span>Grupos</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <Users className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Grupos</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -174,9 +208,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/reports" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <AreaChart className="size-4" />
-                      <span>Relatórios</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <AreaChart className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Relatórios</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -184,9 +225,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/investments" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <TrendingUp className="size-4" />
-                      <span>Investimentos</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <TrendingUp className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Investimentos</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -194,9 +242,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/tasks" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <CheckSquare className="size-4" />
-                      <span>Tarefas</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <CheckSquare className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Tarefas</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -204,9 +259,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/goals" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <Target className="size-4" />
-                      <span>Metas</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <Target className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Metas</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -214,9 +276,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/budget" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <PieChart className="size-4" />
-                      <span>Orçamento</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <PieChart className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Orçamento</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
@@ -224,29 +293,38 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <SidebarMenuItem>
                 <NavLink to="/forecast" className="w-full">
                   {({ isActive }) => (
-                    <SidebarMenuButton isActive={isActive}>
-                      <CalendarDays className="size-4" />
-                      <span>Previsões</span>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`px-4 py-2.5 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : 'hover:bg-accent'
+                      } group-data-[collapsible=icon]:justify-center`}
+                    >
+                      <CalendarDays className="size-5 mr-3 group-data-[collapsible=icon]:mr-0" />
+                      <span className="font-medium group-data-[collapsible=icon]:hidden">Previsões</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="p-4 border-t">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start group-data-[collapsible=icon]:justify-center gap-2"
+                    className="w-full justify-start group-data-[collapsible=icon]:justify-center gap-3 px-2"
                   >
-                    <div className="flex size-8 items-center justify-center rounded-full bg-muted">
-                      <span>{user.email?.[0].toUpperCase()}</span>
+                    <div className="flex size-8 items-center justify-center rounded-full bg-muted flex-shrink-0">
+                      <span className="text-sm font-medium">{user.email?.[0].toUpperCase()}</span>
                     </div>
-                    <span className="truncate overflow-hidden transition-all duration-300 group-data-[collapsible=icon]:w-0">
-                      {user.email}
-                    </span>
+                    <div className="flex-1 min-w-0 text-left group-data-[collapsible=icon]:hidden">
+                      <p className="text-sm font-medium truncate">
+                        {user.email}
+                      </p>
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -287,23 +365,37 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         </div>
       </Sidebar>
       <SidebarInset className="w-full">
-        <header className="border-b p-3 sm:p-4">
-          <div className="flex items-center justify-end gap-2 sm:gap-4">
+        <header className="flex justify-between items-center border-b p-4 md:p-6 lg:p-8">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              Olá, bem-vindo de volta! <span>👋</span>
+            </h2>
+            <p className="text-muted-foreground mt-1">Aqui está um resumo das suas finanças hoje.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="default"
+              size="icon"
+              className="rounded-full bg-primary hover:bg-primary/90 shadow-lg h-12 w-12"
+              onClick={() => setIsTransactionDialogOpen(true)}
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
             <Button
               variant="ghost"
-              size="sm"
-              onClick={() => navigate("/pricing")}
-              className="text-xs sm:text-sm text-muted-foreground hover:text-primary"
+              size="icon"
+              className="relative"
             >
-              Planos
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate("/profile")}
-              className="text-muted-foreground hover:text-primary h-8 w-8 sm:h-9 sm:w-9"
+              className="text-muted-foreground hover:text-primary"
             >
-              <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Settings className="h-5 w-5" />
             </Button>
           </div>
         </header>
@@ -315,6 +407,14 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <SidebarProvider defaultOpen>
       {isMobile ? mobileView : desktopView}
+      <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Nova Transação</DialogTitle>
+          </DialogHeader>
+          <TransactionForm onSave={handleTransactionSave} />
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 };

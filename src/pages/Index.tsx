@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FinancialCard } from "@/components/FinancialCard";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -21,6 +21,8 @@ import {
   DollarSign,
   Building2,
   CreditCard,
+  Users,
+  CheckSquare,
 } from "lucide-react";
 
 interface FinancialData {
@@ -52,13 +54,7 @@ const Index = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchFinancialData();
-    }
-  }, [user, refreshKey, scope, bankTransactions, accounts]);
-
-  const fetchFinancialData = async () => {
+  const fetchFinancialData = useCallback(async () => {
     if (!user) return;
 
     setLoadingData(true);
@@ -95,16 +91,17 @@ const Index = () => {
         monthStartDay - 1,
       );
       monthEndDate.setHours(23, 59, 59, 999);
-      
+
       let prevMonthStartDate = new Date(monthStartDate);
       prevMonthStartDate.setMonth(prevMonthStartDate.getMonth() - 1);
       let prevMonthEndDate = new Date(monthStartDate);
       prevMonthEndDate.setDate(prevMonthEndDate.getDate() - 1);
       prevMonthEndDate.setHours(23, 59, 59, 999);
 
+      const currentBankTransactions = bankTransactions || [];
       const combinedTransactions = [
         ...(manualTransactions || []).map((t) => ({ ...t, source: "manual" })),
-        ...(bankTransactions || []).map((t) => ({
+        ...currentBankTransactions.map((t) => ({
           ...t,
           type: t.amount > 0 ? "income" : "expense",
           source: "open_banking",
@@ -128,26 +125,26 @@ const Index = () => {
             monthlyExpenses += Math.abs(t.amount);
           }
         } else if (
-            transactionDate >= prevMonthStartDate &&
-            transactionDate <= prevMonthEndDate
+          transactionDate >= prevMonthStartDate &&
+          transactionDate <= prevMonthEndDate
         ) {
-            if (t.type === "income") {
-                previousMonthIncome += Math.abs(t.amount);
-            } else {
-                previousMonthExpenses += Math.abs(t.amount);
-            }
+          if (t.type === "income") {
+            previousMonthIncome += Math.abs(t.amount);
+          } else {
+            previousMonthExpenses += Math.abs(t.amount);
+          }
         }
       }
-      
+
       const previousMonthBalance = previousMonthIncome - previousMonthExpenses;
-      const monthlyBalance = previousMonthBalance + monthlyIncome - monthlyExpenses;
+      const monthlyBalance =
+        previousMonthBalance + monthlyIncome - monthlyExpenses;
 
       setFinancialData({
         balance: monthlyBalance,
         monthlyIncome,
         monthlyExpenses,
       });
-
     } catch (err) {
       if (err instanceof Error && !err.message.includes("aborted")) {
         console.error("Erro ao buscar dados financeiros:", err);
@@ -155,7 +152,13 @@ const Index = () => {
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [user, scope, bankTransactions]);
+
+  useEffect(() => {
+    if (user) {
+      fetchFinancialData();
+    }
+  }, [user, refreshKey, scope, fetchFinancialData]);
 
   const handleDataRefresh = () => {
     setRefreshKey((prevKey) => prevKey + 1);
@@ -181,208 +184,246 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Olá, bem-vindo de volta! 👋
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Aqui está um resumo das suas finanças
-          </p>
-        </div>
-
+      <main className="p-4 sm:p-6 md:p-8">
         <PWAInstallPrompt />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <FinancialCard
-            title="Saldo do Mês"
-            amount={monthlyBalance}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isPositive={monthlyBalance >= 0}
-            isNegative={monthlyBalance < 0}
-            icon={Wallet}
-          />
-          <FinancialCard
-            title="Receitas do Mês"
-            amount={financialData?.monthlyIncome ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isPositive={true}
-            icon={TrendingUp}
-          />
-          <FinancialCard
-            title="Gastos do Mês"
-            amount={financialData?.monthlyExpenses ?? 0}
-            isCurrency
-            isLoading={loadingData || bankLoading}
-            isNegative={true}
-            icon={TrendingDown}
-          />
-        </div>
-
-        {bankConnected && accounts.length > 0 && (
-          <div className="mb-6 sm:mb-8">
-            <div className="space-y-4 sm:space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Contas Bancárias</h3>
-                </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
-                  {accounts
-                    .filter((acc) => acc.type === "BANK")
-                    .map((account) => (
-                      <div
-                        key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
-                            {account.marketingName || account.name}
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
-                          {mapAccountSubtype(account.subtype)}
-                        </p>
-                        <p className="text-base sm:text-lg font-bold truncate">
-                          {account.balance.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: account.currency || "BRL",
-                          })}
-                        </p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Cartões de Crédito</h3>
-                </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
-                  {accounts
-                    .filter((acc) => acc.type === "CREDIT")
-                    .map((account) => (
-                      <div
-                        key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
-                            {account.marketingName || account.name}
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
-                          {account.brand
-                            ? `${account.brand} - ${mapAccountSubtype(account.subtype)}`
-                            : mapAccountSubtype(account.subtype)}
-                        </p>
-                        <p className="text-base sm:text-lg font-bold truncate">
-                          {account.balance.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: account.currency || "BRL",
-                          })}
-                        </p>
-                      </div>
-                    ))}
-                </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+          <section className="xl:col-span-2 bg-card rounded-xl shadow-sm border p-4 sm:p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <div className="flex items-center gap-2">
+                <Wallet className="text-primary h-5 w-5" />
+                <h3 className="text-base sm:text-lg font-semibold">Saldo do Mês</h3>
               </div>
             </div>
+            <div className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between md:divide-x w-full">
+              <div className="flex-1 md:pr-6">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
+                  Saldo Total
+                </p>
+                {loadingData || bankLoading ? (
+                  <div className="h-10 sm:h-12 w-32 sm:w-40 bg-muted animate-pulse rounded" />
+                ) : (
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+                    {monthlyBalance.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  </h2>
+                )}
+              </div>
+              <div className="flex-1 md:px-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-full">
+                    <TrendingUp className="text-green-600 dark:text-green-400 h-4 w-4" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-medium">Receitas</span>
+                </div>
+                {loadingData || bankLoading ? (
+                  <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
+                ) : (
+                  <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+                    {(financialData?.monthlyIncome ?? 0).toLocaleString(
+                      "pt-BR",
+                      {
+                        style: "currency",
+                        currency: "BRL",
+                      },
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="flex-1 md:pl-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <TrendingDown className="text-red-600 dark:text-red-400 h-4 w-4" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-medium">Gastos</span>
+                </div>
+                {loadingData || bankLoading ? (
+                  <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
+                ) : (
+                  <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
+                    {(financialData?.monthlyExpenses ?? 0).toLocaleString(
+                      "pt-BR",
+                      {
+                        style: "currency",
+                        currency: "BRL",
+                      },
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
 
-            {bankTransactions.length > 0 && (
-              <Card className="mt-4 sm:mt-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">
-                    Últimas Transações Bancárias
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {bankTransactions.slice(0, 10).map((transaction) => (
+          <section className="xl:col-span-1 bg-card rounded-xl shadow-sm border p-4 sm:p-6 flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Building2 className="text-primary h-5 w-5" />
+                <h3 className="text-base sm:text-lg font-bold">Contas Bancárias</h3>
+              </div>
+            </div>
+            {bankConnected && accounts.length > 0 ? (
+              <>
+                <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+                  {accounts
+                    .filter((acc) => acc.type === "BANK")
+                    .slice(0, 3)
+                    .map((account, index) => (
                       <div
-                        key={transaction.id}
-                        className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1 xs:gap-2 p-2 sm:p-3 bg-muted/20 rounded"
+                        key={account.id}
+                        className={`snap-center flex-none w-56 sm:w-64 p-4 rounded-lg flex flex-col justify-between h-28 relative overflow-hidden group ${
+                          index === 0
+                            ? "bg-muted"
+                            : index === 1
+                              ? "bg-purple-100 dark:bg-purple-900/30"
+                              : "bg-orange-100 dark:bg-orange-900/30"
+                        }`}
                       >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <Building2 className="h-8 w-8 sm:h-10 sm:w-10" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium flex items-center gap-1 truncate">
+                            <CreditCard className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {account.marketingName || account.name}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {mapAccountSubtype(account.subtype)}
+                          </p>
+                        </div>
+                        <p className="text-lg sm:text-xl font-bold truncate">
+                          {account.balance.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: account.currency || "BRL",
+                          })}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+                <div className="flex justify-center mt-2 gap-1">
+                  {accounts
+                    .filter((acc) => acc.type === "BANK")
+                    .slice(0, 3)
+                    .map((_, index) => (
+                      <div
+                        key={index}
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          index === 0 ? "bg-primary" : "bg-muted"
+                        }`}
+                      />
+                    ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta conectada
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+          <div className="xl:col-span-2 space-y-4 sm:space-y-6">
+            {bankConnected && bankTransactions.length > 0 && (
+              <section className="bg-card rounded-xl shadow-sm border overflow-hidden">
+                <div className="p-4 sm:p-6 border-b bg-muted/20 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-primary h-5 w-5 flex-shrink-0" />
+                    <h3 className="text-base sm:text-lg font-bold">
+                      Últimas Transações Bancárias
+                    </h3>
+                  </div>
+                  <button className="text-xs sm:text-sm text-primary hover:underline font-medium self-start sm:self-auto">
+                    Ver extrato completo
+                  </button>
+                </div>
+                <div className="divide-y">
+                  {bankTransactions.slice(0, 3).map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="p-3 sm:p-4 hover:bg-muted/20 transition-colors flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <div
+                          className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            transaction.amount >= 0
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                              : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {transaction.amount >= 0 ? (
+                            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />
+                          )}
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium truncate">
+                          <p className="font-semibold text-sm sm:text-base truncate">
                             {transaction.description}
                           </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {new Date(transaction.date).toLocaleDateString(
                               "pt-BR",
                             )}
                           </p>
                         </div>
-                        <span
-                          className={`text-xs sm:text-sm font-medium whitespace-nowrap ${
-                            transaction.amount >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {transaction.amount >= 0 ? "+" : ""}
-                          {transaction.amount.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          })}
-                        </span>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <span
+                        className={`font-bold text-sm sm:text-base whitespace-nowrap ${
+                          transaction.amount >= 0
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {transaction.amount >= 0 ? "+" : ""}
+                        {transaction.amount.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
-          </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
-            <TransactionForm onSave={handleDataRefresh} />
+            <section className="bg-card rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-muted/20 flex justify-between items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <Users className="h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">Meus Grupos</span>
+                </h3>
+                <button className="text-xs text-primary hover:underline whitespace-nowrap">
+                  Ver todos
+                </button>
+              </div>
+              <div className="p-3 sm:p-4">
+                <FamilyGroups />
+              </div>
+            </section>
           </div>
 
-          <div className="w-full">
-            <TransactionList
-              key={refreshKey}
-              onDataChange={handleDataRefresh}
-            />
-          </div>
-        </div>
+          <div className="xl:col-span-1 space-y-4 sm:space-y-6">
+            <section className="bg-card rounded-xl shadow-sm border overflow-hidden flex flex-col">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-muted/20">
+                <h3 className="text-base sm:text-lg font-bold text-primary flex items-center gap-2">
+                  <CheckSquare className="h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">Próximas Tarefas</span>
+                </h3>
+              </div>
+              <div className="p-4 sm:p-6 flex-1 flex flex-col min-h-[200px]">
+                <ScheduledTasks />
+              </div>
+            </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
-            <FamilyGroups />
-          </div>
-          <div className="w-full">
-            <ScheduledTasks />
-          </div>
-        </div>
-
-        <div className="mb-6 sm:mb-8">
-          <SubscriptionStatus />
-        </div>
-
-        <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-success/10 border border-success/20 rounded-lg">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-success mt-0.5 sm:mt-1 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-sm sm:text-base text-success mb-1 sm:mb-2">
-                Sistema de Autenticação e Grupos Ativo! 🎉
-              </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-3">
-                Agora você pode criar grupos, compartilhar tarefas agendadas
-                entre membros da família e receber notificações por email e
-                push. Seus dados estão protegidos e sincronizados com o
-                Supabase.
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                Use os "Grupos" para compartilhar tarefas com sua família usando
-                o código de convite.
-              </p>
-            </div>
+            <section className="bg-gradient-to-br from-indigo-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-xl shadow-sm border border-indigo-100 dark:border-gray-700 p-4 sm:p-5">
+              <SubscriptionStatus />
+            </section>
           </div>
         </div>
       </main>

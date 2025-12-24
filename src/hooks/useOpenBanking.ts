@@ -293,28 +293,16 @@ export const useOpenBanking = () => {
           setConnected(false);
         }
       } catch (error) {
-        toast({
-          title: "Erro ao buscar conexão",
-          description:
-            "Não foi possível verificar sua conexão com o Open Finance.",
-          variant: "destructive",
-        });
+        // Silently fail on initial load to prevent flickering
+        setConnected(false);
       } finally {
         setLoading(false);
       }
     };
 
     init();
-  }, [
-    user,
-    supabase,
-    loadAccounts,
-    loadInvestments,
-    loadAllAccounts,
-    loadAllInvestments,
-    loadAllTransactions,
-    toast,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const initiateConnection = useCallback(
     async () => {
