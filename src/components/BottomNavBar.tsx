@@ -23,14 +23,6 @@ export const BottomNavBar = () => {
 
   return (
     <>
-      <Button
-        onClick={() => setIsTransactionDialogOpen(true)}
-        className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] rounded-full h-14 w-14 bg-primary hover:bg-primary/90 shadow-xl"
-        size="icon"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
-      
       <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t border-border">
         <div
           className="grid h-full max-w-lg mx-auto font-medium"
@@ -59,6 +51,15 @@ export const BottomNavBar = () => {
           })}
         </div>
       </div>
+
+      <Button
+        onClick={() => setIsTransactionDialogOpen(true)}
+        className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 rounded-full h-14 w-14 bg-primary hover:bg-primary/90 shadow-xl"
+        size="icon"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
       <Dialog
         open={isTransactionDialogOpen}
         onOpenChange={setIsTransactionDialogOpen}
