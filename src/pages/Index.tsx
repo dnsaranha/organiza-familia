@@ -23,7 +23,10 @@ import {
   CreditCard,
   Users,
   CheckSquare,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface FinancialData {
   balance: number;
@@ -47,6 +50,7 @@ const Index = () => {
     loading: bankLoading,
     refreshAllData: refetchBankData,
   } = useOpenBanking();
+  const [valuesVisible, setValuesVisible] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -194,6 +198,17 @@ const Index = () => {
                 <Wallet className="text-primary h-5 w-5" />
                 <h3 className="text-base sm:text-lg font-semibold">Saldo do Mês</h3>
               </div>
+              <button
+                onClick={() => setValuesVisible(!valuesVisible)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
+              >
+                {valuesVisible ? (
+                  <Eye className="h-5 w-5" />
+                ) : (
+                  <EyeOff className="h-5 w-5" />
+                )}
+              </button>
             </div>
             <div className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between md:divide-x w-full">
               <div className="flex-1 md:pr-6">
@@ -203,55 +218,74 @@ const Index = () => {
                 {loadingData || bankLoading ? (
                   <div className="h-10 sm:h-12 w-32 sm:w-40 bg-muted animate-pulse rounded" />
                 ) : (
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
-                    {monthlyBalance.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
+                  <h2
+                    className={cn(
+                      "text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight",
+                      monthlyBalance >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400",
+                    )}
+                  >
+                    {valuesVisible
+                      ? monthlyBalance.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })
+                      : "••••••"}
                   </h2>
                 )}
               </div>
-              <div className="flex-1 md:px-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-full">
-                    <TrendingUp className="text-green-600 dark:text-green-400 h-4 w-4" />
+              <div className="flex flex-row items-center justify-between w-full divide-x md:contents">
+                <div className="flex-1 pr-4 md:pr-0 md:px-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-full">
+                      <TrendingUp className="text-green-600 dark:text-green-400 h-4 w-4" />
+                    </div>
+                    <span className="text-xs sm:text-sm font-medium">
+                      Receitas
+                    </span>
                   </div>
-                  <span className="text-xs sm:text-sm font-medium">Receitas</span>
+                  {loadingData || bankLoading ? (
+                    <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
+                  ) : (
+                    <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+                      {valuesVisible
+                        ? (financialData?.monthlyIncome ?? 0).toLocaleString(
+                            "pt-BR",
+                            {
+                              style: "currency",
+                              currency: "BRL",
+                            },
+                          )
+                        : "••••••"}
+                    </p>
+                  )}
                 </div>
-                {loadingData || bankLoading ? (
-                  <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
-                ) : (
-                  <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
-                    {(financialData?.monthlyIncome ?? 0).toLocaleString(
-                      "pt-BR",
-                      {
-                        style: "currency",
-                        currency: "BRL",
-                      },
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="flex-1 md:pl-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <TrendingDown className="text-red-600 dark:text-red-400 h-4 w-4" />
+                <div className="flex-1 pl-4 md:pl-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
+                      <TrendingDown className="text-red-600 dark:text-red-400 h-4 w-4" />
+                    </div>
+                    <span className="text-xs sm:text-sm font-medium">
+                      Gastos
+                    </span>
                   </div>
-                  <span className="text-xs sm:text-sm font-medium">Gastos</span>
+                  {loadingData || bankLoading ? (
+                    <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
+                  ) : (
+                    <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
+                      {valuesVisible
+                        ? (financialData?.monthlyExpenses ?? 0).toLocaleString(
+                            "pt-BR",
+                            {
+                              style: "currency",
+                              currency: "BRL",
+                            },
+                          )
+                        : "••••••"}
+                    </p>
+                  )}
                 </div>
-                {loadingData || bankLoading ? (
-                  <div className="h-7 sm:h-8 w-28 sm:w-32 bg-muted animate-pulse rounded" />
-                ) : (
-                  <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
-                    {(financialData?.monthlyExpenses ?? 0).toLocaleString(
-                      "pt-BR",
-                      {
-                        style: "currency",
-                        currency: "BRL",
-                      },
-                    )}
-                  </p>
-                )}
               </div>
             </div>
           </section>
