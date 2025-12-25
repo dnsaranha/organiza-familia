@@ -522,7 +522,7 @@ const TasksPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Tarefas Agendadas</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
             <Button
                 variant="outline"
                 onClick={() => navigate('/tasks/calendar')}
