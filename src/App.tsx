@@ -16,6 +16,7 @@ import InvestmentsPage from "./pages/Investments";
 import NotificationSettingsPage from "./pages/NotificationSettings";
 import OpenFinanceConnectPage from "./pages/OpenFinanceConnect";
 import TasksPage from "./pages/Tasks";
+import TasksCalendar from "./pages/TasksCalendar";
 import GoalsPage from "./pages/Goals";
 import ForecastPage from "./pages/Forecast";
 import { PWASettings } from "./pages/PWASettings";
@@ -168,6 +169,14 @@ const App = () => {
                   element={
                     <AppShell>
                       <TasksPage />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/tasks/calendar"
+                  element={
+                    <AppShell>
+                      <TasksCalendar />
                     </AppShell>
                   }
                 />
