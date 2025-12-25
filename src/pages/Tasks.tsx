@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Bell, Mail, Smartphone, Plus, Clock, CheckCircle, Trash2, Edit, Minus, PlusIcon, Undo2 } from "lucide-react";
+import { Calendar, Bell, Mail, Smartphone, Plus, Clock, CheckCircle, Trash2, Edit, Minus, PlusIcon, Undo2, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Combobox } from "@/components/ui/combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useNavigate } from "react-router-dom";
 
 interface ScheduledTask {
   id: string;
@@ -80,6 +81,7 @@ const TasksPage = () => {
   const { toast } = useToast();
   const { permission, requestPermission, scheduleNotification } = useNotifications();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useTaskNotifications();
 
@@ -520,15 +522,24 @@ const TasksPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Tarefas Agendadas</h1>
-        <Button
-            onClick={() => {
-                setSelectedTask(null);
-                setIsFormOpen(true);
-            }}
-        >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Tarefa
-        </Button>
+        <div className="flex flex-col gap-2">
+            <Button
+                variant="outline"
+                onClick={() => navigate('/tasks/calendar')}
+            >
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                Ver Calendário
+            </Button>
+            <Button
+                onClick={() => {
+                    setSelectedTask(null);
+                    setIsFormOpen(true);
+                }}
+            >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tarefa
+            </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
