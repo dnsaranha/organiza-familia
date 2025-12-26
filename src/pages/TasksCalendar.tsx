@@ -4,38 +4,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, Calendar as CalendarIcon, Clock, Mail, Bell, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus, Undo2, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-
-interface ScheduledTask {
-  id: string;
-  title: string;
-  description?: string;
-  task_type: 'payment_reminder' | 'budget_alert' | 'income_reminder' | 'custom';
-  schedule_date: string;
-  notification_email: boolean;
-  notification_push: boolean;
-  is_completed: boolean;
-  created_at: string;
-  group_id?: string;
-  value?: number;
-  category?: string;
-  is_recurring?: boolean;
-  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  recurrence_interval?: number;
-  recurrence_end_date?: string;
-  parent_task_id?: string;
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
+import { useTaskActions } from "@/hooks/useTaskActions";
 
 const TasksCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const { markAsCompleted, undoCompletion, deleteTask } = useTaskActions(() => loadTasks());
 
   useEffect(() => {
     if (user) {
@@ -62,6 +49,11 @@ const TasksCalendar = () => {
     }
   };
 
+  const handleEdit = (task: ScheduledTask) => {
+    setSelectedTask(task);
+    setIsFormOpen(true);
+  };
+
   const daysWithTasks = useMemo(() => {
     return tasks.map(t => new Date(t.schedule_date));
   }, [tasks]);
@@ -79,13 +71,37 @@ const TasksCalendar = () => {
   }, [tasks, date]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-       <div className="flex items-center gap-4 mb-6">
-         <Button variant="ghost" onClick={() => navigate('/tasks')} className="pl-0 hover:pl-2 transition-all">
-           <ChevronLeft className="h-5 w-5 mr-1" />
-           Voltar para Lista
-         </Button>
-       </div>
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Calendário de Tarefas</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Visualize suas tarefas no calendário
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate('/tasks')}
+            >
+                <List className="h-4 w-4 sm:mr-2" />
+                <span className="sm:inline">Ver Lista</span>
+            </Button>
+            <Button
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => {
+                    setSelectedTask(null);
+                    setIsFormOpen(true);
+                }}
+            >
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="sm:inline">Nova Tarefa</span>
+            </Button>
+        </div>
+      </div>
 
        <div className="flex flex-col md:flex-row gap-8">
           <div className="w-full md:w-auto flex justify-center md:block">
@@ -127,6 +143,9 @@ const TasksCalendar = () => {
                                     </h3>
                                     {task.is_completed && <CheckCircle className="h-3 w-3 text-green-500" />}
                                 </div>
+                                {task.description && (
+                                    <p className="text-sm text-muted-foreground">{task.description}</p>
+                                )}
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                     <span className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
@@ -140,19 +159,81 @@ const TasksCalendar = () => {
                                 </div>
                             </div>
 
-                            {task.value !== undefined && task.value !== 0 && (
-                                <Badge
-                                    className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
-                                >
-                                    R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                </Badge>
-                            )}
+                            <div className="flex flex-col items-end gap-2">
+                                <div className="flex items-center gap-2">
+                                    {!task.is_completed ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => markAsCompleted(task)}
+                                        className="h-8 px-3"
+                                        title="Marcar como concluída"
+                                    >
+                                        <CheckCircle className="h-3 w-3" />
+                                    </Button>
+                                    ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => undoCompletion(task.id)}
+                                        className="h-8 px-3 text-orange-600 hover:text-orange-700"
+                                        title="Desfazer conclusão"
+                                    >
+                                        <Undo2 className="h-3 w-3" />
+                                    </Button>
+                                    )}
+                                    <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEdit(task)}
+                                    className="h-8 px-3"
+                                    >
+                                    <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => deleteTask(task.id)}
+                                    className="h-8 px-3 text-destructive hover:text-destructive"
+                                    >
+                                    <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </div>
+
+                                {task.value !== undefined && task.value !== 0 && (
+                                    <Badge
+                                        className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
+                                    >
+                                        R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    </Badge>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                  ))
              )}
           </div>
        </div>
+
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
+          </DialogHeader>
+          <ScheduledTaskForm
+            onSuccess={() => {
+              setIsFormOpen(false);
+              setSelectedTask(null);
+              loadTasks();
+            }}
+            onCancel={() => {
+                setIsFormOpen(false);
+                setSelectedTask(null);
+            }}
+            initialData={selectedTask || (date ? { schedule_date: date.toISOString() } as unknown as ScheduledTask : null)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
