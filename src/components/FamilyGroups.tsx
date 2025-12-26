@@ -458,16 +458,16 @@ export const FamilyGroups = () => {
   return (
     <ErrorBoundary fallback={fallbackUI}>
       <Card className="bg-gradient-card shadow-card border">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Grupos
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center gap-2 text-lg sm:text-xl">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              Grupos Familiares
             </div>
-            <div className="flex gap-2">
+            <div className="flex w-full sm:w-auto gap-2">
               <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" disabled={loadingGroups}>
+                  <Button size="sm" variant="outline" disabled={loadingGroups} className="flex-1 sm:flex-none">
                     <UserPlus className="h-4 w-4 mr-2" />
                     Entrar
                   </Button>
@@ -501,7 +501,7 @@ export const FamilyGroups = () => {
                 <DialogTrigger asChild>
                   <Button
                     size="sm"
-                    className="bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
+                    className="flex-1 sm:flex-none bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
                     disabled={loadingGroups}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -532,7 +532,7 @@ export const FamilyGroups = () => {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
           {loadingGroups ? (
             <div className="text-center py-8 text-muted-foreground">
               <Loader2 className="h-8 w-8 mx-auto animate-spin mb-3 opacity-50" />
@@ -545,7 +545,7 @@ export const FamilyGroups = () => {
               <p className="text-sm">Crie um grupo ou entre em um existente!</p>
             </div>
           ) : (
-            <Accordion type="single" collapsible className="w-full space-y-4">
+            <Accordion type="single" collapsible className="w-full space-y-3 sm:space-y-4">
               {groups.map((group) => (
                 <AccordionItem
                   key={group.id}
@@ -553,7 +553,7 @@ export const FamilyGroups = () => {
                   className="bg-muted/50 border-0 rounded-lg overflow-hidden"
                 >
                   <AccordionTrigger
-                    className="p-4 hover:no-underline"
+                    className="p-3 sm:p-4 hover:no-underline"
                     onClick={() => toggleGroupMembers(group.id)}
                   >
                     <div className="flex items-start justify-between w-full">

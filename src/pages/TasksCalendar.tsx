@@ -79,17 +79,17 @@ const TasksCalendar = () => {
   }, [tasks, date]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-       <div className="flex items-center gap-4 mb-6">
-         <Button variant="ghost" onClick={() => navigate('/tasks')} className="pl-0 hover:pl-2 transition-all">
-           <ChevronLeft className="h-5 w-5 mr-1" />
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+       <div className="flex items-center gap-4 mb-4">
+         <Button variant="ghost" size="sm" onClick={() => navigate('/tasks')} className="pl-0 hover:pl-2 transition-all">
+           <ChevronLeft className="h-4 w-4 mr-1" />
            Voltar para Lista
          </Button>
        </div>
 
-       <div className="flex flex-col md:flex-row gap-8">
+       <div className="flex flex-col md:flex-row gap-4 sm:gap-8">
           <div className="w-full md:w-auto flex justify-center md:block">
-             <div className="border rounded-md p-4 bg-background shadow-sm">
+             <div className="border rounded-md p-3 sm:p-4 bg-background shadow-sm w-full max-w-[350px] mx-auto md:max-w-none">
                 <Calendar
                     mode="single"
                     selected={date}
@@ -119,7 +119,7 @@ const TasksCalendar = () => {
              ) : (
                  selectedDateTasks.map(task => (
                     <Card key={task.id} className="overflow-hidden border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
-                        <CardContent className="p-4 flex items-center justify-between">
+                        <CardContent className="p-3 sm:p-4 flex items-center justify-between">
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <h3 className={`font-medium ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>

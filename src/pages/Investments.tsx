@@ -51,16 +51,21 @@ const Investments = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Meus Investimentos</h1>
-          <Button onClick={handleRefresh} disabled={loading} size="sm">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Meus Investimentos</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Acompanhe a evolução e dividendos da sua carteira
+            </p>
+          </div>
+          <Button onClick={handleRefresh} disabled={loading} size="sm" className="w-full sm:w-auto">
             <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar Dados
           </Button>
         </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 sm:mb-6">
         <FinancialCard
           title="Patrimônio Total"
           amount={totalValue}
