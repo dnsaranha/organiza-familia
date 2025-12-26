@@ -23,7 +23,6 @@ export interface ScheduledTask {
   notification_push: boolean;
   is_completed: boolean;
   created_at: string;
-  user_id?: string;
   group_id?: string;
   value?: number;
   category?: string;
@@ -292,19 +291,15 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           <div className="space-y-2">
               <Label htmlFor="value">Valor (R$)</Label>
               <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
-                  <Input
-                      id="value"
-                      type="number"
-                      step="0.01"
-                      value={formData.value === 0 ? '' : formData.value}
-                      onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                      placeholder="0,00"
-                      className="pl-10"
-                  />
-                </div>
-                {Number(formData.value) > 0 && (
+                <Input
+                    id="value"
+                    type="number"
+                    step="0.01"
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
+                    placeholder="Ex: 150.50"
+                />
+                {formData.value > 0 && (
                     <ToggleGroup
                         type="single"
                         variant="outline"

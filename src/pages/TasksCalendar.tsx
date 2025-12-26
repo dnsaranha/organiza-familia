@@ -4,25 +4,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus, Undo2, Edit, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
-import { useTaskActions } from "@/hooks/useTaskActions";
 
 const TasksCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-
-  const { markAsCompleted, undoCompletion, deleteTask } = useTaskActions(() => loadTasks());
 
   useEffect(() => {
     if (user) {
@@ -47,11 +43,6 @@ const TasksCalendar = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleEdit = (task: ScheduledTask) => {
-    setSelectedTask(task);
-    setIsFormOpen(true);
   };
 
   const daysWithTasks = useMemo(() => {
@@ -92,10 +83,7 @@ const TasksCalendar = () => {
             <Button
                 size="sm"
                 className="flex-1 sm:flex-none"
-                onClick={() => {
-                    setSelectedTask(null);
-                    setIsFormOpen(true);
-                }}
+                onClick={() => setIsFormOpen(true)}
             >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Nova Tarefa</span>
@@ -143,9 +131,6 @@ const TasksCalendar = () => {
                                     </h3>
                                     {task.is_completed && <CheckCircle className="h-3 w-3 text-green-500" />}
                                 </div>
-                                {task.description && (
-                                    <p className="text-sm text-muted-foreground">{task.description}</p>
-                                )}
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                     <span className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
@@ -159,55 +144,13 @@ const TasksCalendar = () => {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col items-end gap-2">
-                                <div className="flex items-center gap-2">
-                                    {!task.is_completed ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => markAsCompleted(task)}
-                                        className="h-8 px-3"
-                                        title="Marcar como concluída"
-                                    >
-                                        <CheckCircle className="h-3 w-3" />
-                                    </Button>
-                                    ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => undoCompletion(task.id)}
-                                        className="h-8 px-3 text-orange-600 hover:text-orange-700"
-                                        title="Desfazer conclusão"
-                                    >
-                                        <Undo2 className="h-3 w-3" />
-                                    </Button>
-                                    )}
-                                    <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEdit(task)}
-                                    className="h-8 px-3"
-                                    >
-                                    <Edit className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => deleteTask(task.id)}
-                                    className="h-8 px-3 text-destructive hover:text-destructive"
-                                    >
-                                    <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-
-                                {task.value !== undefined && task.value !== 0 && (
-                                    <Badge
-                                        className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
-                                    >
-                                        R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                    </Badge>
-                                )}
-                            </div>
+                            {task.value !== undefined && task.value !== 0 && (
+                                <Badge
+                                    className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
+                                >
+                                    R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                </Badge>
+                            )}
                         </CardContent>
                     </Card>
                  ))
@@ -218,19 +161,15 @@ const TasksCalendar = () => {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
+            <DialogTitle>Nova Tarefa</DialogTitle>
           </DialogHeader>
           <ScheduledTaskForm
             onSuccess={() => {
               setIsFormOpen(false);
-              setSelectedTask(null);
               loadTasks();
             }}
-            onCancel={() => {
-                setIsFormOpen(false);
-                setSelectedTask(null);
-            }}
-            initialData={selectedTask || (date ? { schedule_date: date.toISOString() } as unknown as ScheduledTask : null)}
+            onCancel={() => setIsFormOpen(false)}
+            initialData={date ? { schedule_date: date.toISOString() } as unknown as ScheduledTask : null}
           />
         </DialogContent>
       </Dialog>
