@@ -70,7 +70,7 @@ const TasksPage = () => {
     notification_email: true,
     notification_push: true,
     group_id: 'personal',
-    value: 0,
+    value: '' as string | number,
     category: '',
     is_recurring: false,
     recurrence_pattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -144,7 +144,7 @@ const TasksPage = () => {
         notification_email: selectedTask.notification_email,
         notification_push: selectedTask.notification_push,
         group_id: selectedTask.group_id || 'personal',
-        value: selectedTask.value ? Math.abs(selectedTask.value) : 0,
+        value: selectedTask.value ? Math.abs(selectedTask.value) : '',
         category: selectedTask.category || '',
         is_recurring: selectedTask.is_recurring || false,
         recurrence_pattern: selectedTask.recurrence_pattern || 'monthly',
@@ -166,7 +166,7 @@ const TasksPage = () => {
         notification_email: true,
         notification_push: true,
         group_id: 'personal',
-        value: 0,
+        value: '',
         category: '',
         is_recurring: false,
         recurrence_pattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -281,7 +281,9 @@ const TasksPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.schedule_date || !formData.schedule_time || (formData.value !== 0 && !formData.category)) {
+    const numericValue = typeof formData.value === 'string' ? (parseFloat(formData.value) || 0) : formData.value;
+
+    if (!formData.title || !formData.schedule_date || !formData.schedule_time || (numericValue !== 0 && !formData.category)) {
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha o título, data, horário e categoria (se houver valor).",
@@ -309,7 +311,7 @@ const TasksPage = () => {
 
       const localCreatedAt = new Date().toISOString();
 
-      const valueWithSign = formData.value * (transactionType === 'income' ? 1 : -1);
+      const valueWithSign = numericValue * (transactionType === 'income' ? 1 : -1);
 
       const taskData = {
           title: formData.title,
@@ -705,17 +707,21 @@ const TasksPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                      <Label htmlFor="value">Valor (R$)</Label>
+                      <Label htmlFor="value">Valor</Label>
                       <div className="flex items-center gap-2">
-                        <Input
-                            id="value"
-                            type="number"
-                            step="0.01"
-                            value={formData.value}
-                            onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                            placeholder="Ex: 150.50"
-                        />
-                        {formData.value > 0 && (
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
+                          <Input
+                              id="value"
+                              type="number"
+                              step="0.01"
+                              value={formData.value}
+                              onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                              placeholder="0,00"
+                              className="pl-10"
+                          />
+                        </div>
+                        {Number(formData.value) > 0 && (
                             <ToggleGroup
                                 type="single"
                                 variant="outline"
