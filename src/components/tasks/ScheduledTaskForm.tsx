@@ -78,11 +78,10 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   });
 
   useEffect(() => {
-    if (user) {
-      loadGroups();
-      loadCategories();
-    }
-  }, [user]);
+    // Carregar grupos e categorias sempre que o componente for montado
+    loadGroups();
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -295,9 +294,12 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
                     id="value"
                     type="number"
                     step="0.01"
-                    value={formData.value}
-                    onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                    placeholder="Ex: 150.50"
+                    value={formData.value === 0 ? '' : formData.value}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setFormData({ ...formData, value: isNaN(val) ? 0 : val });
+                    }}
+                    placeholder="0,00"
                 />
                 {formData.value > 0 && (
                     <ToggleGroup

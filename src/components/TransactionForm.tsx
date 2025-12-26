@@ -52,7 +52,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
       }
     };
     fetchGroups();
-  }, [user]);
+  }, [user?.id]);
 
   // Efeito para popular o formulário ao editar uma transação
   useEffect(() => {

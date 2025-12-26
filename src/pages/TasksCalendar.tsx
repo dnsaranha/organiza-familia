@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus, Edit, Trash2, Undo2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ const TasksCalendar = () => {
     if (user) {
       loadTasks();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadTasks = async () => {
     try {

@@ -29,7 +29,7 @@ export const BudgetScopeSwitcher = () => {
       }
     };
     fetchGroups();
-  }, [user]);
+  }, [user?.id]);
 
   const selectedGroup = scope === 'personal'
     ? { name: 'Pessoal' }

@@ -31,7 +31,7 @@ export const SubscriptionStatus = () => {
     if (user) {
       fetchSubscription();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchSubscription = async () => {
     try {
