@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Bell, Mail, Smartphone, Plus, Clock, CheckCircle, Trash2, Edit, Minus, PlusIcon, Undo2 } from "lucide-react";
+import { Calendar, Bell, Mail, Smartphone, Plus, Clock, CheckCircle, Trash2, Edit, Minus, PlusIcon, Undo2, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Combobox } from "@/components/ui/combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useNavigate } from "react-router-dom";
 
 interface ScheduledTask {
   id: string;
@@ -80,6 +81,7 @@ const TasksPage = () => {
   const { toast } = useToast();
   const { permission, requestPermission, scheduleNotification } = useNotifications();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useTaskNotifications();
 
@@ -517,21 +519,39 @@ const TasksPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Tarefas Agendadas</h1>
-        <Button
-            onClick={() => {
-                setSelectedTask(null);
-                setIsFormOpen(true);
-            }}
-        >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Tarefa
-        </Button>
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Tarefas Agendadas</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Gerencie e acompanhe suas tarefas futuras
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate('/tasks/calendar')}
+            >
+                <CalendarIcon className="h-4 w-4 sm:mr-2" />
+                <span className="sm:inline">Ver Calendário</span>
+            </Button>
+            <Button
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => {
+                    setSelectedTask(null);
+                    setIsFormOpen(true);
+                }}
+            >
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="sm:inline">Nova Tarefa</span>
+            </Button>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 mb-4 sm:mb-6">
         <Input
           placeholder="Buscar tarefas..."
           value={searchTerm}
@@ -565,7 +585,7 @@ const TasksPage = () => {
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {filteredTasks.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -575,7 +595,7 @@ const TasksPage = () => {
         ) : (
           filteredTasks.map((task) => (
             <Card key={task.id} className={`border ${task.is_completed ? 'bg-muted/50 opacity-75' : 'bg-background'}`}>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
