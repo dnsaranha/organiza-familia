@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, CheckCircle, List, Plus, Undo2, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ const TasksCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -40,6 +41,149 @@ const TasksCalendar = () => {
       toast({
         title: "Erro",
         description: "Não foi possível carregar as tarefas agendadas.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = (task: ScheduledTask) => {
+    setSelectedTask(task);
+    setIsFormOpen(true);
+  };
+
+  const markAsCompleted = async (taskId: string) => {
+    try {
+      // Get the task details first
+      const { data: task, error: fetchError } = await supabase
+        .from('scheduled_tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Mark current task as completed
+      const { error: updateError } = await supabase
+        .from('scheduled_tasks')
+        .update({ is_completed: true })
+        .eq('id', taskId);
+
+      if (updateError) throw updateError;
+
+      // If it's a recurring task, create the next occurrence
+      if (task.is_recurring && task.recurrence_pattern) {
+        const currentDate = new Date(task.schedule_date);
+        let nextDate = new Date(currentDate);
+
+        // Calculate next occurrence based on pattern
+        switch (task.recurrence_pattern) {
+          case 'daily':
+            nextDate.setDate(nextDate.getDate() + (task.recurrence_interval || 1));
+            break;
+          case 'weekly':
+            nextDate.setDate(nextDate.getDate() + (7 * (task.recurrence_interval || 1)));
+            break;
+          case 'monthly':
+            nextDate.setMonth(nextDate.getMonth() + (task.recurrence_interval || 1));
+            break;
+          case 'yearly':
+            nextDate.setFullYear(nextDate.getFullYear() + (task.recurrence_interval || 1));
+            break;
+        }
+
+        // Check if we should create the next occurrence (not past end date)
+        const shouldCreateNext = !task.recurrence_end_date ||
+          nextDate <= new Date(task.recurrence_end_date);
+
+        if (shouldCreateNext) {
+          // Create new task for next occurrence
+          const { error: insertError } = await supabase
+            .from('scheduled_tasks')
+            .insert({
+              title: task.title,
+              description: task.description,
+              task_type: task.task_type,
+              schedule_date: nextDate.toISOString(),
+              notification_email: task.notification_email,
+              notification_push: task.notification_push,
+              user_id: task.user_id,
+              group_id: task.group_id,
+              value: task.value,
+              category: task.category,
+              is_recurring: true,
+              recurrence_pattern: task.recurrence_pattern,
+              recurrence_interval: task.recurrence_interval,
+              recurrence_end_date: task.recurrence_end_date,
+              parent_task_id: task.parent_task_id || task.id,
+            });
+
+          if (insertError) throw insertError;
+        }
+      }
+
+      toast({
+        title: "Tarefa concluída",
+        description: task.is_recurring
+          ? "Tarefa concluída e próxima ocorrência criada."
+          : "A tarefa foi marcada como concluída.",
+      });
+
+      loadTasks();
+    } catch (error) {
+      console.error('Erro ao concluir tarefa:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar a tarefa como concluída.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const undoCompletion = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_tasks')
+        .update({ is_completed: false })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Conclusão desfeita",
+        description: "A tarefa foi marcada como pendente novamente.",
+      });
+
+      loadTasks();
+    } catch (error) {
+      console.error('Erro ao desfazer conclusão:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível desfazer a conclusão da tarefa.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_tasks')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Tarefa removida",
+        description: "A tarefa foi removida com sucesso.",
+      });
+
+      loadTasks();
+    } catch (error) {
+      console.error('Erro ao remover tarefa:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a tarefa.",
         variant: "destructive",
       });
     }
@@ -83,7 +227,10 @@ const TasksCalendar = () => {
             <Button
                 size="sm"
                 className="flex-1 sm:flex-none"
-                onClick={() => setIsFormOpen(true)}
+                onClick={() => {
+                    setSelectedTask(null);
+                    setIsFormOpen(true);
+                }}
             >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Nova Tarefa</span>
@@ -131,6 +278,9 @@ const TasksCalendar = () => {
                                     </h3>
                                     {task.is_completed && <CheckCircle className="h-3 w-3 text-green-500" />}
                                 </div>
+                                {task.description && (
+                                    <p className="text-sm text-muted-foreground">{task.description}</p>
+                                )}
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                     <span className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
@@ -144,13 +294,55 @@ const TasksCalendar = () => {
                                 </div>
                             </div>
 
-                            {task.value !== undefined && task.value !== 0 && (
-                                <Badge
-                                    className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
-                                >
-                                    R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                </Badge>
-                            )}
+                            <div className="flex flex-col items-end gap-2">
+                                <div className="flex items-center gap-2">
+                                    {!task.is_completed ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => markAsCompleted(task.id)}
+                                        className="h-8 px-3"
+                                        title="Marcar como concluída"
+                                    >
+                                        <CheckCircle className="h-3 w-3" />
+                                    </Button>
+                                    ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => undoCompletion(task.id)}
+                                        className="h-8 px-3 text-orange-600 hover:text-orange-700"
+                                        title="Desfazer conclusão"
+                                    >
+                                        <Undo2 className="h-3 w-3" />
+                                    </Button>
+                                    )}
+                                    <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEdit(task)}
+                                    className="h-8 px-3"
+                                    >
+                                    <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => deleteTask(task.id)}
+                                    className="h-8 px-3 text-destructive hover:text-destructive"
+                                    >
+                                    <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </div>
+
+                                {task.value !== undefined && task.value !== 0 && (
+                                    <Badge
+                                        className="text-base px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium whitespace-nowrap"
+                                    >
+                                        R$ {Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    </Badge>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                  ))
@@ -161,15 +353,19 @@ const TasksCalendar = () => {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nova Tarefa</DialogTitle>
+            <DialogTitle>{selectedTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </DialogHeader>
           <ScheduledTaskForm
             onSuccess={() => {
               setIsFormOpen(false);
+              setSelectedTask(null);
               loadTasks();
             }}
-            onCancel={() => setIsFormOpen(false)}
-            initialData={date ? { schedule_date: date.toISOString() } as unknown as ScheduledTask : null}
+            onCancel={() => {
+                setIsFormOpen(false);
+                setSelectedTask(null);
+            }}
+            initialData={selectedTask || (date ? { schedule_date: date.toISOString() } as unknown as ScheduledTask : null)}
           />
         </DialogContent>
       </Dialog>
