@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
+import { useTaskActions } from "@/hooks/useTaskActions";
 
 const TasksCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -20,6 +21,8 @@ const TasksCalendar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const { markAsCompleted, undoCompletion, deleteTask } = useTaskActions(() => loadTasks());
 
   useEffect(() => {
     if (user) {
@@ -49,144 +52,6 @@ const TasksCalendar = () => {
   const handleEdit = (task: ScheduledTask) => {
     setSelectedTask(task);
     setIsFormOpen(true);
-  };
-
-  const markAsCompleted = async (taskId: string) => {
-    try {
-      // Get the task details first
-      const { data: task, error: fetchError } = await supabase
-        .from('scheduled_tasks')
-        .select('*')
-        .eq('id', taskId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Mark current task as completed
-      const { error: updateError } = await supabase
-        .from('scheduled_tasks')
-        .update({ is_completed: true })
-        .eq('id', taskId);
-
-      if (updateError) throw updateError;
-
-      // If it's a recurring task, create the next occurrence
-      if (task.is_recurring && task.recurrence_pattern) {
-        const currentDate = new Date(task.schedule_date);
-        let nextDate = new Date(currentDate);
-
-        // Calculate next occurrence based on pattern
-        switch (task.recurrence_pattern) {
-          case 'daily':
-            nextDate.setDate(nextDate.getDate() + (task.recurrence_interval || 1));
-            break;
-          case 'weekly':
-            nextDate.setDate(nextDate.getDate() + (7 * (task.recurrence_interval || 1)));
-            break;
-          case 'monthly':
-            nextDate.setMonth(nextDate.getMonth() + (task.recurrence_interval || 1));
-            break;
-          case 'yearly':
-            nextDate.setFullYear(nextDate.getFullYear() + (task.recurrence_interval || 1));
-            break;
-        }
-
-        // Check if we should create the next occurrence (not past end date)
-        const shouldCreateNext = !task.recurrence_end_date ||
-          nextDate <= new Date(task.recurrence_end_date);
-
-        if (shouldCreateNext) {
-          // Create new task for next occurrence
-          const { error: insertError } = await supabase
-            .from('scheduled_tasks')
-            .insert({
-              title: task.title,
-              description: task.description,
-              task_type: task.task_type,
-              schedule_date: nextDate.toISOString(),
-              notification_email: task.notification_email,
-              notification_push: task.notification_push,
-              user_id: task.user_id,
-              group_id: task.group_id,
-              value: task.value,
-              category: task.category,
-              is_recurring: true,
-              recurrence_pattern: task.recurrence_pattern,
-              recurrence_interval: task.recurrence_interval,
-              recurrence_end_date: task.recurrence_end_date,
-              parent_task_id: task.parent_task_id || task.id,
-            });
-
-          if (insertError) throw insertError;
-        }
-      }
-
-      toast({
-        title: "Tarefa concluída",
-        description: task.is_recurring
-          ? "Tarefa concluída e próxima ocorrência criada."
-          : "A tarefa foi marcada como concluída.",
-      });
-
-      loadTasks();
-    } catch (error) {
-      console.error('Erro ao concluir tarefa:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível marcar a tarefa como concluída.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const undoCompletion = async (taskId: string) => {
-    try {
-      const { error } = await supabase
-        .from('scheduled_tasks')
-        .update({ is_completed: false })
-        .eq('id', taskId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Conclusão desfeita",
-        description: "A tarefa foi marcada como pendente novamente.",
-      });
-
-      loadTasks();
-    } catch (error) {
-      console.error('Erro ao desfazer conclusão:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível desfazer a conclusão da tarefa.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteTask = async (taskId: string) => {
-    try {
-      const { error } = await supabase
-        .from('scheduled_tasks')
-        .delete()
-        .eq('id', taskId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Tarefa removida",
-        description: "A tarefa foi removida com sucesso.",
-      });
-
-      loadTasks();
-    } catch (error) {
-      console.error('Erro ao remover tarefa:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível remover a tarefa.",
-        variant: "destructive",
-      });
-    }
   };
 
   const daysWithTasks = useMemo(() => {
@@ -300,7 +165,7 @@ const TasksCalendar = () => {
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => markAsCompleted(task.id)}
+                                        onClick={() => markAsCompleted(task)}
                                         className="h-8 px-3"
                                         title="Marcar como concluída"
                                     >
