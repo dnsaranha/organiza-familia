@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Mail, Lock, PiggyBank, Loader2 } from "lucide-react";
+import { AlertCircle, Mail, Lock, PiggyBank, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { SubscriptionPlans } from "@/components/SubscriptionPlans";
 import { Separator } from "@/components/ui/separator";
 
@@ -20,6 +20,10 @@ export default function Auth() {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -142,6 +146,37 @@ export default function Auth() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setError("");
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) throw error;
+
+      setResetSuccess(true);
+      toast({
+        title: "Email enviado!",
+        description: "Verifique sua caixa de entrada para redefinir sua senha.",
+      });
+    } catch (error: any) {
+      setError(error.message || "Erro ao enviar email de redefinição");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCloseResetDialog = () => {
+    setShowResetPasswordDialog(false);
+    setResetEmail("");
+    setResetSuccess(false);
+    setError("");
+  };
+
   return (
     <>
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
@@ -213,6 +248,18 @@ export default function Auth() {
                     disabled={loading}
                   >
                     {loading ? "Entrando..." : "Entrar"}
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-sm text-muted-foreground hover:text-primary p-0 h-auto mt-2"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setShowResetPasswordDialog(true);
+                    }}
+                  >
+                    Esqueci minha senha
                   </Button>
                 </form>
 
@@ -404,11 +451,91 @@ export default function Auth() {
             onClick={() => navigate("/")}
             className="text-muted-foreground hover:text-primary"
           >
-            ← Voltar ao início
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar ao início
           </Button>
         </div>
       </div>
     </div>
+
+    {/* Reset Password Dialog */}
+    <Dialog open={showResetPasswordDialog} onOpenChange={handleCloseResetDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            Redefinir Senha
+          </DialogTitle>
+          <DialogDescription>
+            {resetSuccess 
+              ? "Um email foi enviado com instruções para redefinir sua senha."
+              : "Digite seu email para receber um link de redefinição de senha."
+            }
+          </DialogDescription>
+        </DialogHeader>
+        
+        {resetSuccess ? (
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="rounded-full p-3 bg-green-100 dark:bg-green-900">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+            <p className="text-center text-sm text-muted-foreground">
+              Verifique sua caixa de entrada e spam. O link expira em 1 hora.
+            </p>
+            <Button onClick={handleCloseResetDialog} className="w-full">
+              Voltar ao Login
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="reset-email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email
+              </Label>
+              <Input
+                id="reset-email"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseResetDialog}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-gradient-primary"
+                disabled={resetLoading}
+              >
+                {resetLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar Link"
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
 
     {/* Subscription Plans Dialog */}
     <Dialog open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}>
