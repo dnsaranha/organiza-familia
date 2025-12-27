@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FinancialSummaryCard } from "@/components/FinancialSummaryCard";
 import { FinancialCard } from "@/components/FinancialCard";
-import { TransactionForm } from "@/components/TransactionForm";
 import { TransactionList } from "@/components/TransactionList";
 import { ScheduledTasks } from "@/components/ScheduledTasks";
 import { FamilyGroups } from "@/components/FamilyGroups";
@@ -58,6 +57,17 @@ const Index = () => {
       fetchFinancialData();
     }
   }, [user, refreshKey, scope, bankTransactions, accounts]);
+
+  useEffect(() => {
+    const handleTransactionUpdate = () => {
+      handleDataRefresh();
+    };
+
+    window.addEventListener("transaction-updated", handleTransactionUpdate);
+    return () => {
+      window.removeEventListener("transaction-updated", handleTransactionUpdate);
+    };
+  }, []);
 
   const fetchFinancialData = async () => {
     if (!user) return;
@@ -322,17 +332,11 @@ const Index = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
-            <TransactionForm onTransactionChange={handleDataRefresh} />
-          </div>
-
-          <div className="w-full">
-            <TransactionList
-              key={refreshKey}
-              onTransactionChange={handleDataRefresh}
-            />
-          </div>
+        <div className="mb-6 sm:mb-8">
+          <TransactionList
+            key={refreshKey}
+            onTransactionChange={handleDataRefresh}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
