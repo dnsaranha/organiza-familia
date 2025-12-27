@@ -1,5 +1,5 @@
 import * as React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   Home,
   Users,
@@ -51,12 +51,20 @@ import { TransactionForm } from "@/components/TransactionForm";
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDesktopTransactionOpen, setIsDesktopTransactionOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!loading && !user && location.pathname !== "/yfinance-test") {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate, location]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    navigate("/auth");
   };
 
   const handleDesktopTransactionSaved = () => {
