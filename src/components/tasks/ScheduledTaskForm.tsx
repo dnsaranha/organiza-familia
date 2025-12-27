@@ -79,9 +79,11 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
 
   useEffect(() => {
     // Carregar grupos e categorias sempre que o componente for montado
-    loadGroups();
-    loadCategories();
-  }, []);
+    if (user) {
+      loadGroups();
+      loadCategories();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (initialData) {
