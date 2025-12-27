@@ -103,7 +103,7 @@ export const FamilyGroups = () => {
     if (user) {
       loadGroups();
     }
-  }, [user, refreshKey]);
+  }, [user?.id, refreshKey]);
 
   const loadGroups = async () => {
     if (!user) return;

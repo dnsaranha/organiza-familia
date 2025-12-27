@@ -78,7 +78,7 @@ const TasksPage = () => {
         abortController.abort();
       };
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadTasks = async () => {
     if (!user) return;

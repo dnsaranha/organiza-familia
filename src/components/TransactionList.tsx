@@ -112,14 +112,14 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         localStorage.removeItem('transactionFilters');
       }
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
       fetchTransactions();
       localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, date: dateRange }));
     }
-  }, [user, budgetFilter, dateRange, fetchTransactions]);
+  }, [user?.id, budgetFilter, dateRange, fetchTransactions]);
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));

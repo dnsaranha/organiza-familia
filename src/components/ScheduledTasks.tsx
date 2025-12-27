@@ -38,7 +38,7 @@ export const ScheduledTasks = () => {
     if (user) {
       loadTasks();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadTasks = async () => {
     if (!user) return;

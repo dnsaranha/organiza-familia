@@ -82,7 +82,7 @@ const OpenFinanceConnectPage = () => {
       }
     };
     fetchGroups();
-  }, [user]);
+  }, [user?.id]);
 
   const handleDisconnect = async () => {
     await disconnectBank();
