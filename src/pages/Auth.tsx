@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -24,20 +25,30 @@ export default function Auth() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if user is already logged in or if this is a password reset flow
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
+      // Check if URL has reset=true parameter
+      const resetParam = searchParams.get('reset');
+      if (resetParam === 'true') {
+        setIsPasswordReset(true);
+        return;
+      }
+      
       if (session) {
         // Check if user has a subscription
         await checkSubscription(session.user.id);
       }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   const checkSubscription = async (userId: string) => {
     try {
@@ -153,7 +164,7 @@ export default function Auth() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/auth?reset=true`,
       });
 
       if (error) throw error;
@@ -167,6 +178,33 @@ export default function Auth() {
       setError(error.message || "Erro ao enviar email de redefinição");
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Senha redefinida!",
+        description: "Sua senha foi atualizada com sucesso.",
+      });
+      
+      setIsPasswordReset(false);
+      setNewPassword("");
+      navigate("/");
+    } catch (error: any) {
+      setError(error.message || "Erro ao redefinir senha");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -192,13 +230,65 @@ export default function Auth() {
           <p className="text-muted-foreground">Gestão Financeira Familiar</p>
         </div>
 
-        <Card className="bg-gradient-card shadow-card border">
-          <CardHeader>
-            <CardTitle className="text-center text-foreground">
-              Acesse sua conta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        {isPasswordReset ? (
+          <Card className="bg-gradient-card shadow-card border">
+            <CardHeader>
+              <CardTitle className="text-center text-foreground flex items-center justify-center gap-2">
+                <Lock className="h-5 w-5" />
+                Nova Senha
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="new-password" className="flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    Nova Senha
+                  </Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Digite sua nova senha"
+                    required
+                    minLength={6}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Mínimo de 6 caracteres
+                  </p>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-primary"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    "Redefinir Senha"
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-gradient-card shadow-card border">
+            <CardHeader>
+              <CardTitle className="text-center text-foreground">
+                Acesse sua conta
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="login">Entrar</TabsTrigger>
@@ -444,6 +534,7 @@ export default function Auth() {
             </Tabs>
           </CardContent>
         </Card>
+        )}
 
         <div className="mt-6 text-center">
           <Button
