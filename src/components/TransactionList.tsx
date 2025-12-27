@@ -270,7 +270,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           <DialogHeader><DialogTitle>Editar Transação</DialogTitle></DialogHeader>
           <TransactionForm
             transactionToEdit={editingTransaction}
-            onTransactionChange={() => {
+            onSave={() => {
               setEditingTransaction(null);
               onTransactionChange();
               fetchTransactions(); // Adicionado para re-buscar a lista
