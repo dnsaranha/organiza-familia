@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Calendar,
   PieChart, // Ícone adicionado
+  Plus,
 } from "lucide-react";
 
 import {
@@ -45,14 +46,22 @@ import { BottomNavBar } from "@/components/BottomNavBar";
 import { BudgetScopeSwitcher } from "@/components/BudgetScopeSwitcher";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { TransactionForm } from "@/components/TransactionForm";
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [isDesktopTransactionOpen, setIsDesktopTransactionOpen] = React.useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const handleDesktopTransactionSaved = () => {
+    setIsDesktopTransactionOpen(false);
+    window.dispatchEvent(new CustomEvent("transaction-updated"));
   };
 
   const mobileView = (
@@ -301,6 +310,14 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         <header className="border-b p-3 sm:p-4">
           <div className="flex items-center justify-end gap-2 sm:gap-4">
             <Button
+              onClick={() => setIsDesktopTransactionOpen(true)}
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nova Transação</span>
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/pricing")}
@@ -319,6 +336,15 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           </div>
         </header>
         <div className="w-full">{children}</div>
+        <Dialog open={isDesktopTransactionOpen} onOpenChange={setIsDesktopTransactionOpen}>
+          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+            <DialogTitle className="sr-only">Nova Transação</DialogTitle>
+             <TransactionForm
+              onSave={handleDesktopTransactionSaved}
+              onCancel={() => setIsDesktopTransactionOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </SidebarInset>
     </>
   );
