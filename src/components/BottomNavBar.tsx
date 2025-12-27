@@ -21,7 +21,7 @@ export const BottomNavBar = () => {
       <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t border-border">
         <button
           onClick={() => setIsTransactionModalOpen(true)}
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-primary shadow-lg flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors z-50"
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-primary shadow-lg flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors z-50"
           aria-label="Nova Transação"
         >
           <Plus className="h-8 w-8" />
