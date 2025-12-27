@@ -14,6 +14,7 @@ import {
   CheckSquare,
   Target,
   CalendarDays,
+  Calendar,
   PieChart, // Ícone adicionado
 } from "lucide-react";
 
@@ -157,6 +158,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <SidebarMenuButton isActive={isActive}>
                       <Home className="size-4" />
                       <span>Home</span>
+                    </SidebarMenuButton>
+                  )}
+                </NavLink>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <NavLink to="/tasks/calendar" className="w-full">
+                  {({ isActive }) => (
+                    <SidebarMenuButton isActive={isActive}>
+                      <Calendar className="size-4" />
+                      <span>Calendário</span>
                     </SidebarMenuButton>
                   )}
                 </NavLink>

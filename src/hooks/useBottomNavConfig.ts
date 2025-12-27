@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Users, AreaChart, TrendingUp, CheckSquare, Target, PiggyBank, Settings, Calendar, FileText } from "lucide-react";
+import { Home, Users, AreaChart, TrendingUp, CheckSquare, Target, PiggyBank, Settings, Calendar, CalendarDays, FileText } from "lucide-react";
 
 export interface NavItem {
   id: string;
@@ -16,7 +16,8 @@ export const allNavItems: NavItem[] = [
   { id: "reports", label: "Relatórios", icon: AreaChart, path: "/reports" },
   { id: "goals", label: "Metas", icon: Target, path: "/goals" },
   { id: "budget", label: "Orçamento", icon: PiggyBank, path: "/budget" },
-  { id: "forecast", label: "Previsão", icon: Calendar, path: "/forecast" },
+  { id: "forecast", label: "Previsão", icon: CalendarDays, path: "/forecast" },
+  { id: "task-calendar", label: "Calendário", icon: Calendar, path: "/tasks/calendar" },
   { id: "profile", label: "Perfil", icon: Settings, path: "/profile" },
 ];
 
