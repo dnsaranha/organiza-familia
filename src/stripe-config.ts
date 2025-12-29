@@ -10,8 +10,8 @@ export interface StripeProduct {
 
 export const stripeProducts: StripeProduct[] = [
   {
-    id: 'prod_Sv7t99cA7bEeXv',
-    priceId: 'price_1RzHdZHcVbxMAUgHWZXTsnsM',
+    id: 'prod_Tgt7DcUIS7w1Y2',
+    priceId: 'price_1SjVL3QWn2kjGtoMSfnWKglg',
     name: 'Assinatatura Gratuita',
     description: 'Plano gratuito com funcionalidades básicas para gestão financeira pessoal',
     mode: 'payment',
@@ -19,21 +19,21 @@ export const stripeProducts: StripeProduct[] = [
     currency: 'BRL',
   },
   {
-    id: 'prod_Sv7pIweNKESXRN',
-    priceId: 'price_1RzHZNHcVbxMAUgHPNnvPWb3',
+    id: 'prod_TgtCAPh2NCGcUH',
+    priceId: 'price_1SjVPgQWn2kjGtoMmkm2fceQ',
     name: 'Assinatura Básica',
     description: 'Plano básico com recursos essenciais para gestão financeira familiar',
     mode: 'subscription',
-    price: 0.00,
+    price: 9.90,
     currency: 'BRL',
   },
   {
-    id: 'prod_Sv7o0atd2j7Z4R',
-    priceId: 'price_1RzHYrHcVbxMAUgHpGDGvwKX',
+    id: 'prod_TgtE4frZahIphs',
+    priceId: 'price_1SjVSDQWn2kjGtoMBTWLT3K4',
     name: 'Assinatura Avançada',
     description: 'Plano completo com todos os recursos avançados e suporte prioritário',
     mode: 'subscription',
-    price: 0.00,
+    price: 15.90,
     currency: 'BRL',
   },
 ];
