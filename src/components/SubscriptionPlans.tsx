@@ -48,7 +48,7 @@ export const SubscriptionPlans = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "stripe-checkout",
+        "supabase-functions-stripe-checkout",
         {
           body: {
             price_id: priceId,
