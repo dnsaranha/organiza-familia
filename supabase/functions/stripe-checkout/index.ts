@@ -23,21 +23,24 @@ function corsResponse(body: string | object | null, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  // Log request start
+  console.log('[stripe-checkout] Request received', { method: req.method, url: req.url });
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
   if (!stripeSecret) {
-    console.error('STRIPE_SECRET_KEY not configured');
-    return corsResponse({ error: 'Stripe not configured' }, 500);
+    console.error('[stripe-checkout] ERROR: STRIPE_SECRET_KEY not configured');
+    return corsResponse({ error: 'Stripe not configured (missing secret key)' }, 500);
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Supabase environment variables not configured');
-    return corsResponse({ error: 'Server configuration error' }, 500);
+    console.error('[stripe-checkout] ERROR: Supabase environment variables not configured');
+    return corsResponse({ error: 'Server configuration error (missing Supabase vars)' }, 500);
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -46,26 +49,45 @@ Deno.serve(async (req) => {
       name: 'Family Budget App',
       version: '1.0.0',
     },
+    httpClient: Stripe.createFetchHttpClient(), // Ensure fetch client is used for Edge Runtime compatibility
   });
 
   try {
     if (req.method !== 'POST') {
+      console.warn('[stripe-checkout] Method not allowed:', req.method);
       return corsResponse({ error: 'Method not allowed' }, 405);
     }
 
-    const { price_id, success_url, cancel_url, mode } = await req.json();
+    // Read and parse body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error('[stripe-checkout] Failed to parse JSON body', e);
+      return corsResponse({ error: 'Invalid JSON body' }, 400);
+    }
 
-    console.log('Received checkout request:', { price_id, success_url, cancel_url, mode });
+    const { price_id, success_url, cancel_url, mode } = body;
+
+    console.log('[stripe-checkout] Processing checkout for:', { price_id, mode });
 
     if (!price_id || !success_url || !cancel_url || !mode) {
+      console.error('[stripe-checkout] Missing required parameters', { price_id, success_url, cancel_url, mode });
       return corsResponse({ error: 'Missing required parameters' }, 400);
     }
 
     if (!['payment', 'subscription'].includes(mode)) {
+      console.error('[stripe-checkout] Invalid mode:', mode);
       return corsResponse({ error: 'Invalid mode. Must be payment or subscription' }, 400);
     }
 
-    const authHeader = req.headers.get('Authorization')!;
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+        console.error('[stripe-checkout] Missing Authorization header');
+        return corsResponse({ error: 'Missing Authorization header' }, 401);
+    }
+
     const token = authHeader.replace('Bearer ', '');
     const {
       data: { user },
@@ -73,17 +95,19 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser(token);
 
     if (getUserError) {
-      console.error('Auth error:', getUserError);
-      return corsResponse({ error: 'Failed to authenticate user' }, 401);
+      console.error('[stripe-checkout] Auth error:', getUserError);
+      return corsResponse({ error: 'Failed to authenticate user: ' + getUserError.message }, 401);
     }
 
     if (!user) {
+      console.error('[stripe-checkout] User not found via getUser');
       return corsResponse({ error: 'User not found' }, 404);
     }
 
-    console.log('User authenticated:', user.id);
+    console.log('[stripe-checkout] User authenticated:', user.id);
 
-    // Check if customer already exists
+    // Check if customer already exists in DB
+    console.log('[stripe-checkout] Checking for existing customer in DB...');
     const { data: existingCustomer, error: getCustomerError } = await supabase
       .from('stripe_customers')
       .select('customer_id')
@@ -91,50 +115,54 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (getCustomerError) {
-      console.error('Failed to fetch customer information from the database', getCustomerError);
+      console.error('[stripe-checkout] DB Error fetching customer:', getCustomerError);
       return corsResponse({ error: 'Failed to fetch customer information' }, 500);
     }
 
     let customerId;
 
     if (!existingCustomer || !existingCustomer.customer_id) {
-      console.log('Creating new Stripe customer');
-      const newCustomer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        metadata: {
-          user_id: user.id,
-        },
-      });
-
-      customerId = newCustomer.id;
-      console.log(`Created new Stripe customer ${customerId} for user ${user.id}`);
-
-      const { error: createCustomerError } = await supabase
-        .from('stripe_customers')
-        .insert({
-          user_id: user.id,
-          customer_id: customerId,
+      console.log('[stripe-checkout] No local customer found. Creating new Stripe customer...');
+      try {
+        const newCustomer = await stripe.customers.create({
+            email: user.email ?? undefined,
+            metadata: {
+            user_id: user.id,
+            },
         });
+        customerId = newCustomer.id;
+        console.log(`[stripe-checkout] Created new Stripe customer ${customerId}`);
 
-      if (createCustomerError) {
-        console.error('Failed to save new customer in the database', createCustomerError);
-        // Attempt to clean up Stripe customer if DB insert fails
-        try {
-          await stripe.customers.del(newCustomer.id);
-        } catch (deleteError) {
-          console.error('Failed to clean up Stripe customer after DB error:', deleteError);
+        const { error: createCustomerError } = await supabase
+            .from('stripe_customers')
+            .insert({
+            user_id: user.id,
+            customer_id: customerId,
+            });
+
+        if (createCustomerError) {
+            console.error('[stripe-checkout] Failed to save new customer to DB:', createCustomerError);
+            // Attempt cleanup
+            try {
+            console.log('[stripe-checkout] Cleaning up orphaned Stripe customer...');
+            await stripe.customers.del(newCustomer.id);
+            } catch (deleteError) {
+            console.error('[stripe-checkout] Failed to clean up Stripe customer:', deleteError);
+            }
+            return corsResponse({ error: 'Failed to create customer record' }, 500);
         }
-        return corsResponse({ error: 'Failed to create customer' }, 500);
+      } catch (stripeCustError: any) {
+         console.error('[stripe-checkout] Stripe customer creation failed:', stripeCustError);
+         return corsResponse({ error: 'Stripe customer creation failed: ' + stripeCustError.message}, 500);
       }
-      console.log(`Successfully created customer record for new customer ${customerId}`);
+
     } else {
       customerId = existingCustomer.customer_id;
-      console.log(`Found existing Stripe customer ${customerId} for user ${user.id}`);
+      console.log(`[stripe-checkout] Found existing customer ${customerId}`);
     }
 
-    // create Checkout Session
-    console.log('Creating checkout session with:', { customerId, price_id, mode, success_url, cancel_url });
-    
+    // Create Checkout Session
+    console.log('[stripe-checkout] Creating Stripe session...');
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -149,17 +177,18 @@ Deno.serve(async (req) => {
       cancel_url,
     });
 
-    console.log(`Created checkout session ${session.id} for customer ${customerId}`);
+    console.log(`[stripe-checkout] Session created successfully: ${session.id}`);
 
     return corsResponse({ sessionId: session.id, url: session.url });
+
   } catch (error: any) {
-    console.error(`Checkout error: ${error.message}`, error);
+    console.error(`[stripe-checkout] FATAL ERROR:`, error);
     
     // Provide more specific error messages
     let errorMessage = error.message || 'Unknown error occurred';
     
     if (error.type === 'StripeInvalidRequestError') {
-      errorMessage = `Stripe error: ${error.message}`;
+      errorMessage = `Stripe invalid request: ${error.message}`;
     } else if (error.type === 'StripeAuthenticationError') {
       errorMessage = 'Stripe authentication failed. Check API key.';
     } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
