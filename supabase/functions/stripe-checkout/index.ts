@@ -2,43 +2,53 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import Stripe from 'npm:stripe@17.7.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
-const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY')!;
-const stripe = new Stripe(stripeSecret, {
-  appInfo: {
-    name: 'Family Budget App',
-    version: '1.0.0',
-  },
-});
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-// Helper function to create responses with CORS headers
 function corsResponse(body: string | object | null, status = 200) {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*',
-  };
-
-  // For 204 No Content, don't include Content-Type or body
   if (status === 204) {
-    return new Response(null, { status, headers });
+    return new Response(null, { status, headers: corsHeaders });
   }
 
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...headers,
+      ...corsHeaders,
       'Content-Type': 'application/json',
     },
   });
 }
 
 Deno.serve(async (req) => {
-  try {
-    if (req.method === 'OPTIONS') {
-      return corsResponse({}, 204);
-    }
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
+  const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
+  if (!stripeSecret) {
+    console.error('STRIPE_SECRET_KEY not configured');
+    return corsResponse({ error: 'Stripe not configured' }, 500);
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('Supabase environment variables not configured');
+    return corsResponse({ error: 'Server configuration error' }, 500);
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const stripe = new Stripe(stripeSecret, {
+    appInfo: {
+      name: 'Family Budget App',
+      version: '1.0.0',
+    },
+  });
+
+  try {
     if (req.method !== 'POST') {
       return corsResponse({ error: 'Method not allowed' }, 405);
     }
@@ -143,7 +153,19 @@ Deno.serve(async (req) => {
 
     return corsResponse({ sessionId: session.id, url: session.url });
   } catch (error: any) {
-    console.error(`Checkout error: ${error.message}`);
-    return corsResponse({ error: error.message }, 500);
+    console.error(`Checkout error: ${error.message}`, error);
+    
+    // Provide more specific error messages
+    let errorMessage = error.message || 'Unknown error occurred';
+    
+    if (error.type === 'StripeInvalidRequestError') {
+      errorMessage = `Stripe error: ${error.message}`;
+    } else if (error.type === 'StripeAuthenticationError') {
+      errorMessage = 'Stripe authentication failed. Check API key.';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      errorMessage = 'Unable to connect to Stripe. Check network connection.';
+    }
+    
+    return corsResponse({ error: errorMessage }, 500);
   }
 });

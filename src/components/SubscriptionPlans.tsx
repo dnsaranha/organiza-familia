@@ -47,7 +47,7 @@ export const SubscriptionPlans = () => {
     setLoading(priceId);
 
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const response = await supabase.functions.invoke(
         "supabase-functions-stripe-checkout",
         {
           body: {
@@ -59,11 +59,21 @@ export const SubscriptionPlans = () => {
         },
       );
 
-      if (error) {
-        throw new Error(error.message || "Erro ao criar sessão de checkout");
+      console.log("Stripe checkout response:", response);
+
+      if (response.error) {
+        const errorMessage = response.error?.message || 
+          (typeof response.error === 'string' ? response.error : JSON.stringify(response.error));
+        throw new Error(errorMessage || "Erro ao criar sessão de checkout");
       }
 
-      if (data.url) {
+      const data = response.data;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.url) {
         window.location.href = data.url;
       } else {
         throw new Error("URL de checkout não recebida");
