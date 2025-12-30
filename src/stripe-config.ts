@@ -10,8 +10,8 @@ export interface StripeProduct {
 
 export const stripeProducts: StripeProduct[] = [
   {
-    id: 'prod_Tgt7DcUIS7w1Y2',
-    priceId: 'price_1SjVL3QWn2kjGtoMSfnWKglg',
+    id: 'prod_ThD8Ebquxm2Hgl',
+    priceId: 'price_1SjoifQWn2kjGtoMCD2TLuAd',
     name: 'Plano Gratuito',
     description: 'Plano gratuito com funcionalidades básicas para gestão financeira pessoal',
     mode: 'payment',
@@ -19,8 +19,8 @@ export const stripeProducts: StripeProduct[] = [
     currency: 'BRL',
   },
   {
-    id: 'prod_TgtCAPh2NCGcUH',
-    priceId: 'price_1SjVPgQWn2kjGtoMmkm2fceQ',
+    id: 'prod_ThD8Ebquxm2Hgl',
+    priceId: 'price_1Sk1CAQWn2kjGtoM0Wlz1Xql',
     name: 'Plano Básico',
     description: 'Plano básico com recursos essenciais para gestão financeira familiar',
     mode: 'subscription',
@@ -28,8 +28,8 @@ export const stripeProducts: StripeProduct[] = [
     currency: 'BRL',
   },
   {
-    id: 'prod_TgtE4frZahIphs',
-    priceId: 'price_1SjVSDQWn2kjGtoMBTWLT3K4',
+    id: 'prod_ThD8iH01c4AKCL',
+    priceId: 'price_1Sk1MbQWn2kjGtoMSDAU65sj',
     name: 'Plano Avançado',
     description: 'Plano completo com todos os recursos avançados e suporte prioritário',
     mode: 'subscription',
