@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Combobox } from "@/components/ui/combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 
 export interface ScheduledTask {
   id: string;
@@ -59,6 +60,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [categories, setCategories] = useState<{ label: string; value: string }[]>([]);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
+  const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -69,7 +71,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
     notification_email: true,
     notification_push: true,
     group_id: 'personal',
-    value: 0,
     category: '',
     is_recurring: false,
     recurrence_pattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -88,6 +89,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   useEffect(() => {
     if (initialData) {
       setTransactionType(initialData.value && initialData.value > 0 ? 'income' : 'expense');
+      setAmountValue(initialData.value ? Math.abs(initialData.value) : 0);
       setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
@@ -97,7 +99,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         notification_email: initialData.notification_email ?? true,
         notification_push: initialData.notification_push ?? true,
         group_id: initialData.group_id || 'personal',
-        value: initialData.value ? Math.abs(initialData.value) : 0,
         category: initialData.category || '',
         is_recurring: initialData.is_recurring || false,
         recurrence_pattern: initialData.recurrence_pattern || 'monthly',
@@ -105,6 +106,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         recurrence_end_date: initialData.recurrence_end_date ? new Date(initialData.recurrence_end_date).toISOString().split('T')[0] : '',
       });
     } else {
+      setAmountValue(0);
       setFormData({
         title: '',
         description: '',
@@ -114,7 +116,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         notification_email: true,
         notification_push: true,
         group_id: 'personal',
-        value: 0,
         category: '',
         is_recurring: false,
         recurrence_pattern: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
@@ -123,7 +124,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
       });
       setTransactionType('expense');
     }
-  }, [initialData]);
+  }, [initialData, setAmountValue]);
 
   const loadGroups = async () => {
     if (!user) return;
@@ -170,7 +171,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.schedule_date || !formData.schedule_time || (formData.value !== 0 && !formData.category)) {
+    if (!formData.title || !formData.schedule_date || !formData.schedule_time || (amountValue !== 0 && !formData.category)) {
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha o título, data, horário e categoria (se houver valor).",
@@ -198,7 +199,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
 
       const localCreatedAt = new Date().toISOString();
 
-      const valueWithSign = formData.value * (transactionType === 'income' ? 1 : -1);
+      const valueWithSign = amountValue * (transactionType === 'income' ? 1 : -1);
 
       const taskData = {
           title: formData.title,
@@ -294,16 +295,13 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
               <div className="flex items-center gap-2">
                 <Input
                     id="value"
-                    type="number"
-                    step="0.01"
-                    value={formData.value === 0 ? '' : formData.value}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setFormData({ ...formData, value: isNaN(val) ? 0 : val });
-                    }}
+                    type="text"
+                    inputMode="numeric"
+                    value={amountDisplay}
+                    onChange={handleAmountChange}
                     placeholder="0,00"
                 />
-                {formData.value > 0 && (
+                {amountValue > 0 && (
                     <ToggleGroup
                         type="single"
                         variant="outline"
