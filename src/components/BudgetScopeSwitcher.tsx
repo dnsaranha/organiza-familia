@@ -19,32 +19,16 @@ export const BudgetScopeSwitcher = () => {
   const { state: sidebarState } = useSidebar();
 
   useEffect(() => {
-    let isMounted = true;
-    
     const fetchGroups = async () => {
       if (!user) return;
-      try {
-        const { data, error } = await (supabase as any).rpc('get_user_groups');
-        if (!isMounted) return;
-        
-        if (error) {
-          // Silently handle errors - groups will just be empty
-          console.warn("Erro ao buscar grupos para o seletor:", error?.message || error);
-        } else {
-          setGroups((data as FamilyGroup[]) || []);
-        }
-      } catch (err) {
-        // Silently handle network errors - groups will just be empty
-        if (isMounted) {
-          console.warn("Network error fetching groups");
-        }
+      const { data, error } = await (supabase as any).rpc('get_user_groups');
+      if (error) {
+        console.error("Erro ao buscar grupos para o seletor:", error);
+      } else {
+        setGroups((data as FamilyGroup[]) || []);
       }
     };
     fetchGroups();
-    
-    return () => {
-      isMounted = false;
-    };
   }, [user?.id]);
 
   const selectedGroup = scope === 'personal'

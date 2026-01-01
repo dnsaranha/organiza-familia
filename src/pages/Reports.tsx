@@ -129,18 +129,8 @@ const ReportsPage = () => {
     pdf.text("Relatório Financeiro", 14, 15);
 
     try {
-      const html2canvasOptions = {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        ignoreElements: (element: Element) => {
-          // Ignore elements with problematic CSS
-          return element.classList?.contains('recharts-tooltip-wrapper');
-        }
-      };
-      const pieCanvas = await html2canvas(pieChartElement, html2canvasOptions);
-      const barCanvas = await html2canvas(barChartElement, html2canvasOptions);
+      const pieCanvas = await html2canvas(pieChartElement);
+      const barCanvas = await html2canvas(barChartElement);
       const pieImageData = pieCanvas.toDataURL("image/png");
       const barImageData = barCanvas.toDataURL("image/png");
 

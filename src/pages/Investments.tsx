@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
 import { useB3Data } from "@/hooks/useB3Data";
-import { useSubscription } from "@/hooks/useSubscription";
 import EnhancedAssetTable from "@/components/EnhancedAssetTable";
 import PortfolioEvolutionChart from "@/components/charts/PortfolioEvolutionChart";
 import DividendHistoryChart from "@/components/charts/DividendHistoryChart";
@@ -9,10 +8,8 @@ import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw } from "lucide-react";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 const Investments = () => {
-  const { canAccessInvestments, isLoading: subscriptionLoading } = useSubscription();
   const {
     enhancedAssets,
     portfolioEvolution,
@@ -52,20 +49,6 @@ const Investments = () => {
     await getPortfolioEvolutionData("12m", true);
     await getDividendHistoryData();
   };
-
-  // Check subscription access
-  if (!subscriptionLoading && !canAccessInvestments()) {
-    return (
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Meus Investimentos</h1>
-        <UpgradePrompt 
-          feature="Investimentos" 
-          requiredPlan="basic"
-          description="Acompanhe seus investimentos, veja a evolução do portfólio e análise de dividendos."
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-4">
