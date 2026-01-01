@@ -8,6 +8,7 @@ import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw } from "lucide-react";
+import { FeatureGate } from "@/components/FeatureGate";
 
 const Investments = () => {
   const {
@@ -51,7 +52,8 @@ const Investments = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <FeatureGate feature="investments">
+      <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Meus Investimentos</h1>
           <Button onClick={handleRefresh} disabled={loading} size="sm">
@@ -60,57 +62,58 @@ const Investments = () => {
           </Button>
         </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <FinancialCard
-          title="Patrimônio Total"
-          amount={totalValue}
-          isCurrency
-          isLoading={loading}
-        />
-        <FinancialCard
-          title="Lucro/Prejuízo Total"
-          amount={totalProfitLoss}
-          isCurrency
-          isPositive={totalProfitLoss >= 0}
-          isNegative={totalProfitLoss < 0}
-          isLoading={loading}
-        />
-        <FinancialCard
-          title="Rentabilidade Total"
-          amount={totalProfitability}
-          isPercentage
-          isPositive={totalProfitability >= 0}
-          isNegative={totalProfitability < 0}
-          isLoading={loading}
-        />
-        <FinancialCard
-          title="Dividendos (12M)"
-          amount={Array.isArray(enhancedAssets) ? enhancedAssets.reduce((sum, asset) => sum + asset.accumulatedDividends, 0) : 0}
-          isCurrency
-          isLoading={loading}
-        />
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <FinancialCard
+            title="Patrimônio Total"
+            amount={totalValue}
+            isCurrency
+            isLoading={loading}
+          />
+          <FinancialCard
+            title="Lucro/Prejuízo Total"
+            amount={totalProfitLoss}
+            isCurrency
+            isPositive={totalProfitLoss >= 0}
+            isNegative={totalProfitLoss < 0}
+            isLoading={loading}
+          />
+          <FinancialCard
+            title="Rentabilidade Total"
+            amount={totalProfitability}
+            isPercentage
+            isPositive={totalProfitability >= 0}
+            isNegative={totalProfitability < 0}
+            isLoading={loading}
+          />
+          <FinancialCard
+            title="Dividendos (12M)"
+            amount={Array.isArray(enhancedAssets) ? enhancedAssets.reduce((sum, asset) => sum + asset.accumulatedDividends, 0) : 0}
+            isCurrency
+            isLoading={loading}
+          />
+        </div>
 
-      <div className="mb-6">
-        <PortfolioEvolutionChart data={portfolioEvolution} loading={loading} />
-      </div>
+        <div className="mb-6">
+          <PortfolioEvolutionChart data={portfolioEvolution} loading={loading} />
+        </div>
 
-      <div className="mb-6">
-        <ManualInvestmentTransactions onTransactionsUpdate={handleRefresh} />
-      </div>
+        <div className="mb-6">
+          <ManualInvestmentTransactions onTransactionsUpdate={handleRefresh} />
+        </div>
 
-      <div className="mb-6">
-        <EnhancedAssetTable assets={enhancedAssets} loading={loading} />
-      </div>
+        <div className="mb-6">
+          <EnhancedAssetTable assets={enhancedAssets} loading={loading} />
+        </div>
 
-      <div className="mb-6">
-        <DividendMonthlyTable assetsData={dividendHistory} loading={loading} />
-      </div>
+        <div className="mb-6">
+          <DividendMonthlyTable assetsData={dividendHistory} loading={loading} />
+        </div>
 
-      <div className="mb-6">
-        <DividendHistoryChart data={[]} loading={loading} />
+        <div className="mb-6">
+          <DividendHistoryChart data={[]} loading={loading} />
+        </div>
       </div>
-    </div>
+    </FeatureGate>
   );
 };
 
