@@ -36,8 +36,13 @@ const TasksCalendar = () => {
 
       if (error) throw error;
       setTasks((data || []) as ScheduledTask[]);
-    } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
+    } catch (error: any) {
+      // Silently handle network errors
+      if (error?.message?.includes('Failed to fetch')) {
+        console.warn('Network error loading tasks');
+        return;
+      }
+      console.warn('Erro ao carregar tarefas:', error?.message || error);
       toast({
         title: "Erro",
         description: "Não foi possível carregar as tarefas agendadas.",

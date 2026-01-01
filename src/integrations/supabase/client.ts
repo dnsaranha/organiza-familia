@@ -8,10 +8,24 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJh
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Custom fetch that suppresses network errors in console
+const customFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  return fetch(input, init).catch((err) => {
+    // Silently handle network errors to avoid console.error spam
+    if (err.message === 'Failed to fetch') {
+      return Promise.reject(err);
+    }
+    throw err;
+  });
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    fetch: customFetch,
+  },
 });

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useBudgetScope } from "@/contexts/BudgetScopeContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, Gradua
 import { toast } from "sonner";
 import { format, addMonths, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { LimitReachedPrompt } from "@/components/UpgradePrompt";
 
 interface Goal {
   id: string; user_id: string; group_id: string | null; title: string; description: string | null; target_amount: number; current_amount: number; deadline: string | null; category: string; icon: string; color: string; created_at: string; updated_at: string; monthly_contribution: number | null;
@@ -159,6 +161,7 @@ const GoalHistoryChart = ({ goalId, color, targetAmount, currentAmount, monthlyC
 export default function GoalsPage() {
   const { user } = useAuth();
   const { scope } = useBudgetScope();
+  const { canAddGoal, limits } = useSubscription();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -191,6 +194,13 @@ export default function GoalsPage() {
   const handleSubmit = async () => {
     if (!user) return;
     if (!formData.title || !formData.target_amount) { toast.error("Preencha o título e valor da meta"); return; }
+    
+    // Check goal limit for new goals
+    if (!editingGoal && !canAddGoal(goals.length)) {
+      toast.error(`Limite de ${limits.goals} metas atingido no plano gratuito`);
+      return;
+    }
+    
     try {
       const monthlyContribution = formData.monthly_contribution ? parseFloat(formData.monthly_contribution) : null;
       const goalData = { 
@@ -325,8 +335,18 @@ export default function GoalsPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Target className="h-6 w-6 text-primary" />Metas de Reserva</h1>
           <p className="text-muted-foreground text-sm">Defina e acompanhe suas metas financeiras</p>
         </div>
+        {!canAddGoal(goals.length) && (
+          <div className="mb-4">
+            <LimitReachedPrompt 
+              feature="metas"
+              currentCount={goals.length}
+              limit={limits.goals}
+              upgradePlan="basic"
+            />
+          </div>
+        )}
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setEditingGoal(null); resetForm(); } }}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
+          <DialogTrigger asChild><Button disabled={!editingGoal && !canAddGoal(goals.length)}><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingGoal ? "Editar Meta" : "Nova Meta"}</DialogTitle></DialogHeader>
             <div className="space-y-4">

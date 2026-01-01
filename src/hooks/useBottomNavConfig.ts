@@ -50,7 +50,13 @@ export function useBottomNavConfig() {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length <= MAX_ITEMS) {
-            setSelectedIds(parsed);
+            setSelectedIds((prev) => {
+              // Only update if different to avoid unnecessary re-renders
+              if (JSON.stringify(prev) !== JSON.stringify(parsed)) {
+                return parsed;
+              }
+              return prev;
+            });
           }
         } catch {
           // Keep current
@@ -58,14 +64,27 @@ export function useBottomNavConfig() {
       }
     };
 
+    // Listen for custom event
     window.addEventListener(NAV_CONFIG_EVENT, handleConfigChange);
-    return () => window.removeEventListener(NAV_CONFIG_EVENT, handleConfigChange);
+    
+    // Also listen for storage events from other tabs
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY) {
+        handleConfigChange();
+      }
+    });
+    
+    return () => {
+      window.removeEventListener(NAV_CONFIG_EVENT, handleConfigChange);
+      window.removeEventListener("storage", handleConfigChange);
+    };
   }, []);
 
   const saveConfig = (ids: string[]) => {
     const limitedIds = ids.slice(0, MAX_ITEMS);
     setSelectedIds(limitedIds);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(limitedIds));
+    // Dispatch event immediately and synchronously
     window.dispatchEvent(new CustomEvent(NAV_CONFIG_EVENT));
   };
 

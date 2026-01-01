@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, Mail, Plus, Clock, CheckCircle, Trash2, Edit, Undo2, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useNavigate } from "react-router-dom";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
+import { LimitReachedPrompt } from "@/components/UpgradePrompt";
 
 const taskTypes = [
   { value: 'payment_reminder', label: 'Lembrete de Pagamento' },
@@ -31,6 +33,7 @@ const TasksPage = () => {
 
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canAddTask, limits } = useSubscription();
   const navigate = useNavigate();
 
   useTaskNotifications();
@@ -305,15 +308,35 @@ const TasksPage = () => {
                 size="sm"
                 className="flex-1 sm:flex-none"
                 onClick={() => {
+                    if (!canAddTask(tasks.length)) {
+                      toast({
+                        title: "Limite atingido",
+                        description: `Você atingiu o limite de ${limits.tasks} tarefas no plano gratuito.`,
+                        variant: "destructive"
+                      });
+                      return;
+                    }
                     setSelectedTask(null);
                     setIsFormOpen(true);
                 }}
+                disabled={!canAddTask(tasks.length)}
             >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Nova Tarefa</span>
             </Button>
         </div>
       </div>
+
+      {!canAddTask(tasks.length) && (
+        <div className="mb-4">
+          <LimitReachedPrompt 
+            feature="tarefas"
+            currentCount={tasks.length}
+            limit={limits.tasks}
+            upgradePlan="basic"
+          />
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4 mb-4 sm:mb-6">
         <Input

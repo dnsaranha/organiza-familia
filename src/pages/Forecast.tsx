@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useBudgetScope } from "@/contexts/BudgetScopeContext";
 import { useOpenBanking } from "@/hooks/useOpenBanking";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, TrendingUp, TrendingDown, ArrowRight, CalendarDays, AlertTriangle, CheckCircle } from "lucide-react";
@@ -11,6 +12,7 @@ import { format, addMonths, startOfMonth, endOfMonth, isSameMonth } from "date-f
 import { ptBR } from "date-fns/locale";
 import IncomeExpenseBarChart from "@/components/charts/IncomeExpenseBarChart";
 import { toast } from "sonner";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 // Interfaces
 interface ScheduledTask { id: string; title: string; task_type: string; schedule_date: string; value: number | null; is_completed: boolean | null; is_recurring: boolean | null; recurrence_pattern: string | null; recurrence_interval: number | null; group_id: string | null; user_id: string; }
@@ -22,6 +24,7 @@ export default function ForecastPage() {
   const { user } = useAuth();
   const { scope } = useBudgetScope();
   const { accounts: bankAccounts, loading: bankLoading } = useOpenBanking();
+  const { canAccessForecast, isLoading: subscriptionLoading } = useSubscription();
 
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -151,6 +154,20 @@ export default function ForecastPage() {
   }), [forecasts]);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  // Check subscription access
+  if (!subscriptionLoading && !canAccessForecast()) {
+    return (
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-6">Previsão Financeira</h1>
+        <UpgradePrompt 
+          feature="Previsão Financeira" 
+          requiredPlan="basic"
+          description="Visualize projeções de receitas e despesas para os próximos meses."
+        />
+      </div>
+    );
+  }
 
   if (!user) return <div className="flex items-center justify-center min-h-[60vh]"><p className="text-muted-foreground">Faça login para ver suas previsões</p></div>;
 

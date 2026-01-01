@@ -14,6 +14,9 @@ import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { incomeCategories, expenseCategories } from "@/lib/budget-categories";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
+import { useSubscription } from "@/hooks/useSubscription";
+import { LimitReachedPrompt } from "./UpgradePrompt";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 type Transaction = Tables<'transactions'>;
 
@@ -38,18 +41,72 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [loading, setLoading] = useState(false);
+  const [monthlyTransactionCount, setMonthlyTransactionCount] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canAddTransaction, limits } = useSubscription();
+
+  // Fetch current month transaction count
+  useEffect(() => {
+    const fetchMonthlyCount = async () => {
+      if (!user || isEditMode) return;
+      
+      const now = new Date();
+      const start = startOfMonth(now).toISOString();
+      const end = endOfMonth(now).toISOString();
+      
+      const { count, error } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end);
+      
+      if (!error && count !== null) {
+        setMonthlyTransactionCount(count);
+      }
+    };
+    
+    fetchMonthlyCount();
+  }, [user, isEditMode]);
+
+  // Fetch current month transaction count
+  useEffect(() => {
+    const fetchMonthlyCount = async () => {
+      if (!user || isEditMode) return;
+      
+      const now = new Date();
+      const start = startOfMonth(now).toISOString();
+      const end = endOfMonth(now).toISOString();
+      
+      const { count, error } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end);
+      
+      if (!error && count !== null) {
+        setMonthlyTransactionCount(count);
+      }
+    };
+    
+    fetchMonthlyCount();
+  }, [user, isEditMode]);
 
   // Efeito para buscar os grupos do usuário
   useEffect(() => {
     const fetchGroups = async () => {
       if (!user) return;
-      const { data, error } = await (supabase as any).rpc('get_user_groups');
-      if (error) {
-        console.error("Erro ao buscar grupos:", error);
-      } else {
-        setGroups((data as FamilyGroup[]) || []);
+      try {
+        const { data, error } = await (supabase as any).rpc('get_user_groups');
+        if (error) {
+          console.error("Erro ao buscar grupos:", error);
+        } else {
+          setGroups((data as FamilyGroup[]) || []);
+        }
+      } catch (err) {
+        console.warn("Network error fetching groups:", err);
       }
     };
     fetchGroups();
@@ -156,6 +213,16 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
 
   return (
     <ErrorBoundary fallback={fallbackUI}>
+      {!isEditMode && !canAddTransaction(monthlyTransactionCount) && (
+        <div className="mb-4">
+          <LimitReachedPrompt 
+            feature="transações"
+            currentCount={monthlyTransactionCount}
+            limit={limits.transactionsPerMonth}
+            upgradePlan="basic"
+          />
+        </div>
+      )}
       <Card className="bg-gradient-card shadow-card border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
