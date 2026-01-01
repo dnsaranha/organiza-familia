@@ -22,9 +22,10 @@ import ForecastPage from "./pages/Forecast";
 import { PWASettings } from "./pages/PWASettings";
 import AppShell from "./components/AppShell";
 import { BudgetScopeProvider } from "./contexts/BudgetScopeContext";
+import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import YFinanceTestPage from "./pages/YFinanceTest";
-import BudgetPage from "./pages/Budget"; // Importa a nova página
+import BudgetPage from "./pages/Budget";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,9 +82,10 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <BudgetScopeProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+            <SubscriptionProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/pricing" element={<Pricing />} />
@@ -209,6 +211,7 @@ const App = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
+            </SubscriptionProvider>
           </BudgetScopeProvider>
         </TooltipProvider>
       </QueryClientProvider>
