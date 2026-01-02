@@ -144,8 +144,21 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   const handleImportClick = () => {
     // Generate and download template
-    const headers = [{'ID': '', 'Data/Hora': '', 'Descrição': '', 'Categoria': '', 'Valor': '', 'Tipo': ''}];
-    const worksheet = utils.json_to_sheet(headers);
+    const templateData = [
+      { 'ID': '', 'Data/Hora': '', 'Descrição': '', 'Categoria': '', 'Valor': '', 'Tipo': '' }, // Headers (implicit in json_to_sheet, but adding empty row for safety or just array of objects)
+    ];
+    // Actually json_to_sheet takes an array of objects and uses keys as headers.
+    // To have headers + example, we just provide the example object.
+    const exampleRow = {
+      'ID': '',
+      'Data/Hora': '25/12/2024',
+      'Descrição': 'Exemplo de Compra',
+      'Categoria': 'Alimentação',
+      'Valor': '50,00',
+      'Tipo': 'expense'
+    };
+
+    const worksheet = utils.json_to_sheet([exampleRow]);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Modelo");
     writeFile(workbook, "modelo_importacao.xlsx");
@@ -166,7 +179,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = read(data, { type: 'array' });
+        const workbook = read(data, { type: 'array', cellDates: true }); // cellDates: true converts Excel serial dates to JS Date objects
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const importedData: ImportedRow[] = utils.sheet_to_json(worksheet);
 
@@ -186,40 +199,49 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
           let transactionDate: Date;
-          if (typeof row['Data/Hora'] === 'string') {
-            const parts = row['Data/Hora'].split('/');
+          const rawDate = row['Data/Hora'];
+
+          if (rawDate instanceof Date) {
+            transactionDate = rawDate;
+          } else if (typeof rawDate === 'string') {
+            const parts = rawDate.split('/');
             if (parts.length === 3) {
                 // dd/MM/yyyy
                 transactionDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
             } else {
                 // Try fallback or standard string parsing
-                transactionDate = new Date(row['Data/Hora']);
+                transactionDate = new Date(rawDate);
             }
           } else {
-             // Handle if excel parsed it as number (serial date) or other format
-             transactionDate = new Date(row['Data/Hora']);
+             // Fallback for number (if cellDates failed or not used, though we enabled it) or other
+             transactionDate = new Date(rawDate);
           }
 
           let amountVal: number;
           const rawVal = row.Valor;
           if (typeof rawVal === 'string') {
-             // Remove R$, remove dots (thousands), replace comma with dot (decimal)
-             // Example: "R$ 1.200,50" -> "1200.50"
-             const cleanVal = rawVal.replace('R$', '').trim();
-             // Simple heuristic: if it has comma and dot, or comma is last separator -> BR format
+             // Remove R$, r$, whitespace.
+             const cleanVal = rawVal.replace(/R\$\s?/gi, '').trim();
+
+             // Check for Brazilian format: 1.200,50 or 50,00
+             // Heuristic: if comma is present, and (no dot, OR dot is before comma)
              if (cleanVal.includes(',') && (!cleanVal.includes('.') || cleanVal.indexOf('.') < cleanVal.indexOf(','))) {
                 amountVal = parseFloat(cleanVal.replace(/\./g, '').replace(',', '.'));
              } else {
-                amountVal = parseFloat(cleanVal.replace(',', '')); // US Format fallback or simple number
+                // US format (1,200.50) or plain number (1200.50)
+                // If there are commas but they are likely thousands separators (e.g. 1,200.00), we remove them.
+                // Standard parseFloat stops at comma if not handled? No, just parses prefix. We need to clean.
+                // If it looks like US format: Remove commas.
+                amountVal = parseFloat(cleanVal.replace(/,/g, ''));
              }
           } else {
              amountVal = Number(rawVal);
           }
 
           if (isNaN(transactionDate.getTime()) || isNaN(amountVal)) { ignoredCount++; continue; }
-
-          const category = row.Categoria || autoCategorize(row.Descrição || '');
           
+          const category = row.Categoria || autoCategorize(row.Descrição || '');
+
           // Generate a composite key even if ID is missing to prevent duplicates
           const compositeKey = `${transactionDate.toISOString()}|${amountVal}|${category}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
