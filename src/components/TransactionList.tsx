@@ -36,7 +36,7 @@ interface TransactionListProps {
 }
 
 interface ImportedRow {
-  ID: string;
+  ID?: string;
   'Data/Hora': string;
   Valor: number;
   Categoria: string;
@@ -129,7 +129,30 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     XLSX.writeFile(workbook, "historico_transacoes.xlsx");
   };
 
-  const handleImportClick = () => importFileInputRef.current?.click();
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        'ID': '',
+        'Data/Hora': format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        'Descrição': 'Exemplo de Transação',
+        'Categoria': 'Alimentação',
+        'Valor': 50.00,
+        'Tipo': 'expense'
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
+    XLSX.writeFile(workbook, "modelo_importacao.xlsx");
+  };
+
+  const handleImportClick = () => {
+    toast.info("Baixando modelo...", { description: "O modelo de importação será baixado. Selecione seu arquivo preenchido na janela que abrirá." });
+    handleDownloadTemplate();
+    setTimeout(() => {
+      importFileInputRef.current?.click();
+    }, 500);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -153,8 +176,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          if (!row.ID || !row['Data/Hora'] || !row.Valor || !row.Categoria) { ignoredCount++; continue; }
-          if (existingIdSet.has(row.ID)) { ignoredCount++; continue; }
+          if (!row['Data/Hora'] || !row.Valor || !row.Categoria) { ignoredCount++; continue; }
+
+          if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
           const transactionDate = new Date(row['Data/Hora']);
           const transactionValue = parseFloat(String(row.Valor));
@@ -163,7 +187,19 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${row.Categoria}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
 
-          newTransactions.push({ id: row.ID, date: transactionDate.toISOString(), description: row.Descrição || null, category: row.Categoria, amount: transactionValue, type: row.Tipo === 'income' ? 'income' : 'expense' });
+          const newTransaction: TablesInsert<'transactions'> = {
+            date: transactionDate.toISOString(),
+            description: row.Descrição || null,
+            category: row.Categoria,
+            amount: transactionValue,
+            type: row.Tipo === 'income' ? 'income' : 'expense'
+          };
+
+          if (row.ID) {
+            newTransaction.id = row.ID;
+          }
+
+          newTransactions.push(newTransaction);
         }
 
         if (newTransactions.length > 0) {
