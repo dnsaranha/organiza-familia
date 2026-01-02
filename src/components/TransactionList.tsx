@@ -20,9 +20,33 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { TransactionForm } from "./TransactionForm";
+
+const autoCategorize = (description: string): string => {
+  const lowerDesc = description.toLowerCase();
+
+  const mappings: Record<string, string[]> = {
+    'Alimentação': ['padaria', 'lanche', 'ifood', 'burguer', 'pizza', 'sushi', 'fome', 'restaurante', 'churrascaria', 'bistro'],
+    'Mercado': ['mercado', 'supermercado', 'atacadao', 'carrefour', 'pao de acucar', 'assai', 'tenda'],
+    'Transporte': ['uber', '99', 'taxi', 'onibus', 'metro', 'trem', 'passagem', 'posto', 'gasolina', 'combustivel', 'estacionamento'],
+    'Saúde': ['farmacia', 'drogaria', 'medico', 'hospital', 'clinica', 'exame', 'dentista', 'consulta'],
+    'Casa': ['aluguel', 'condominio', 'iptu', 'luz', 'energia', 'agua', 'sabesp', 'gas', 'internet', 'claro', 'vivo', 'tim', 'oi', 'net'],
+    'Educação': ['escola', 'faculdade', 'curso', 'livro', 'papelaria', 'udemy', 'alura'],
+    'Lazer': ['cinema', 'filme', 'netflix', 'amazon prime', 'hbo', 'disney', 'spotify', 'jogo', 'steam', 'playstation', 'xbox'],
+    'Compras': ['amazon', 'shopee', 'mercado livre', 'magalu', 'casas bahia', 'loja', 'shopping', 'roupa', 'calcado'],
+    'Serviços': ['barbeiro', 'salao', 'manicure', 'corte'],
+  };
+
+  for (const [category, keywords] of Object.entries(mappings)) {
+    if (keywords.some(k => lowerDesc.includes(k))) {
+      return category;
+    }
+  }
+
+  return 'Outros';
+};
 
 type Transaction = Tables<'transactions'>;
 
@@ -129,7 +153,28 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     XLSX.writeFile(workbook, "historico_transacoes.xlsx");
   };
 
-  const handleImportClick = () => importFileInputRef.current?.click();
+  const handleImportClick = () => {
+    // Create and Download Template
+    const templateData = [
+      {
+        'ID': '',
+        'Data/Hora': '12/02/2025',
+        'Descrição': 'PADARIA E LANCHON',
+        'Categoria': '',
+        'Valor': 'R$ 7,24',
+        'Tipo': 'expense'
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
+    XLSX.writeFile(workbook, "modelo_importacao.xlsx");
+
+    // Trigger File Input (with small delay to ensure download starts)
+    setTimeout(() => {
+        importFileInputRef.current?.click();
+    }, 500);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -153,21 +198,67 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          if (!row.ID || !row['Data/Hora'] || !row.Valor || !row.Categoria) { ignoredCount++; continue; }
-          if (existingIdSet.has(row.ID)) { ignoredCount++; continue; }
+          // Parse Date
+          let transactionDate: Date;
+          const rawDate = row['Data/Hora'];
+          if (typeof rawDate === 'string') {
+             // Try parsing d/M/yyyy (handles 1/1/2025 and 01/01/2025)
+             const parsedDate = parse(rawDate, 'd/M/yyyy', new Date());
+             if (!isNaN(parsedDate.getTime())) {
+               transactionDate = parsedDate;
+             } else {
+               // Fallback to standard Date parse
+               transactionDate = new Date(rawDate);
+             }
+          } else {
+             // Excel serial date or other
+             transactionDate = new Date(rawDate);
+          }
+
+          if (isNaN(transactionDate.getTime())) { ignoredCount++; continue; }
+
+          // Clean Value
+          let valStr = String(row.Valor).replace('R$', '').trim();
+          // Handle Brazilian format: 1.234,56 -> 1234.56
+          // If comma exists, remove dots then replace comma with dot
+          if (valStr.includes(',')) {
+            valStr = valStr.replace(/\./g, '').replace(',', '.');
+          }
+          const transactionValue = parseFloat(valStr);
+
+          if (isNaN(transactionValue)) { ignoredCount++; continue; }
+
+          // Auto Categorize
+          let category = row.Categoria;
+          if (!category && row.Descrição) {
+            category = autoCategorize(row.Descrição);
+          }
+          // Default fallback
+          if (!category) category = 'Outros';
+
+          if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          const transactionDate = new Date(row['Data/Hora']);
-          const transactionValue = parseFloat(String(row.Valor));
-          if (isNaN(transactionDate.getTime()) || isNaN(transactionValue)) { ignoredCount++; continue; }
-          
-          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${row.Categoria}`;
+          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${category}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
 
-          newTransactions.push({ id: row.ID, date: transactionDate.toISOString(), description: row.Descrição || null, category: row.Categoria, amount: transactionValue, type: row.Tipo === 'income' ? 'income' : 'expense' });
+          const newTx: TablesInsert<'transactions'> = {
+            date: transactionDate.toISOString(),
+            description: row.Descrição || null,
+            category: category,
+            amount: transactionValue,
+            type: row.Tipo === 'income' ? 'income' : 'expense',
+            user_id: user?.id
+          };
+
+          if (row.ID) {
+            newTx.id = row.ID;
+          }
+
+          newTransactions.push(newTx);
         }
 
         if (newTransactions.length > 0) {
-          const { error: insertError } = await supabase.from('transactions').insert(newTransactions.map(t => ({...t, user_id: user?.id })));
+          const { error: insertError } = await supabase.from('transactions').insert(newTransactions);
           if (insertError) throw insertError;
           importedCount = newTransactions.length;
         }
