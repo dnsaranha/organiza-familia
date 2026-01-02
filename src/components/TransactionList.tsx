@@ -133,7 +133,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     const templateData = [
       {
         'ID': '',
-        'Data/Hora': format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        'Data/Hora': format(new Date(), "dd/MM/yyyy"),
         'Descrição': 'Exemplo de Transação',
         'Categoria': 'Alimentação',
         'Valor': 50.00,
@@ -152,6 +152,56 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     setTimeout(() => {
       importFileInputRef.current?.click();
     }, 500);
+  };
+
+  const parseDate = (dateVal: string | number): Date | null => {
+    if (typeof dateVal === 'number') {
+      // Excel serial date
+      const date = new Date((dateVal - (25567 + 2)) * 86400 * 1000);
+      return isNaN(date.getTime()) ? null : date;
+    }
+
+    if (typeof dateVal === 'string') {
+        // Try parsing DD/MM/YYYY
+        const parts = dateVal.split('/');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            const date = new Date(year, month, day);
+            if (!isNaN(date.getTime())) return date;
+        }
+        // Fallback to ISO parsing
+        const isoDate = new Date(dateVal);
+        return isNaN(isoDate.getTime()) ? null : isoDate;
+    }
+    return null;
+  };
+
+  const parseCurrency = (val: string | number): number | null => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+        // Remove 'R$', whitespace
+        let cleanVal = val.replace(/R\$\s?/g, '').trim();
+
+        // Handle Brazilian format: 1.200,50 -> 1200.50
+        // If it contains both dot and comma
+        if (cleanVal.includes('.') && cleanVal.includes(',')) {
+            cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
+        } else if (cleanVal.includes(',')) {
+            // If it only contains comma, replace with dot (1200,50 -> 1200.50)
+            cleanVal = cleanVal.replace(',', '.');
+        }
+        // If it only contains dots, it might be 1200.50 (US) or 1.200 (BR thousands).
+        // We assume US if no commas, unless it looks like thousands separators only?
+        // But usually "1.200" in BR means 1200. "1.200,00" handled above.
+        // If we strictly follow BR format, "1.200" is 1200.
+        // Let's assume standard float parsing for remaining dots if no commas were present
+
+        const num = parseFloat(cleanVal);
+        return isNaN(num) ? null : num;
+    }
+    return null;
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,21 +226,26 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          if (!row['Data/Hora'] || !row.Valor || !row.Categoria) { ignoredCount++; continue; }
+          // If category is missing, we will default it later, so don't ignore yet.
+          if (!row['Data/Hora'] || row.Valor === undefined) { ignoredCount++; continue; }
 
           if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          const transactionDate = new Date(row['Data/Hora']);
-          const transactionValue = parseFloat(String(row.Valor));
-          if (isNaN(transactionDate.getTime()) || isNaN(transactionValue)) { ignoredCount++; continue; }
+          const transactionDate = parseDate(row['Data/Hora']);
+          const transactionValue = parseCurrency(row.Valor);
           
-          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${row.Categoria}`;
+          if (!transactionDate || transactionValue === null) { ignoredCount++; continue; }
+
+          // Default category to "Outros" if missing
+          const category = row.Categoria || "Outros";
+
+          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${category}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
 
           const newTransaction: TablesInsert<'transactions'> = {
             date: transactionDate.toISOString(),
             description: row.Descrição || null,
-            category: row.Categoria,
+            category: category,
             amount: transactionValue,
             type: row.Tipo === 'income' ? 'income' : 'expense'
           };
