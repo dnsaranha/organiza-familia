@@ -13,6 +13,7 @@ import { Tables } from "@/integrations/supabase/types";
 import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { incomeCategories, expenseCategories } from "@/lib/budget-categories";
+import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 
 type Transaction = Tables<'transactions'>;
 
@@ -31,7 +32,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const isEditMode = !!transactionToEdit;
 
   const [type, setType] = useState<Transaction['type']>('expense');
-  const [amount, setAmount] = useState('');
+  const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -58,24 +59,24 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   useEffect(() => {
     if (isEditMode && transactionToEdit) {
       setType(transactionToEdit.type);
-      setAmount(String(transactionToEdit.amount));
+      setAmountValue(transactionToEdit.amount);
       setCategory(transactionToEdit.category);
       setDescription(transactionToEdit.description || '');
       setGroupId(transactionToEdit.group_id);
     } else {
       // Reseta o formulário se não estiver em modo de edição (ex: ao criar uma nova transação)
       setType('expense');
-      setAmount('');
+      setAmountValue(0);
       setCategory('');
       setDescription('');
       setGroupId(null);
     }
-  }, [isEditMode, transactionToEdit]);
+  }, [isEditMode, transactionToEdit, setAmountValue]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!amount || !category || !user) {
+    if (amountValue <= 0 || !category || !user) {
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha o valor e a categoria.",
@@ -93,7 +94,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         user_id: user.id,
         group_id: groupId,
         type,
-        amount: parseFloat(amount),
+        amount: amountValue,
         category,
         description: description || null,
         date: isEditMode ? transactionToEdit.date : localDateString,
@@ -123,7 +124,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
 
       if (!isEditMode) {
         // Reset form only when adding
-        setAmount('');
+        setAmountValue(0);
         setCategory('');
         setDescription('');
         setGroupId(null);
@@ -203,11 +204,11 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                 <span className="absolute left-3 top-3 text-muted-foreground">R$</span>
                 <Input
                   id="amount"
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="0,00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={amountDisplay}
+                  onChange={handleAmountChange}
                   className="pl-10"
                   required
                   disabled={loading}
