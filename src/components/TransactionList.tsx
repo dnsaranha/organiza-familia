@@ -61,8 +61,8 @@ interface TransactionListProps {
 
 interface ImportedRow {
   ID: string;
-  'Data/Hora': string;
-  Valor: number;
+  'Data/Hora': string | number | Date;
+  Valor: number | string;
   Categoria: string;
   Descrição?: string;
   Tipo?: 'income' | 'expense';
@@ -184,7 +184,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const importedData: ImportedRow[] = XLSX.utils.sheet_to_json(worksheet);
 
@@ -194,14 +194,17 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         if (fetchError) throw fetchError;
 
         const existingIdSet = new Set(existingTransactions.map(t => t.id));
-        const existingCompositeKeySet = new Set(existingTransactions.map(t => `${new Date(t.date).toISOString()}|${t.amount}|${t.category}`));
+        const existingCompositeKeySet = new Set(existingTransactions.map(t => `${format(new Date(t.date), 'yyyy-MM-dd')}|${t.amount}|${t.category}`));
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
           // Parse Date
           let transactionDate: Date;
           const rawDate = row['Data/Hora'];
-          if (typeof rawDate === 'string') {
+
+          if (rawDate instanceof Date) {
+            transactionDate = rawDate;
+          } else if (typeof rawDate === 'string') {
              // Try parsing d/M/yyyy (handles 1/1/2025 and 01/01/2025)
              const parsedDate = parse(rawDate, 'd/M/yyyy', new Date());
              if (!isNaN(parsedDate.getTime())) {
@@ -210,9 +213,11 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                // Fallback to standard Date parse
                transactionDate = new Date(rawDate);
              }
+          } else if (typeof rawDate === 'number') {
+             // Excel serial date to JS Date (fallback)
+             transactionDate = new Date((rawDate - 25569) * 86400 * 1000);
           } else {
-             // Excel serial date or other
-             transactionDate = new Date(rawDate);
+             transactionDate = new Date(rawDate as any);
           }
 
           if (isNaN(transactionDate.getTime())) { ignoredCount++; continue; }
@@ -238,11 +243,12 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
           if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${category}`;
+          const dateStr = format(transactionDate, 'yyyy-MM-dd');
+          const compositeKey = `${dateStr}|${transactionValue}|${category}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
 
           const newTx: TablesInsert<'transactions'> = {
-            date: transactionDate.toISOString(),
+            date: dateStr,
             description: row.Descrição || null,
             category: category,
             amount: transactionValue,
