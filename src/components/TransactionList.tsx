@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowUpRight, ArrowDownRight, Clock, AlertTriangle, User, Calendar as CalendarIcon, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import * as XLSX from 'xlsx';
+import { read, utils, writeFile } from 'xlsx';
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -147,10 +147,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Transações");
-    XLSX.writeFile(workbook, "historico_transacoes.xlsx");
+    const worksheet = utils.json_to_sheet(dataToExport);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Transações");
+    writeFile(workbook, "historico_transacoes.xlsx");
   };
 
   const handleImportClick = () => {
@@ -165,10 +165,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         'Tipo': 'expense'
       }
     ];
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
-    XLSX.writeFile(workbook, "modelo_importacao.xlsx");
+    const worksheet = utils.json_to_sheet(templateData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Modelo");
+    writeFile(workbook, "modelo_importacao.xlsx");
 
     // Trigger File Input (with small delay to ensure download starts)
     setTimeout(() => {
@@ -184,9 +184,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = read(data, { type: 'array', cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const importedData: ImportedRow[] = XLSX.utils.sheet_to_json(worksheet);
+        const importedData: ImportedRow[] = utils.sheet_to_json(worksheet);
 
         let importedCount = 0, ignoredCount = 0;
 

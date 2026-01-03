@@ -43,7 +43,7 @@ import {
   accountTypeMapping,
   mapAccountSubtype,
 } from "@/lib/account-mapping";
-import * as XLSX from "xlsx";
+import { utils, writeFile } from "xlsx";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
@@ -183,10 +183,10 @@ const ReportsPage = () => {
       Valor: t.amount,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Transações");
-    XLSX.writeFile(workbook, "Relatorio_Transacoes.xlsx");
+    const worksheet = utils.json_to_sheet(dataToExport);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Transações");
+    writeFile(workbook, "Relatorio_Transacoes.xlsx");
   };
 
   useEffect(() => {

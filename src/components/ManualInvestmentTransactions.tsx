@@ -15,6 +15,7 @@ import { Trash2, Edit, TrendingUp, TrendingDown, PlusCircle, Upload, Download } 
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
+import { read, utils, writeFile, SSF } from "xlsx";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { TickerSearch } from "@/components/TickerSearch";
-import * as XLSX from "xlsx";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -123,10 +123,10 @@ export function ManualInvestmentTransactions({
       if (!user) throw new Error("Usuário não autenticado");
 
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = read(data);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+      const jsonData = utils.sheet_to_json(worksheet) as any[];
 
       if (jsonData.length === 0) {
         throw new Error("Planilha vazia");
@@ -148,7 +148,7 @@ export function ManualInvestmentTransactions({
         if (dateValue) {
           if (typeof dateValue === "number") {
             // Excel serial date
-            const excelDate = XLSX.SSF.parse_date_code(dateValue);
+            const excelDate = SSF.parse_date_code(dateValue);
             transactionDate = `${excelDate.y}-${String(excelDate.m).padStart(2, "0")}-${String(excelDate.d).padStart(2, "0")}`;
           } else {
             const parsed = new Date(dateValue);
@@ -225,10 +225,10 @@ export function ManualInvestmentTransactions({
       },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "template_investimentos.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Template");
+    writeFile(wb, "template_investimentos.xlsx");
   };
 
   useEffect(() => {
