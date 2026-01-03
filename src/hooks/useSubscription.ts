@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { stripeProducts } from '@/stripe-config';
 
 export type PlanType = 'free' | 'basic' | 'advanced';
 
@@ -123,9 +122,11 @@ export function useSubscription(): SubscriptionState {
       setIsLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      // First check if there's a valid session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (!user) {
+      // If there's an auth error or no session, default to free plan
+      if (sessionError || !session) {
         setPlan('free');
         setIsLoading(false);
         return;
@@ -154,8 +155,8 @@ export function useSubscription(): SubscriptionState {
         setSubscriptionStatus(subscription?.subscription_status || null);
       }
     } catch (err) {
-      console.error('Error in fetchSubscription:', err);
-      setError('Erro ao carregar informações do plano');
+      // Silently handle errors and default to free plan
+      console.warn('Error in fetchSubscription:', err);
       setPlan('free');
     } finally {
       setIsLoading(false);
