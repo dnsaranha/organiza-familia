@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowUpRight, ArrowDownRight, Clock, AlertTriangle, User, Calendar as CalendarIcon, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { read, utils, writeFile } from 'xlsx';
+import * as XLSX from 'xlsx';
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,19 +25,6 @@ import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { TransactionForm } from "./TransactionForm";
 
 type Transaction = Tables<'transactions'>;
-
-const autoCategorize = (description: string): string => {
-  const desc = description.toLowerCase();
-  if (desc.includes('uber') || desc.includes('99') || desc.includes('taxi') || desc.includes('posto') || desc.includes('estacionamento') || desc.includes('shell') || desc.includes('ipiranga')) return 'Transporte';
-  if (desc.includes('ifood') || desc.includes('restaurante') || desc.includes('burger') || desc.includes('pizza') || desc.includes('mcdonalds') || desc.includes('padaria')) return 'Alimentação';
-  if (desc.includes('mercado') || desc.includes('carrefour') || desc.includes('extra') || desc.includes('atacadão') || desc.includes('pão de açúcar') || desc.includes('walmart')) return 'Mercado';
-  if (desc.includes('farmacia') || desc.includes('drogaria') || desc.includes('hospital') || desc.includes('medico') || desc.includes('doutor')) return 'Saúde';
-  if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('cinema') || desc.includes('steam') || desc.includes('prime') || desc.includes('hbo')) return 'Lazer';
-  if (desc.includes('luz') || desc.includes('agua') || desc.includes('energia') || desc.includes('internet') || desc.includes('claro') || desc.includes('vivo') || desc.includes('tim') || desc.includes('oi') || desc.includes('net')) return 'Contas';
-  if (desc.includes('curso') || desc.includes('udemy') || desc.includes('alura') || desc.includes('escola') || desc.includes('faculdade')) return 'Educação';
-  if (desc.includes('leroy') || desc.includes('telhanorte') || desc.includes('casa') || desc.includes('condominio') || desc.includes('aluguel')) return 'Casa';
-  return 'Outros';
-};
 
 interface FamilyGroup {
   id: string;
@@ -136,40 +123,13 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));
-    const worksheet = utils.json_to_sheet(dataToExport);
-    const workbook = utils.book_new();
-    utils.book_append_sheet(workbook, worksheet, "Transações");
-    writeFile(workbook, "historico_transacoes.xlsx");
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Transações");
+    XLSX.writeFile(workbook, "historico_transacoes.xlsx");
   };
 
-  const handleImportClick = () => {
-    // Generate and download template
-    const templateData = [
-      { 'ID': '', 'Data/Hora': '', 'Descrição': '', 'Categoria': '', 'Valor': '', 'Tipo': '' }, // Headers (implicit in json_to_sheet, but adding empty row for safety or just array of objects)
-    ];
-    // Actually json_to_sheet takes an array of objects and uses keys as headers.
-    // To have headers + example, we just provide the example object.
-    const exampleRow = {
-      'ID': '',
-      'Data/Hora': '25/12/2024',
-      'Descrição': 'Exemplo de Compra',
-      'Categoria': 'Alimentação',
-      'Valor': '50,00',
-      'Tipo': 'expense'
-    };
-
-    const worksheet = utils.json_to_sheet([exampleRow]);
-    const workbook = utils.book_new();
-    utils.book_append_sheet(workbook, worksheet, "Modelo");
-    writeFile(workbook, "modelo_importacao.xlsx");
-
-    toast.info("Modelo baixado", { description: "Preencha o arquivo e selecione-o na janela que irá abrir." });
-
-    // Open file dialog after delay
-    setTimeout(() => {
-        importFileInputRef.current?.click();
-    }, 1500);
-  };
+  const handleImportClick = () => importFileInputRef.current?.click();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -179,9 +139,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = read(data, { type: 'array', cellDates: true }); // cellDates: true converts Excel serial dates to JS Date objects
+        const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const importedData: ImportedRow[] = utils.sheet_to_json(worksheet);
+        const importedData: ImportedRow[] = XLSX.utils.sheet_to_json(worksheet);
 
         let importedCount = 0, ignoredCount = 0;
 
@@ -193,75 +153,17 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          // Relaxed check: ID, Descrição, Categoria might be empty/missing. Data/Hora and Valor are critical.
-          if (!row['Data/Hora'] || !row.Valor) { ignoredCount++; continue; }
-
-          if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
+          if (!row.ID || !row['Data/Hora'] || !row.Valor || !row.Categoria) { ignoredCount++; continue; }
+          if (existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          let transactionDate: Date;
-          const rawDate = row['Data/Hora'];
-
-          if (rawDate instanceof Date) {
-            transactionDate = rawDate;
-          } else if (typeof rawDate === 'string') {
-            const parts = rawDate.split('/');
-            if (parts.length === 3) {
-                // dd/MM/yyyy
-                transactionDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            } else {
-                // Try fallback or standard string parsing
-                transactionDate = new Date(rawDate);
-            }
-          } else {
-             // Fallback for number (if cellDates failed or not used, though we enabled it) or other
-             transactionDate = new Date(rawDate);
-          }
-
-          let amountVal: number;
-          const rawVal = row.Valor;
-          if (typeof rawVal === 'string') {
-             // Remove R$, r$, whitespace.
-             const cleanVal = rawVal.replace(/R\$\s?/gi, '').trim();
-
-             // Check for Brazilian format: 1.200,50 or 50,00
-             // Heuristic: if comma is present, and (no dot, OR dot is before comma)
-             if (cleanVal.includes(',') && (!cleanVal.includes('.') || cleanVal.indexOf('.') < cleanVal.indexOf(','))) {
-                amountVal = parseFloat(cleanVal.replace(/\./g, '').replace(',', '.'));
-             } else {
-                // US format (1,200.50) or plain number (1200.50)
-                // If there are commas but they are likely thousands separators (e.g. 1,200.00), we remove them.
-                // Standard parseFloat stops at comma if not handled? No, just parses prefix. We need to clean.
-                // If it looks like US format: Remove commas.
-                amountVal = parseFloat(cleanVal.replace(/,/g, ''));
-             }
-          } else {
-             amountVal = Number(rawVal);
-          }
-
-          if (isNaN(transactionDate.getTime()) || isNaN(amountVal)) { ignoredCount++; continue; }
+          const transactionDate = new Date(row['Data/Hora']);
+          const transactionValue = parseFloat(String(row.Valor));
+          if (isNaN(transactionDate.getTime()) || isNaN(transactionValue)) { ignoredCount++; continue; }
           
-          const category = row.Categoria || autoCategorize(row.Descrição || '');
-
-          // Generate a composite key even if ID is missing to prevent duplicates
-          const compositeKey = `${transactionDate.toISOString()}|${amountVal}|${category}`;
+          const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${row.Categoria}`;
           if (existingCompositeKeySet.has(compositeKey)) { ignoredCount++; continue; }
 
-          // If ID is missing, we let database generate it (by not including it in object if it's undefined, but here we need to match type)
-          // Actually, we can generate a UUID if missing, or let Supabase handle it if column is default gen_random_uuid()
-          // But TablesInsert<'transactions'> expects id if it's mandatory. Let's check type.
-          // Usually ID is optional in insert if default exists.
-          // If the CSV/XLS row has no ID, we use crypto.randomUUID() for client-side generation or undefined if types allow.
-
-          const newId = row.ID || crypto.randomUUID();
-
-          newTransactions.push({
-            id: newId,
-            date: transactionDate.toISOString(),
-            description: row.Descrição || null,
-            category: category,
-            amount: amountVal,
-            type: row.Tipo === 'income' ? 'income' : 'expense'
-          });
+          newTransactions.push({ id: row.ID, date: transactionDate.toISOString(), description: row.Descrição || null, category: row.Categoria, amount: transactionValue, type: row.Tipo === 'income' ? 'income' : 'expense' });
         }
 
         if (newTransactions.length > 0) {
