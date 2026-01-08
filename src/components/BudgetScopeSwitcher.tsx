@@ -21,16 +21,11 @@ export const BudgetScopeSwitcher = () => {
   useEffect(() => {
     const fetchGroups = async () => {
       if (!user) return;
-      try {
-        const { data, error } = await (supabase as any).rpc('get_user_groups');
-        if (error) {
-          console.error("Erro ao buscar grupos para o seletor:", error);
-        } else {
-          setGroups((data as FamilyGroup[]) || []);
-        }
-      } catch (err) {
-        // Silently handle network errors - groups will just be empty
-        console.warn("Network error fetching groups:", err);
+      const { data, error } = await (supabase as any).rpc('get_user_groups');
+      if (error) {
+        console.error("Erro ao buscar grupos para o seletor:", error);
+      } else {
+        setGroups((data as FamilyGroup[]) || []);
       }
     };
     fetchGroups();
