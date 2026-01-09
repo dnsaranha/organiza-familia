@@ -413,14 +413,14 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     <ErrorBoundary fallback={fallbackUI}>
       <Card className="bg-gradient-card shadow-card border">
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CardHeader>
+          <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /><CardTitle>Histórico de Transações</CardTitle></div>
+              <div className="flex items-center gap-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /><CardTitle className="text-base sm:text-lg">Histórico de Transações</CardTitle></div>
               <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-9 p-0"><ChevronUp className={`h-4 w-4 transition-transform duration-200 ${isOpen ? '' : 'rotate-180'}`} /><span className="sr-only">Toggle</span></Button></CollapsibleTrigger>
             </div>
           </CardHeader>
           <CollapsibleContent>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
                <div className="flex flex-col gap-4 mb-4">
                 <div className="flex gap-2 justify-start md:justify-end">
                    <input type="file" ref={importFileInputRef} className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
@@ -436,25 +436,37 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
                 {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada.</p></div> : (
                   transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <div className={`rounded-full p-2 ${transaction.type === 'income' ? 'bg-success-light text-success' : 'bg-expense-light text-expense'}`}>{transaction.type === 'income' ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}</div>
-                        <div>
-                          <p className="font-medium text-foreground">{transaction.description || transaction.category}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant="secondary" className="text-xs">{transaction.category}</Badge>
-                            <span className="text-xs text-muted-foreground" translate="no">{formatDate(transaction.date)}</span>
+                    <div key={transaction.id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                        <div className={`rounded-full p-1.5 sm:p-2 flex-shrink-0 ${transaction.type === 'income' ? 'bg-success-light text-success' : 'bg-expense-light text-expense'}`}>
+                          {transaction.type === 'income' ? <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                        </div>
+                        <div className="min-w-0 flex-1 mr-2">
+                          <p className="font-medium text-foreground text-xs sm:text-base truncate">{transaction.description || transaction.category}</p>
+                          <div className="flex items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs h-4 sm:h-auto px-1 sm:px-2.5">{transaction.category}</Badge>
+                            <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap" translate="no">{formatDate(transaction.date)}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                         <div className="text-right">
-                          <p className={`font-semibold ${transaction.type === 'income' ? 'text-success' : 'text-expense'}`} translate="no">{transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}</p>
+                          <p className={`font-semibold text-xs sm:text-base ${transaction.type === 'income' ? 'text-success' : 'text-expense'}`} translate="no">
+                            {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                          </p>
                         </div>
-                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setEditingTransaction(transaction)}><Pencil className="mr-2 h-4 w-4" /><span>Editar</span></DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onSelect={() => setTransactionToDelete(transaction)}><Trash2 className="mr-2 h-4 w-4" /><span>Excluir</span></DropdownMenuItem>
-                        </DropdownMenuContent></DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                              <span className="sr-only">Menu</span>
+                              <MoreHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => setEditingTransaction(transaction)}><Pencil className="mr-2 h-4 w-4" /><span>Editar</span></DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onSelect={() => setTransactionToDelete(transaction)}><Trash2 className="mr-2 h-4 w-4" /><span>Excluir</span></DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))
