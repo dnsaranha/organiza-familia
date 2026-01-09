@@ -19,7 +19,8 @@ export interface PlanLimits {
   advancedAnalytics: boolean;
   
   // Grupos
-  groupsEnabled: boolean;
+  groupsEnabled: boolean; // Can CREATE groups
+  canBeGroupMember: boolean; // Can be invited to groups
   maxGroups: number;
   maxMembersPerGroup: number;
   
@@ -44,7 +45,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     investmentsEnabled: false,
     maxAssets: 0,
     advancedAnalytics: false,
-    groupsEnabled: false,
+    groupsEnabled: false, // Cannot CREATE groups, but can be invited as member
+    canBeGroupMember: true, // Can join groups as invited member
     maxGroups: 0,
     maxMembersPerGroup: 0,
     reportsHistoryMonths: 1,
@@ -62,6 +64,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     maxAssets: 20,
     advancedAnalytics: false,
     groupsEnabled: true,
+    canBeGroupMember: true,
     maxGroups: 1,
     maxMembersPerGroup: 3,
     reportsHistoryMonths: 12,
@@ -79,6 +82,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     maxAssets: Infinity,
     advancedAnalytics: true,
     groupsEnabled: true,
+    canBeGroupMember: true,
     maxGroups: 3,
     maxMembersPerGroup: Infinity,
     reportsHistoryMonths: Infinity,
