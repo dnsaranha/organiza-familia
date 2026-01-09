@@ -170,6 +170,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importGroupId, setImportGroupId] = useState<string | null>(null);
 
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [budgetFilter, setBudgetFilter] = useState('all');
@@ -245,10 +246,12 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     XLSX.writeFile(workbook, "historico_transacoes.xlsx");
   };
 
-  const handleImportClick = () => setShowImportDialog(true);
+  const handleImportClick = () => {
+    setImportGroupId(null); // Reset to personal by default
+    setShowImportDialog(true);
+  };
   
   const handleSelectFile = () => {
-    setShowImportDialog(false);
     importFileInputRef.current?.click();
   };
   
@@ -351,7 +354,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             description: row.Descrição || null, 
             category: category, 
             amount: transactionValue, 
-            type: transactionType 
+            type: transactionType,
+            group_id: importGroupId 
           };
           
           // Only include ID if it was provided
@@ -495,9 +499,26 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           <DialogHeader>
             <DialogTitle>Importar Transações</DialogTitle>
             <DialogDescription>
-              Escolha uma opção para importar suas transações de um arquivo Excel.
+              Escolha o grupo onde as transações serão importadas e depois selecione a opção desejada.
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Group Selection */}
+          <div className="space-y-3 py-2">
+            <label className="text-sm font-medium">Importar para:</label>
+            <Select value={importGroupId || 'personal'} onValueChange={(v) => setImportGroupId(v === 'personal' ? null : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o destino" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="personal">Pessoal</SelectItem>
+                {groups.map(g => (
+                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           <div className="flex flex-col gap-4 py-4">
             <Button 
               variant="outline" 
