@@ -500,18 +500,20 @@ export const FamilyGroups = () => {
                 open={createDialogOpen}
                 onOpenChange={setCreateDialogOpen}
               >
-                <DialogTrigger asChild>
+                <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span>
-                        <Button
-                          size="sm"
-                          className="bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
-                          disabled={loadingGroups || !limits.groupsEnabled}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Criar
-                        </Button>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            className="bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
+                            disabled={loadingGroups || !limits.groupsEnabled}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Criar
+                          </Button>
+                        </DialogTrigger>
                       </span>
                     </TooltipTrigger>
                     {!limits.groupsEnabled && (
@@ -520,7 +522,7 @@ export const FamilyGroups = () => {
                       </TooltipContent>
                     )}
                   </Tooltip>
-                </DialogTrigger>
+                </TooltipProvider>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Criar Novo Grupo</DialogTitle>
