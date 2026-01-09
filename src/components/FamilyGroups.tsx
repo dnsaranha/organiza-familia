@@ -48,6 +48,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +99,7 @@ export const FamilyGroups = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { limits } = useSubscription();
 
   useEffect(() => {
     if (user) {
@@ -499,14 +501,25 @@ export const FamilyGroups = () => {
                 onOpenChange={setCreateDialogOpen}
               >
                 <DialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    className="bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
-                    disabled={loadingGroups}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Criar
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          size="sm"
+                          className="bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
+                          disabled={loadingGroups || !limits.groupsEnabled}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Criar
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!limits.groupsEnabled && (
+                      <TooltipContent>
+                        <p>Faça upgrade para criar grupos</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>

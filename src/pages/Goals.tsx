@@ -16,6 +16,8 @@ import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, Gradua
 import { toast } from "sonner";
 import { format, addMonths, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSubscription } from "@/hooks/useSubscription";
+import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 
 interface Goal {
   id: string; user_id: string; group_id: string | null; title: string; description: string | null; target_amount: number; current_amount: number; deadline: string | null; category: string; icon: string; color: string; created_at: string; updated_at: string; monthly_contribution: number | null;
@@ -162,6 +164,7 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { canAdd: canAddGoal, limit: goalsLimit } = useCanAdd('maxGoals', goals.length);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [isAddingValue, setIsAddingValue] = useState<string | null>(null);
   const [addValue, setAddValue] = useState("");
@@ -320,13 +323,14 @@ export default function GoalsPage() {
 
   return (
     <div className="container mx-auto p-4 pb-20 space-y-6">
+      <LimitAlert limitKey="maxGoals" currentCount={goals.length} itemName="metas" className="mb-4" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Target className="h-6 w-6 text-primary" />Metas de Reserva</h1>
           <p className="text-muted-foreground text-sm">Defina e acompanhe suas metas financeiras</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setEditingGoal(null); resetForm(); } }}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
+          <DialogTrigger asChild><Button disabled={!canAddGoal && !editingGoal}><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingGoal ? "Editar Meta" : "Nova Meta"}</DialogTitle></DialogHeader>
             <div className="space-y-4">

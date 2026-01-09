@@ -13,6 +13,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useNavigate } from "react-router-dom";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
+import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 
 const taskTypes = [
   { value: 'payment_reminder', label: 'Lembrete de Pagamento' },
@@ -32,6 +33,7 @@ const TasksPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { canAdd: canAddTask } = useCanAdd('maxTasks', tasks.length);
 
   useTaskNotifications();
 
@@ -284,6 +286,7 @@ const TasksPage = () => {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <LimitAlert limitKey="maxTasks" currentCount={tasks.length} itemName="tarefas" className="mb-4" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Tarefas Agendadas</h1>
@@ -304,6 +307,7 @@ const TasksPage = () => {
             <Button
                 size="sm"
                 className="flex-1 sm:flex-none"
+                disabled={!canAddTask}
                 onClick={() => {
                     setSelectedTask(null);
                     setIsFormOpen(true);
