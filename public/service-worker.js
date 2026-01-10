@@ -1,9 +1,9 @@
 // Enhanced Service Worker for PWA with Push Notifications
-const CACHE_NAME = 'organiza-v1';
+// Updated cache name to force refresh
+const CACHE_NAME = 'organiza-v2-' + new Date().toISOString().slice(0, 10);
+// Removed '/' from pre-cache to prevent stale index.html
+// Removed hardcoded CRA paths ('/static/js/bundle.js') which don't exist in Vite
 const urlsToCache = [
-  '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
@@ -25,18 +25,25 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
-// (moved down to combine with task checking setup)
-
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+  // Navigation requests (HTML) should be Network First to avoid stale index.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Other requests: Cache First, fall back to Network
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
         return response || fetch(event.request);
-      }
-    )
+      })
   );
 });
 
