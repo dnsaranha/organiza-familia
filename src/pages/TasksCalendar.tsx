@@ -240,12 +240,12 @@ const TasksCalendar = () => {
 
        <div className="flex flex-col md:flex-row gap-8">
           <div className="w-full md:w-auto flex justify-center md:block">
-             <div className="border rounded-md p-4 bg-background shadow-sm">
+             <div className="border rounded-md p-0 md:p-4 bg-background shadow-sm">
                 <Calendar
                     mode="single"
                     selected={date}
                     onSelect={setDate}
-                    className="p-0"
+                    className="p-0 w-full [&_td]:w-full [&_td]:md:w-9 [&_th]:w-full [&_th]:md:w-9 [&_td_button]:w-full [&_td_button]:md:w-9"
                     locale={ptBR}
                     modifiers={{
                         hasTask: daysWithTasks
