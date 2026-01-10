@@ -239,8 +239,8 @@ const TasksCalendar = () => {
       </div>
 
        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-auto flex justify-center md:block">
-             <div className="border rounded-md p-0 md:p-4 bg-background shadow-sm">
+          <div className="w-full md:w-auto md:block">
+             <div className="border-y border-x-0 md:border md:rounded-md p-0 md:p-4 bg-background shadow-none md:shadow-sm -mx-2 sm:-mx-4 md:mx-0 w-[calc(100%+1rem)] sm:w-[calc(100%+2rem)] md:w-auto">
                 <Calendar
                     mode="single"
                     selected={date}
