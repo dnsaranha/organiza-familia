@@ -41,6 +41,8 @@ export default function Profile() {
   const [monthStartDay, setMonthStartDay] = useState<number | string>(1);
   const [carryOverBalance, setCarryOverBalance] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
@@ -107,7 +109,7 @@ export default function Profile() {
         const { data: preferencesData, error: preferencesError } =
           await supabase
             .from("user_preferences")
-            .select("month_start_day, carry_over_balance, theme")
+            .select("month_start_day, carry_over_balance, theme, google_client_id, google_client_secret")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -118,6 +120,8 @@ export default function Profile() {
         if (preferencesData) {
           setMonthStartDay(preferencesData.month_start_day || 1);
           setCarryOverBalance(preferencesData.carry_over_balance);
+          setGoogleClientId(preferencesData.google_client_id || "");
+          setGoogleClientSecret(preferencesData.google_client_secret || "");
           const theme = preferencesData.theme || "system";
           const prefersDark =
             theme === "dark" ||
@@ -215,6 +219,8 @@ export default function Profile() {
         month_start_day: Number(monthStartDay),
         carry_over_balance: carryOverBalance,
         theme: darkMode ? "dark" : "light",
+        google_client_id: googleClientId || null,
+        google_client_secret: googleClientSecret || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -345,6 +351,37 @@ export default function Profile() {
                     }}
                   />
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">
+                  Autenticação Social
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="googleClientId">Google Client ID</Label>
+                  <Input
+                    id="googleClientId"
+                    type="text"
+                    placeholder="123456789-abc123def456.apps.googleusercontent.com"
+                    value={googleClientId}
+                    onChange={(e) => setGoogleClientId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="googleClientSecret">Google Client Secret</Label>
+                  <Input
+                    id="googleClientSecret"
+                    type="password"
+                    placeholder="GOCSPX-••••••••••••••••••••"
+                    value={googleClientSecret}
+                    onChange={(e) => setGoogleClientSecret(e.target.value)}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Configure suas credenciais do Google OAuth para permitir login com Google.
+                </p>
               </div>
 
               <Separator />

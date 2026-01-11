@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
   month_start_day INTEGER DEFAULT 1,
   carry_over_balance BOOLEAN DEFAULT false,
   theme TEXT DEFAULT 'system',
+  google_client_id TEXT,
+  google_client_secret TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
