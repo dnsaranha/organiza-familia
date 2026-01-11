@@ -31,6 +31,16 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    // Listen for auth state changes (important for OAuth redirects)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        // Only check subscription on sign in events (including OAuth callback)
+        if (event === 'SIGNED_IN' && session) {
+          await checkSubscription(session.user.id);
+        }
+      }
+    );
+
     // Check if user is already logged in or if this is a password reset flow
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -48,6 +58,8 @@ export default function Auth() {
       }
     };
     checkAuth();
+
+    return () => subscription.unsubscribe();
   }, [navigate, searchParams]);
 
   const checkSubscription = async (userId: string) => {
