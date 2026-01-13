@@ -48,12 +48,15 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
 
-const ExpensePieChart = lazy(
-  () => import("@/components/charts/ExpensePieChart"),
+const ExpenseByCategoryBarChart = lazy(
+  () => import("@/components/charts/ExpenseByCategoryBarChart"),
 );
 const IncomeExpenseBarChart = lazy(
   () => import("@/components/charts/IncomeExpenseBarChart"),
 );
+
+import { CategoryManager } from "@/components/CategoryManager";
+import { useUserCategories } from "@/hooks/useUserCategories";
 
 interface Transaction {
   id: string;
@@ -86,6 +89,10 @@ const ReportsPage = () => {
   const { user } = useAuth();
   const { scope } = useBudgetScope();
   const navigate = useNavigate();
+  const {
+    userCategories,
+    refetch: refetchCategories,
+  } = useUserCategories();
   const {
     connected: bankConnected,
     accounts,
@@ -457,6 +464,7 @@ const ReportsPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <CategoryManager onCategoriesChange={refetchCategories} />
           {bankConnected && (
             <Button 
               variant="outline" 
@@ -614,9 +622,12 @@ const ReportsPage = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base sm:text-lg">Despesas por Categoria</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px] sm:h-[300px]">
+              <CardContent className="h-[280px] sm:h-[320px]">
                 <Suspense fallback={<ChartLoader />}>
-                  <ExpensePieChart data={expenseByCategory} />
+                  <ExpenseByCategoryBarChart 
+                    data={expenseByCategory} 
+                    userCategories={userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
+                  />
                 </Suspense>
               </CardContent>
             </Card>
@@ -797,9 +808,12 @@ const ReportsPage = () => {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base sm:text-lg">Despesas por Categoria</CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[250px] sm:h-[300px]">
+                  <CardContent className="h-[280px] sm:h-[320px]">
                     <Suspense fallback={<ChartLoader />}>
-                      <ExpensePieChart data={bankExpenseByCategory} />
+                      <ExpenseByCategoryBarChart 
+                        data={bankExpenseByCategory} 
+                        userCategories={userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
+                      />
                     </Suspense>
                   </CardContent>
                 </Card>
