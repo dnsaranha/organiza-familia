@@ -44,31 +44,46 @@ export const SubscriptionPlans = () => {
       return;
     }
 
+    const product = stripeProducts.find((p) => p.priceId === priceId);
+    if (product?.price === 0) {
+      toast({
+        title: "Plano Gratuito",
+        description: "Você já tem acesso às funcionalidades do plano gratuito.",
+      });
+      navigate("/");
+      return;
+    }
+
     setLoading(priceId);
 
     try {
-      const response = await supabase.functions.invoke(
-        "stripe-checkout",
-        {
-          body: {
-            price_id: priceId,
-            success_url: `${window.location.origin}/success`,
-            cancel_url: `${window.location.origin}/pricing`,
-            mode,
-          },
+      const response = await supabase.functions.invoke("stripe-checkout", {
+        body: {
+          price_id: priceId,
+          success_url: `${window.location.origin}/success`,
+          cancel_url: `${window.location.origin}/pricing`,
+          mode,
         },
-      );
+      });
 
-      console.log("Stripe checkout response:", response);
+      console.log("Full Stripe Response:", response);
 
       if (response.error) {
-        const errorMessage = response.error?.message || 
-          (typeof response.error === 'string' ? response.error : JSON.stringify(response.error));
-        throw new Error(errorMessage || "Erro ao criar sessão de checkout");
+        let errorMessage = "Erro ao criar sessão de checkout";
+        if (response.error && typeof response.error === "object") {
+          // Try to get message from context if available, or just use message property
+          errorMessage =
+            (response.error as any).context?.statusText ||
+            response.error.message ||
+            JSON.stringify(response.error);
+        } else if (typeof response.error === "string") {
+          errorMessage = response.error;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = response.data;
-      
+
       if (data?.error) {
         throw new Error(data.error);
       }
