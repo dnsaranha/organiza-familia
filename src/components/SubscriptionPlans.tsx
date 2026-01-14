@@ -68,7 +68,7 @@ export const SubscriptionPlans = () => {
       }
 
       const data = response.data;
-      
+
       if (data?.error) {
         throw new Error(data.error);
       }
