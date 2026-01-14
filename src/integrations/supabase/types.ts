@@ -629,6 +629,53 @@ export type Database = {
           },
         ]
       }
+      user_categories: {
+        Row: {
+          color: string
+          created_at: string
+          group_id: string | null
+          icon: string
+          id: string
+          is_default: boolean
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          group_id?: string | null
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          group_id?: string | null
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_categories_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "family_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           carry_over_balance: boolean

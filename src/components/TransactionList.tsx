@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowUpRight, ArrowDownRight, Clock, AlertTriangle, User, Calendar as CalendarIcon, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import * as XLSX from 'xlsx';
@@ -24,6 +25,8 @@ import { format } from "date-fns";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { TransactionForm } from "./TransactionForm";
 import { expenseCategories, incomeCategories } from "@/lib/budget-categories";
+import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
+import { useUserCategories } from "@/hooks/useUserCategories";
 
 type Transaction = Tables<'transactions'>;
 
@@ -165,6 +168,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const { userCategories } = useUserCategories();
 
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -435,11 +439,19 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
                 {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada.</p></div> : (
-                  transactions.map((transaction) => (
+                    transactions.map((transaction) => {
+                      const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
+                      const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
+                      const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
+                      
+                      return (
                     <div key={transaction.id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                        <div className={`rounded-full p-1.5 sm:p-2 flex-shrink-0 ${transaction.type === 'income' ? 'bg-success-light text-success' : 'bg-expense-light text-expense'}`}>
-                          {transaction.type === 'income' ? <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                        <div 
+                          className="rounded-lg p-1.5 sm:p-2 flex-shrink-0 flex items-center justify-center"
+                          style={{ backgroundColor: iconColor }}
+                        >
+                          <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                         </div>
                         <div className="min-w-0 flex-1 mr-2">
                           <p className="font-medium text-foreground text-xs sm:text-base truncate">{transaction.description || transaction.category}</p>
@@ -469,7 +481,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                         </DropdownMenu>
                       </div>
                     </div>
-                  ))
+                      );
+                    })
                 )}
               </div></ScrollArea>
             </CardContent>
