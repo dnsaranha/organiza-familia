@@ -33,10 +33,13 @@ export default function Auth() {
   useEffect(() => {
     // Listen for auth state changes (important for OAuth redirects)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         // Only check subscription on sign in events (including OAuth callback)
         if (event === 'SIGNED_IN' && session) {
-          await checkSubscription(session.user.id);
+          // Use setTimeout to avoid deadlock with async operations
+          setTimeout(() => {
+            checkSubscription(session.user.id);
+          }, 0);
         }
       }
     );
@@ -64,6 +67,10 @@ export default function Auth() {
 
   const checkSubscription = async (userId: string) => {
     try {
+      // First, try to sync subscription from Stripe by email
+      const syncResult = await supabase.functions.invoke('stripe-sync-subscription');
+      console.log('Sync result:', syncResult);
+
       const { data, error } = await (supabase as any)
         .from('stripe_user_subscriptions')
         .select('subscription_status')
@@ -71,17 +78,23 @@ export default function Auth() {
 
       if (error) throw error;
 
-      // If no subscription or status is not_started, show subscription dialog
-      if (!data || data.subscription_status === 'not_started') {
-        setShowSubscriptionDialog(true);
-      } else {
+      // If user has an active or trialing subscription, navigate to home
+      if (data && (data.subscription_status === 'active' || data.subscription_status === 'trialing')) {
         navigate("/");
+      } else {
+        // Show subscription dialog for users without active subscription
+        setShowSubscriptionDialog(true);
       }
     } catch (err) {
       console.error('Erro ao verificar assinatura:', err);
-      // If error checking subscription, navigate anyway
-      navigate("/");
+      // If error checking subscription, show dialog
+      setShowSubscriptionDialog(true);
     }
+  };
+
+  const handleContinueFree = () => {
+    setShowSubscriptionDialog(false);
+    navigate("/");
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
@@ -645,8 +658,20 @@ export default function Auth() {
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">Escolha seu Plano</DialogTitle>
+          <DialogDescription className="text-center">
+            Selecione o plano ideal para você ou continue com o plano gratuito
+          </DialogDescription>
         </DialogHeader>
         <SubscriptionPlans />
+        <div className="mt-4 text-center">
+          <Button 
+            variant="ghost" 
+            onClick={handleContinueFree}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Continuar com plano gratuito
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
     </>
