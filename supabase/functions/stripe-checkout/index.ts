@@ -169,12 +169,21 @@ Deno.serve(async (req) => {
       customerId = existingCustomer.customer_id;
       console.log(`[stripe-checkout] Found existing customer ${customerId}`);
       
-      // Verify the customer still exists in Stripe
+      // Verify the customer still exists in Stripe and is not deleted
       try {
-        await stripe.customers.retrieve(customerId);
-        console.log(`[stripe-checkout] Customer ${customerId} verified in Stripe`);
+        const customer = await stripe.customers.retrieve(customerId);
+        
+        // Check if customer is deleted
+        if ('deleted' in customer && customer.deleted === true) {
+          console.warn(`[stripe-checkout] Customer ${customerId} was deleted in Stripe, creating new one...`);
+          customerId = await createNewStripeCustomer();
+          console.log(`[stripe-checkout] Created replacement Stripe customer ${customerId}`);
+          await saveCustomerToDb(customerId);
+        } else {
+          console.log(`[stripe-checkout] Customer ${customerId} verified and active in Stripe`);
+        }
       } catch (retrieveError: any) {
-        console.warn(`[stripe-checkout] Customer ${customerId} not found in Stripe, creating new one...`);
+        console.warn(`[stripe-checkout] Customer ${customerId} not found in Stripe (${retrieveError.message}), creating new one...`);
         try {
           customerId = await createNewStripeCustomer();
           console.log(`[stripe-checkout] Created replacement Stripe customer ${customerId}`);
