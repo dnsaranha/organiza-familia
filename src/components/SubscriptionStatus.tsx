@@ -3,11 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Crown, Calendar, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { Crown, Calendar, CreditCard, AlertCircle, Loader2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getProductByPriceId, stripeProducts } from '@/stripe-config';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface SubscriptionData {
   subscription_status: string;
@@ -22,11 +33,50 @@ interface SubscriptionData {
 export const SubscriptionStatus = () => {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const openCustomerPortal = async () => {
+    try {
+      setPortalLoading(true);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: 'Erro',
+          description: 'Você precisa estar logado para gerenciar sua assinatura',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('stripe-customer-portal', {
+        body: { return_url: window.location.href },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao abrir portal');
+      }
+
+      if (response.data?.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('URL do portal não encontrada');
+      }
+    } catch (err: any) {
+      console.error('Erro ao abrir portal:', err);
+      toast({
+        title: 'Erro',
+        description: err.message || 'Não foi possível abrir o portal de gerenciamento',
+        variant: 'destructive',
+      });
+    } finally {
+      setPortalLoading(false);
+    }
+  };
   useEffect(() => {
     if (user) {
       fetchSubscription();
@@ -223,7 +273,7 @@ export const SubscriptionStatus = () => {
           </div>
         )}
 
-        <div className="flex gap-2 pt-4">
+        <div className="flex flex-wrap gap-2 pt-4">
           <Button 
             variant="outline" 
             size="sm"
@@ -238,6 +288,27 @@ export const SubscriptionStatus = () => {
           >
             Atualizar Status
           </Button>
+          {subscription.subscription_status === 'active' && !subscription.cancel_at_period_end && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={openCustomerPortal}
+              disabled={portalLoading}
+              className="text-destructive hover:text-destructive"
+            >
+              {portalLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Abrindo...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Gerenciar Assinatura
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
