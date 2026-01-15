@@ -138,6 +138,7 @@ async function syncCustomerFromStripe(customerId: string) {
       return;
     }
 
+    // First, check if this customer exists in our database
     const { data: existingCustomer, error: getCustomerError } = await supabase
       .from('stripe_customers')
       .select('user_id')
@@ -149,7 +150,43 @@ async function syncCustomerFromStripe(customerId: string) {
       throw new Error('Failed to fetch user from database');
     }
 
-    const userId = existingCustomer?.user_id ?? (customer.metadata.user_id || null);
+    let userId = existingCustomer?.user_id ?? (customer.metadata.user_id || null);
+
+    // If customer exists in Stripe but not in our DB, try to link via email
+    if (!userId && customer.email) {
+      console.info(`Trying to link customer ${customerId} via email: ${customer.email}`);
+      
+      // Try to find user by email in auth.users (via RPC or metadata)
+      const { data: userByEmail } = await supabase.rpc('get_user_id_by_email', { 
+        email: customer.email 
+      });
+      
+      if (userByEmail) {
+        userId = userByEmail;
+        console.info(`Found user ${userId} by email ${customer.email}`);
+        
+        // Check if this user already has a different customer_id
+        const { data: existingUserCustomer } = await supabase
+          .from('stripe_customers')
+          .select('customer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (existingUserCustomer && existingUserCustomer.customer_id !== customerId) {
+          console.info(`User ${userId} already has customer ${existingUserCustomer.customer_id}, updating to ${customerId}`);
+          // Update the existing record to use the new customer_id
+          await supabase
+            .from('stripe_customers')
+            .update({ customer_id: customerId, updated_at: new Date().toISOString() })
+            .eq('user_id', userId);
+        } else if (!existingUserCustomer) {
+          // Create new customer record
+          await supabase
+            .from('stripe_customers')
+            .insert({ user_id: userId, customer_id: customerId });
+        }
+      }
+    }
 
     if (!userId) {
       console.error(`user_id not found for customer ${customerId}. Cannot sync subscription.`);
@@ -185,6 +222,7 @@ async function syncCustomerFromStripe(customerId: string) {
       payment_method_last4: paymentMethod?.card?.last4 ?? null,
     };
 
+    // Use upsert to handle both new and existing subscriptions
     const { error: subError } = await supabase
       .from('stripe_subscriptions')
       .upsert(subscriptionData, { onConflict: 'customer_id' });
