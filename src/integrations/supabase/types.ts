@@ -798,6 +798,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_user_id_by_email: { Args: { email: string }; Returns: string }
       import_transactions: {
         Args: {
           transactions: Database["public"]["CompositeTypes"]["transaction_import_type"][]
