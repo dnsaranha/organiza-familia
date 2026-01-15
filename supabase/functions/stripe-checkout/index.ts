@@ -121,44 +121,69 @@ Deno.serve(async (req) => {
 
     let customerId;
 
-    if (!existingCustomer || !existingCustomer.customer_id) {
-      console.log('[stripe-checkout] No local customer found. Creating new Stripe customer...');
-      try {
-        const newCustomer = await stripe.customers.create({
-            email: user.email ?? undefined,
-            metadata: {
-            user_id: user.id,
-            },
+    // Helper function to create a new Stripe customer
+    const createNewStripeCustomer = async () => {
+      console.log('[stripe-checkout] Creating new Stripe customer...');
+      const newCustomer = await stripe.customers.create({
+        email: user.email ?? undefined,
+        metadata: {
+          user_id: user.id,
+        },
+      });
+      return newCustomer.id;
+    };
+
+    // Helper function to save customer to DB
+    const saveCustomerToDb = async (custId: string) => {
+      // First delete any existing record for this user
+      await supabase
+        .from('stripe_customers')
+        .delete()
+        .eq('user_id', user.id);
+      
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from('stripe_customers')
+        .insert({
+          user_id: user.id,
+          customer_id: custId,
         });
-        customerId = newCustomer.id;
-        console.log(`[stripe-checkout] Created new Stripe customer ${customerId}`);
 
-        const { error: createCustomerError } = await supabase
-            .from('stripe_customers')
-            .insert({
-            user_id: user.id,
-            customer_id: customerId,
-            });
-
-        if (createCustomerError) {
-            console.error('[stripe-checkout] Failed to save new customer to DB:', createCustomerError);
-            // Attempt cleanup
-            try {
-            console.log('[stripe-checkout] Cleaning up orphaned Stripe customer...');
-            await stripe.customers.del(newCustomer.id);
-            } catch (deleteError) {
-            console.error('[stripe-checkout] Failed to clean up Stripe customer:', deleteError);
-            }
-            return corsResponse({ error: 'Failed to create customer record' }, 500);
-        }
-      } catch (stripeCustError: any) {
-         console.error('[stripe-checkout] Stripe customer creation failed:', stripeCustError);
-         return corsResponse({ error: 'Stripe customer creation failed: ' + stripeCustError.message}, 500);
+      if (insertError) {
+        console.error('[stripe-checkout] Failed to save customer to DB:', insertError);
+        throw new Error('Failed to create customer record');
       }
+    };
 
+    if (!existingCustomer || !existingCustomer.customer_id) {
+      console.log('[stripe-checkout] No local customer found.');
+      try {
+        customerId = await createNewStripeCustomer();
+        console.log(`[stripe-checkout] Created new Stripe customer ${customerId}`);
+        await saveCustomerToDb(customerId);
+      } catch (stripeCustError: any) {
+        console.error('[stripe-checkout] Stripe customer creation failed:', stripeCustError);
+        return corsResponse({ error: 'Stripe customer creation failed: ' + stripeCustError.message }, 500);
+      }
     } else {
       customerId = existingCustomer.customer_id;
       console.log(`[stripe-checkout] Found existing customer ${customerId}`);
+      
+      // Verify the customer still exists in Stripe
+      try {
+        await stripe.customers.retrieve(customerId);
+        console.log(`[stripe-checkout] Customer ${customerId} verified in Stripe`);
+      } catch (retrieveError: any) {
+        console.warn(`[stripe-checkout] Customer ${customerId} not found in Stripe, creating new one...`);
+        try {
+          customerId = await createNewStripeCustomer();
+          console.log(`[stripe-checkout] Created replacement Stripe customer ${customerId}`);
+          await saveCustomerToDb(customerId);
+        } catch (createError: any) {
+          console.error('[stripe-checkout] Failed to create replacement customer:', createError);
+          return corsResponse({ error: 'Failed to create customer: ' + createError.message }, 500);
+        }
+      }
     }
 
     // Create Checkout Session
