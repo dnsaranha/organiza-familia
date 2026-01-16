@@ -445,15 +445,15 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
                       
                       return (
-                    <div key={transaction.id} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
-                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    <div key={transaction.id} className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <div 
                           className="rounded-lg p-1.5 sm:p-2 flex-shrink-0 flex items-center justify-center"
                           style={{ backgroundColor: iconColor }}
                         >
                           <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                         </div>
-                        <div className="min-w-0 flex-1 mr-2">
+                        <div className="min-w-0 flex-1">
                           <p className="font-medium text-foreground text-xs sm:text-base truncate">{transaction.description || transaction.category}</p>
                           <div className="flex items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
                             <Badge variant="secondary" className="text-[10px] sm:text-xs h-4 sm:h-auto px-1 sm:px-2.5">{transaction.category}</Badge>
