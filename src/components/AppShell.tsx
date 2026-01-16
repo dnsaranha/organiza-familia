@@ -98,33 +98,87 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               <DropdownMenuContent align="end" className="w-56">
                 {user ? (
                   <>
-                    <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                    <DropdownMenuLabel>Navegação</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <NavLink to="/goals">Metas</NavLink>
+                      <NavLink to="/investments" className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Investimentos
+                      </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <NavLink to="/budget">Orçamento</NavLink>
+                      <NavLink to="/reports" className="flex items-center gap-2">
+                        <AreaChart className="h-4 w-4" />
+                        Relatórios
+                      </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <NavLink to="/forecast">Previsões</NavLink>
+                      <NavLink to="/tasks" className="flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4" />
+                        Tarefas
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/tasks/calendar" className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Agenda
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/groups" className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Grupos
+                      </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Financeiro</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <NavLink to="/connect">Conectar</NavLink>
+                      <NavLink to="/goals" className="flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        Metas
+                      </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <NavLink to="/settings/notifications">
+                      <NavLink to="/budget" className="flex items-center gap-2">
+                        <PiggyBank className="h-4 w-4" />
+                        Orçamento
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/forecast" className="flex items-center gap-2">
+                        <CalendarDays className="h-4 w-4" />
+                        Previsões
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Configurações</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/connect" className="flex items-center gap-2">
+                        <Link className="h-4 w-4" />
+                        Conectar
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/settings/notifications" className="flex items-center gap-2">
                         Notificações
                       </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <NavLink to="/pricing">Planos</NavLink>
+                      <NavLink to="/pricing" className="flex items-center gap-2">
+                        Planos
+                      </NavLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <NavLink to="/profile">Perfil</NavLink>
+                      <NavLink to="/profile" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Perfil
+                      </NavLink>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2">
+                      <LogOut className="h-4 w-4" />
                       Sair
                     </DropdownMenuItem>
                   </>
