@@ -202,7 +202,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           notification_email: formData.notification_email,
           notification_push: formData.notification_push,
           user_id: user?.id,
-          group_id: formData.group_id === 'personal' ? null : formData.group_id,
+          group_id: (!formData.group_id || formData.group_id === 'personal' || formData.group_id === '') ? null : formData.group_id,
           value: valueWithSign,
           category: formData.category,
           created_at: initialData?.created_at || localCreatedAt,
