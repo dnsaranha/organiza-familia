@@ -64,7 +64,7 @@ export const useUserCategories = () => {
       }
     });
     
-    return combined;
+    return combined.sort((a, b) => a.localeCompare(b));
   }, [userCategories]);
 
   const getAllExpenseCategories = useCallback(() => {
@@ -79,7 +79,7 @@ export const useUserCategories = () => {
       }
     });
     
-    return combined;
+    return combined.sort((a, b) => a.localeCompare(b));
   }, [userCategories]);
 
   return {
