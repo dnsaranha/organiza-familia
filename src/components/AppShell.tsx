@@ -10,7 +10,7 @@ import {
   LogOut,
   AreaChart,
   TrendingUp,
-  Link,
+  Link2,
   CheckSquare,
   Target,
   CalendarDays,
@@ -156,7 +156,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <NavLink to="/connect" className="flex items-center gap-2">
-                        <Link className="h-4 w-4" />
+                        <Link2 className="h-4 w-4" />
                         Conectar
                       </NavLink>
                     </DropdownMenuItem>

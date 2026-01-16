@@ -28,8 +28,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, Smartphone } from "lucide-react";
+import { Trash2, Loader2, Smartphone, Tags } from "lucide-react";
 import { BottomNavConfig } from "@/components/BottomNavConfig";
+import { CategoryManager } from "@/components/CategoryManager";
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -345,6 +346,19 @@ export default function Profile() {
                     }}
                   />
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Tags className="h-5 w-5" />
+                  <h3 className="text-lg font-medium">Gerenciar Categorias</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Crie e edite categorias personalizadas para suas transações e tarefas.
+                </p>
+                <CategoryManager />
               </div>
 
               <Separator />

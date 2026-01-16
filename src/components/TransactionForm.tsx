@@ -12,8 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Tables } from "@/integrations/supabase/types";
 import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { incomeCategories, expenseCategories } from "@/lib/budget-categories";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
+import { useUserCategories } from "@/hooks/useUserCategories";
 
 type Transaction = Tables<'transactions'>;
 
@@ -40,6 +40,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { getAllIncomeCategories, getAllExpenseCategories } = useUserCategories();
 
   // Efeito para buscar os grupos do usuário
   useEffect(() => {
@@ -224,7 +225,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(type === 'income' ? incomeCategories : expenseCategories).map((cat) => (
+                  {(type === 'income' ? getAllIncomeCategories() : getAllExpenseCategories()).map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
