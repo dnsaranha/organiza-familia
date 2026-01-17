@@ -160,8 +160,8 @@ export const SupportChat = () => {
       )}
 
       {isOpen && (
-        <Card className="fixed bottom-20 right-4 z-50 w-80 h-96 shadow-xl flex flex-col">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b">
+        <Card className="fixed bottom-20 right-4 z-50 w-[calc(100vw-2rem)] max-w-80 h-80 md:h-96 shadow-xl flex flex-col">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b flex-shrink-0">
             <CardTitle className="text-sm flex items-center gap-2">
               <MessageCircle className="h-4 w-4" /> Suporte
             </CardTitle>
@@ -169,7 +169,7 @@ export const SupportChat = () => {
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
-          <CardContent className="flex-1 p-0 flex flex-col">
+          <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
             <ScrollArea className="flex-1 p-3" ref={scrollRef}>
               {loading ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -188,13 +188,14 @@ export const SupportChat = () => {
                 </div>
               )}
             </ScrollArea>
-            <div className="p-3 border-t flex gap-2">
+            <div className="p-3 border-t flex gap-2 flex-shrink-0 bg-background">
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Digite sua mensagem..."
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                 disabled={sending}
+                className="flex-1"
               />
               <Button size="icon" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

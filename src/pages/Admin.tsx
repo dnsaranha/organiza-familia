@@ -214,14 +214,14 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="support">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-250px)] min-h-[500px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Conversations List */}
-              <Card className="md:col-span-1">
+              <Card className="md:col-span-1 h-[300px] md:h-[500px]">
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm">Conversas</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="h-[calc(100vh-330px)] min-h-[400px]">
+                  <ScrollArea className="h-[200px] md:h-[420px]">
                     {conversations.length === 0 ? (
                       <p className="p-4 text-sm text-muted-foreground text-center">
                         Nenhuma conversa encontrada
@@ -257,13 +257,13 @@ export default function AdminPage() {
               </Card>
 
               {/* Messages */}
-              <Card className="md:col-span-2 flex flex-col overflow-hidden">
-                <CardHeader className="py-3 border-b flex-shrink-0">
+              <Card className="md:col-span-2 h-[400px] md:h-[500px] flex flex-col">
+                <CardHeader className="py-3 border-b">
                   <CardTitle className="text-sm">
                     {selectedConversation ? selectedConversation.email : 'Selecione uma conversa'}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 p-0 flex flex-col min-h-0">
+                <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
                   <ScrollArea className="flex-1 p-4">
                     {selectedConversation ? (
                       <div className="space-y-3">
