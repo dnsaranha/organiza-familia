@@ -17,6 +17,8 @@ import {
   Calendar,
   PieChart, // Ícone adicionado
   Plus,
+  MessageCircle,
+  Shield,
 } from "lucide-react";
 
 import {
@@ -48,6 +50,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TransactionForm } from "@/components/TransactionForm";
+import { toggleSupportChat } from "@/components/SupportChat";
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
@@ -55,12 +58,36 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isDesktopTransactionOpen, setIsDesktopTransactionOpen] = React.useState(false);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   React.useEffect(() => {
     if (!loading && !user && location.pathname !== "/yfinance-test") {
       navigate("/auth");
     }
   }, [user, loading, navigate, location]);
+
+  // Check if user is admin
+  React.useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        setIsAdmin(!!data);
+      } catch (err) {
+        console.error('Error checking admin status:', err);
+        setIsAdmin(false);
+      }
+    };
+    checkAdmin();
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -176,6 +203,28 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                         Perfil
                       </NavLink>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={toggleSupportChat} className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Chat de Suporte
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                        <DropdownMenuItem asChild>
+                          <NavLink to="/admin" className="flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Painel Admin
+                          </NavLink>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <NavLink to="/yfinance-test" className="flex items-center gap-2">
+                            Teste YFinance
+                          </NavLink>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2">
                       <LogOut className="h-4 w-4" />
@@ -355,6 +404,27 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                   <DropdownMenuItem asChild>
                     <NavLink to="/profile">Perfil</NavLink>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={toggleSupportChat} className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Chat de Suporte
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                      <DropdownMenuItem asChild>
+                        <NavLink to="/admin" className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Painel Admin
+                        </NavLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <NavLink to="/yfinance-test">Teste YFinance</NavLink>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     Sair
                   </DropdownMenuItem>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,20 @@ interface Message {
   created_at: string;
 }
 
+// Global state for chat visibility that can be controlled from outside
+let globalSetChatVisible: ((visible: boolean) => void) | null = null;
+let globalToggleChat: (() => void) | null = null;
+
+export const toggleSupportChat = () => {
+  if (globalToggleChat) globalToggleChat();
+};
+
+export const setSupportChatVisible = (visible: boolean) => {
+  if (globalSetChatVisible) globalSetChatVisible(visible);
+};
+
 export const SupportChat = () => {
+  const [isVisible, setIsVisible] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -25,6 +38,47 @@ export const SupportChat = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Register global controls
+  useEffect(() => {
+    globalSetChatVisible = setIsVisible;
+    globalToggleChat = () => setIsVisible(prev => !prev);
+    return () => {
+      globalSetChatVisible = null;
+      globalToggleChat = null;
+    };
+  }, []);
+
+  // Auto-hide chat after 2 minutes of inactivity (only if chat is closed)
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimeout.current) {
+      clearTimeout(inactivityTimeout.current);
+    }
+    // Only set timer if chat is not open
+    if (!isOpen) {
+      inactivityTimeout.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 2 * 60 * 1000); // 2 minutes
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    resetInactivityTimer();
+    return () => {
+      if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
+    };
+  }, [resetInactivityTimer]);
+
+  // When chat opens, clear the inactivity timer
+  useEffect(() => {
+    if (isOpen && inactivityTimeout.current) {
+      clearTimeout(inactivityTimeout.current);
+    }
+    if (!isOpen) {
+      resetInactivityTimer();
+    }
+  }, [isOpen, resetInactivityTimer]);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -67,12 +121,18 @@ export const SupportChat = () => {
     if (!newMessage.trim() || !user) return;
     setSending(true);
     try {
-      const { error } = await supabase.from('support_messages').insert({
+      const { data, error } = await supabase.from('support_messages').insert({
         user_id: user.id,
         message: newMessage.trim(),
         is_from_admin: false,
-      });
+      }).select().single();
       if (error) throw error;
+      
+      // Add message immediately to the UI
+      if (data) {
+        setMessages(prev => [...prev, data as Message]);
+      }
+      
       setNewMessage('');
       toast({ title: 'Mensagem enviada!', description: 'O suporte responderá em breve.' });
     } catch (err: any) {
@@ -84,15 +144,20 @@ export const SupportChat = () => {
 
   if (!user) return null;
 
+  // Don't render anything if not visible and not open
+  if (!isVisible && !isOpen) return null;
+
   return (
     <>
-      <Button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 z-50 rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90"
-        size="icon"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </Button>
+      {isVisible && (
+        <Button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-20 right-4 z-50 rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90"
+          size="icon"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </Button>
+      )}
 
       {isOpen && (
         <Card className="fixed bottom-20 right-4 z-50 w-80 h-96 shadow-xl flex flex-col">

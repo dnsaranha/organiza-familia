@@ -288,13 +288,12 @@ export const SubscriptionStatus = () => {
           >
             Atualizar Status
           </Button>
-          {subscription.subscription_status === 'active' && !subscription.cancel_at_period_end && (
+          {(subscription.subscription_status === 'active' || subscription.subscription_status === 'trialing') && (
             <Button 
               variant="outline" 
               size="sm"
               onClick={openCustomerPortal}
               disabled={portalLoading}
-              className="text-destructive hover:text-destructive"
             >
               {portalLoading ? (
                 <>
@@ -303,7 +302,7 @@ export const SubscriptionStatus = () => {
                 </>
               ) : (
                 <>
-                  <XCircle className="h-4 w-4 mr-2" />
+                  <CreditCard className="h-4 w-4 mr-2" />
                   Gerenciar Assinatura
                 </>
               )}
