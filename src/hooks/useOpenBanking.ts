@@ -208,7 +208,7 @@ export const useOpenBanking = () => {
           const { data, error } = await supabase.functions.invoke(
             "pluggy-transactions",
             {
-              body: { accountId: account.id },
+              body: { accountId: account.id, itemId: account.itemId },
             },
           );
           if (error) {
