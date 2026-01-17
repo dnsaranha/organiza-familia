@@ -26,6 +26,8 @@ import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import YFinanceTestPage from "./pages/YFinanceTest";
 import BudgetPage from "./pages/Budget";
+import { SupportChat } from "./components/SupportChat";
+import AdminPage from "./pages/Admin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +87,7 @@ const App = () => {
             <SubscriptionProvider>
               <Toaster />
               <Sonner />
+              <SupportChat />
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
@@ -203,6 +206,14 @@ const App = () => {
                   element={
                     <AppShell>
                       <PWASettings />
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <AppShell>
+                      <AdminPage />
                     </AppShell>
                   }
                 />
