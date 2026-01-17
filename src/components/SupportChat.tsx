@@ -95,7 +95,11 @@ export const SupportChat = () => {
           .channel('support_messages')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
             const newMsg = payload.new as Message;
-            setMessages(prev => [...prev, newMsg]);
+            // Prevent duplicate messages if optimistic update already added it
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
 
             if (newMsg.is_from_admin) {
               if (!isOpenRef.current) {
@@ -123,31 +127,91 @@ export const SupportChat = () => {
     };
   }, [user, calculateUnread]);
 
-  // Scroll to bottom when messages change or chat opens
-  useEffect(() => {
-    if (isOpen && scrollRef.current) {
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Scroll management
+  const scrollToMessage = useCallback(() => {
+    if (!scrollRef.current) return;
+
+    // If opening chat, try to scroll to last visualized message
+    const lastSeen = localStorage.getItem('support_chat_last_seen_at');
+    let targetMessageId: string | null = null;
+
+    if (lastSeen && messages.length > 0) {
+        // Find the LAST message that was <= lastSeen
+        // Since messages are sorted ascending:
+        // iterate backwards? or just filter.
+        const seenMessages = messages.filter(m => new Date(m.created_at) <= new Date(lastSeen));
+        if (seenMessages.length > 0) {
+            targetMessageId = seenMessages[seenMessages.length - 1].id;
         }
-      }, 100);
     }
-  }, [messages, isOpen]);
+
+    if (targetMessageId) {
+        const element = document.getElementById(`msg-${targetMessageId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'auto', block: 'start' });
+            return;
+        }
+    }
+
+    // Fallback: Scroll to bottom
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+
+  // Effect to handle scroll on Open
+  useEffect(() => {
+      if (isOpen) {
+          // Use setTimeout to ensure DOM is rendered
+          setTimeout(scrollToMessage, 100);
+      }
+  }, [isOpen, scrollToMessage]);
+
+
+  useEffect(() => {
+      if (isOpen) {
+          setTimeout(scrollToMessage, 100);
+      }
+  }, [messages, isOpen, scrollToMessage]);
+
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setSending(true);
     try {
+      // Optimistic update
+      const tempId = crypto.randomUUID();
+      const tempMessage: Message = {
+          id: tempId,
+          message: newMessage.trim(),
+          is_from_admin: false,
+          created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, tempMessage]);
+      setNewMessage('');
+
+      // Scroll to bottom immediately
+       setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 50);
+
       const { data, error } = await supabase.from('support_messages').insert({
         user_id: user.id,
-        message: newMessage.trim(),
+        message: tempMessage.message,
         is_from_admin: false,
       }).select().single();
       if (error) throw error;
       
-      setNewMessage('');
+      // Replace temp message with real one to get real ID and created_at
+      if (data) {
+          setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
+      }
+
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+      // Remove temp message on error
+       setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
     }
@@ -156,11 +220,11 @@ export const SupportChat = () => {
   const handleOpenChat = () => {
     setIsOpen(true);
     setUnreadCount(0);
-    localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
   };
 
   const handleCloseChat = () => {
     setIsOpen(false);
+    localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
     if (unreadCount === 0) {
       setIsVisible(false);
     }
@@ -210,7 +274,7 @@ export const SupportChat = () => {
               ) : (
                 <div className="space-y-2">
                   {messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
+                    <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
                       <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${msg.is_from_admin ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
                         {msg.is_from_admin && <Badge variant="outline" className="mb-1 text-xs">Suporte</Badge>}
                         <p>{msg.message}</p>
