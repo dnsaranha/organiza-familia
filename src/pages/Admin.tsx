@@ -214,14 +214,14 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="support">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[600px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-250px)] min-h-[500px]">
               {/* Conversations List */}
               <Card className="md:col-span-1">
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm">Conversas</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="h-[520px]">
+                  <ScrollArea className="h-[calc(100vh-330px)] min-h-[400px]">
                     {conversations.length === 0 ? (
                       <p className="p-4 text-sm text-muted-foreground text-center">
                         Nenhuma conversa encontrada
@@ -257,13 +257,13 @@ export default function AdminPage() {
               </Card>
 
               {/* Messages */}
-              <Card className="md:col-span-2 flex flex-col">
-                <CardHeader className="py-3 border-b">
+              <Card className="md:col-span-2 flex flex-col overflow-hidden">
+                <CardHeader className="py-3 border-b flex-shrink-0">
                   <CardTitle className="text-sm">
                     {selectedConversation ? selectedConversation.email : 'Selecione uma conversa'}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 p-0 flex flex-col">
+                <CardContent className="flex-1 p-0 flex flex-col min-h-0">
                   <ScrollArea className="flex-1 p-4">
                     {selectedConversation ? (
                       <div className="space-y-3">
@@ -300,15 +300,16 @@ export default function AdminPage() {
                   </ScrollArea>
 
                   {selectedConversation && (
-                    <div className="p-3 border-t flex gap-2">
+                    <div className="p-3 border-t flex gap-2 flex-shrink-0 bg-background">
                       <Input
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
                         placeholder="Digite sua resposta..."
                         onKeyDown={e => e.key === 'Enter' && sendReply()}
                         disabled={sending}
+                        className="flex-1"
                       />
-                      <Button onClick={sendReply} disabled={sending || !replyMessage.trim()}>
+                      <Button onClick={sendReply} disabled={sending || !replyMessage.trim()} size="icon">
                         {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       </Button>
                     </div>
