@@ -29,16 +29,22 @@ export const setSupportChatVisible = (visible: boolean) => {
 };
 
 export const SupportChat = () => {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref to track open state inside subscription callback
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Register global controls
   useEffect(() => {
@@ -50,72 +56,83 @@ export const SupportChat = () => {
     };
   }, []);
 
-  // Auto-hide chat after 2 minutes of inactivity (only if chat is closed)
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimeout.current) {
-      clearTimeout(inactivityTimeout.current);
-    }
-    // Only set timer if chat is not open
-    if (!isOpen) {
-      inactivityTimeout.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 2 * 60 * 1000); // 2 minutes
-    }
-  }, [isOpen]);
+  // Helper to calculate unread count
+  const calculateUnread = useCallback((msgs: Message[]) => {
+    const lastSeen = localStorage.getItem('support_chat_last_seen_at');
+    const count = msgs.filter(m => {
+        if (!m.is_from_admin) return false;
+        if (!lastSeen) return true;
+        return new Date(m.created_at) > new Date(lastSeen);
+    }).length;
+    setUnreadCount(count);
+    if (count > 0) setIsVisible(true);
+  }, []);
 
+  // Fetch messages and subscribe
   useEffect(() => {
-    resetInactivityTimer();
-    return () => {
-      if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
-    };
-  }, [resetInactivityTimer]);
-
-  // When chat opens, clear the inactivity timer
-  useEffect(() => {
-    if (isOpen && inactivityTimeout.current) {
-      clearTimeout(inactivityTimeout.current);
-    }
-    if (!isOpen) {
-      resetInactivityTimer();
-    }
-  }, [isOpen, resetInactivityTimer]);
-
-  useEffect(() => {
-    if (isOpen && user) {
-      fetchMessages();
-      const channel = supabase
-        .channel('support_messages')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
-        })
-        .subscribe();
-      return () => { supabase.removeChannel(channel); };
-    }
-  }, [isOpen, user]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const fetchMessages = async () => {
     if (!user) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('support_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    } finally {
-      setLoading(false);
+
+    let channel: any = null;
+
+    const fetchAndSubscribe = async () => {
+      setLoading(true);
+      try {
+        // Fetch initial messages
+        const { data, error } = await supabase
+          .from('support_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        const msgs = data || [];
+        setMessages(msgs);
+        calculateUnread(msgs);
+
+        // Subscribe to new messages
+        channel = supabase
+          .channel('support_messages')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
+            const newMsg = payload.new as Message;
+            setMessages(prev => [...prev, newMsg]);
+
+            if (newMsg.is_from_admin) {
+              if (!isOpenRef.current) {
+                setUnreadCount(prev => prev + 1);
+                setIsVisible(true);
+              } else {
+                // If chat is open, update timestamp to mark as seen immediately
+                localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
+              }
+            }
+          })
+          .subscribe();
+
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAndSubscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user, calculateUnread]);
+
+  // Scroll to bottom when messages change or chat opens
+  useEffect(() => {
+    if (isOpen && scrollRef.current) {
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 100);
     }
-  };
+  }, [messages, isOpen]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user) return;
@@ -128,13 +145,7 @@ export const SupportChat = () => {
       }).select().single();
       if (error) throw error;
       
-      // Add message immediately to the UI
-      if (data) {
-        setMessages(prev => [...prev, data as Message]);
-      }
-      
       setNewMessage('');
-      toast({ title: 'Mensagem enviada!', description: 'O suporte responderá em breve.' });
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     } finally {
@@ -142,36 +153,57 @@ export const SupportChat = () => {
     }
   };
 
+  const handleOpenChat = () => {
+    setIsOpen(true);
+    setUnreadCount(0);
+    localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
+  };
+
+  const handleCloseChat = () => {
+    setIsOpen(false);
+    if (unreadCount === 0) {
+      setIsVisible(false);
+    }
+  };
+
   if (!user) return null;
 
-  // Don't render anything if not visible and not open
+  // Render nothing if not visible and not open
   if (!isVisible && !isOpen) return null;
 
   return (
     <>
-      {isVisible && (
+      {isVisible && !isOpen && (
         <Button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 z-50 rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90"
+          onClick={handleOpenChat}
+          className="fixed bottom-20 right-4 z-[100] rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90"
           size="icon"
         >
           <MessageCircle className="h-6 w-6" />
+          {unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-6 w-6 flex items-center justify-center p-0 rounded-full text-xs"
+            >
+              {unreadCount}
+            </Badge>
+          )}
         </Button>
       )}
 
       {isOpen && (
-        <Card className="fixed bottom-20 right-4 z-50 w-[calc(100vw-2rem)] max-w-80 h-80 md:h-96 shadow-xl flex flex-col">
+        <Card className="fixed bottom-20 right-4 z-[100] w-[calc(100vw-2rem)] max-w-80 h-80 md:h-96 shadow-xl flex flex-col">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b flex-shrink-0">
             <CardTitle className="text-sm flex items-center gap-2">
               <MessageCircle className="h-4 w-4" /> Suporte
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+            <Button variant="ghost" size="icon" onClick={handleCloseChat}>
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
           <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
             <ScrollArea className="flex-1 p-3" ref={scrollRef}>
-              {loading ? (
+              {loading && messages.length === 0 ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Envie uma mensagem para iniciar o chat.</p>
