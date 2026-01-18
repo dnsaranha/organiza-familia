@@ -230,6 +230,7 @@ const ReportsPage = () => {
     fetchTransactions();
   }, [user, scope]);
 
+
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
