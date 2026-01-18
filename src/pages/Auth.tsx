@@ -395,13 +395,13 @@ export default function Auth() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="flex justify-center gap-3 mt-4">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => handleSocialLogin('google')}
                       disabled={socialLoading !== null}
-                      className="w-full"
+                      className="w-full max-w-xs"
                     >
                       {socialLoading === 'google' ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -429,6 +429,7 @@ export default function Auth() {
                         </>
                       )}
                     </Button>
+                    {/* TODO: Reativar quando a conta Apple estiver configurada
                     <Button
                       type="button"
                       variant="outline"
@@ -447,6 +448,7 @@ export default function Auth() {
                         </>
                       )}
                     </Button>
+                    */}
                   </div>
                 </div>
               </TabsContent>
@@ -506,13 +508,13 @@ export default function Auth() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="flex justify-center gap-3 mt-4">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => handleSocialLogin('google')}
                       disabled={socialLoading !== null}
-                      className="w-full"
+                      className="w-full max-w-xs"
                     >
                       {socialLoading === 'google' ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -540,6 +542,7 @@ export default function Auth() {
                         </>
                       )}
                     </Button>
+                    {/* TODO: Reativar quando a conta Apple estiver configurada
                     <Button
                       type="button"
                       variant="outline"
@@ -558,6 +561,7 @@ export default function Auth() {
                         </>
                       )}
                     </Button>
+                    */}
                   </div>
                 </div>
               </TabsContent>
