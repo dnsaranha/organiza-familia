@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, Plus, Clock, CheckCircle, Trash2, Edit, Undo2, Calendar as CalendarIcon } from "lucide-react";
+import { Bell, Mail, Plus, Clock, CheckCircle, Trash2, Edit, Undo2, Calendar as CalendarIcon, CalendarPlus, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,10 @@ import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTa
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 
+interface ScheduledTaskWithGoogle extends ScheduledTask {
+  google_calendar_event_id?: string | null;
+}
+
 const taskTypes = [
   { value: 'payment_reminder', label: 'Lembrete de Pagamento' },
   { value: 'budget_alert', label: 'Alerta de Orçamento' },
@@ -23,9 +27,9 @@ const taskTypes = [
 ];
 
 const TasksPage = () => {
-  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
+  const [tasks, setTasks] = useState<ScheduledTaskWithGoogle[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<ScheduledTaskWithGoogle | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [periodFilter, setPeriodFilter] = useState<'all' | 'current_month' | 'next_month' | 'custom'>('all');
@@ -36,6 +40,9 @@ const TasksPage = () => {
   const { canAdd: canAddTask } = useCanAdd('maxTasks', tasks.length);
 
   useTaskNotifications();
+
+  // Verifica se o Google está na lista de provedores conectados
+  const hasGoogleConnection = useMemo(() => user?.app_metadata?.providers?.includes('google'), [user]);
 
   // Load saved period filter from localStorage
   useEffect(() => {
@@ -92,7 +99,7 @@ const TasksPage = () => {
         .order('schedule_date', { ascending: true });
 
       if (error) throw error;
-      setTasks((data || []) as ScheduledTask[]);
+      setTasks((data || []) as ScheduledTaskWithGoogle[]);
     } catch (error) {
       // Only log non-network errors
       if (error instanceof Error && !error.message.includes("Failed to fetch") && !error.message.includes("aborted")) {
@@ -141,9 +148,95 @@ const TasksPage = () => {
     });
   }, [tasks, searchTerm, dateRange, periodFilter]);
 
-  const handleEdit = (task: ScheduledTask) => {
+  const handleEdit = (task: ScheduledTaskWithGoogle) => {
     setSelectedTask(task);
     setIsFormOpen(true);
+  };
+
+  const handleAddToGoogleCalendar = async (task: ScheduledTaskWithGoogle) => {
+    toast({ title: "Sincronizando...", description: "Adicionando tarefa ao Google Calendar." });
+    try {
+      // Get the current session to access provider_token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.provider_token) {
+        // Need to re-authenticate with Google to get calendar scope
+        toast({ 
+          title: "Permissão necessária", 
+          description: "Vamos te redirecionar para autorizar o acesso ao seu calendário." 
+        });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
+        if (signInError) {
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
+        }
+        return;
+      }
+
+      const taskPayload = { 
+        id: task.id, 
+        title: task.title, 
+        description: task.description, 
+        date: task.schedule_date,
+        provider_token: session.provider_token 
+      };
+      
+      const { data, error } = await supabase.functions.invoke('google-calendar-integration', { 
+        body: taskPayload 
+      });
+      
+      if (error) throw error;
+      
+      if (data?.needsReauth) {
+        toast({ 
+          title: "Permissão necessária", 
+          description: "Reconecte sua conta Google com permissão de calendário." 
+        });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
+        if (signInError) {
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
+        }
+        return;
+      }
+      
+      toast({ title: "Sucesso!", description: "Tarefa adicionada ao seu Google Calendar." });
+      loadTasks();
+    } catch (error: any) {
+      console.error('Google Calendar error:', error);
+      if (error?.context?.status === 403 || error?.message?.includes('403')) {
+        toast({ title: "Permissão necessária", description: "Reconecte sua conta Google com permissão de calendário." });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
+        if (signInError) {
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
+        }
+      } else {
+        toast({ 
+          title: "Erro", 
+          description: error?.message || "Falha ao adicionar o evento ao Google Calendar.", 
+          variant: "destructive" 
+        });
+      }
+    }
   };
 
   const markAsCompleted = async (taskId: string) => {
@@ -432,6 +525,33 @@ const TasksPage = () => {
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
+                    
+                    {/* Botão de Google Calendar */}
+                    {hasGoogleConnection && (
+                      <>
+                        {task.google_calendar_event_id ? (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => window.open(`https://calendar.google.com/calendar/r/eventedit/${task.google_calendar_event_id}`, '_blank')} 
+                            className="h-8 px-3 text-blue-600 hover:text-blue-700" 
+                            title="Ver no Google Calendar"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleAddToGoogleCalendar(task)} 
+                            className="h-8 px-3" 
+                            title="Adicionar ao Google Calendar"
+                          >
+                            <CalendarPlus className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>

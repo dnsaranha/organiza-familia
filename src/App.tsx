@@ -28,6 +28,8 @@ import YFinanceTestPage from "./pages/YFinanceTest";
 import BudgetPage from "./pages/Budget";
 import { SupportChat } from "./components/SupportChat";
 import AdminPage from "./pages/Admin";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +95,8 @@ const App = () => {
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/success" element={<Success />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
 
                 {/* Test Route */}
                 <Route
