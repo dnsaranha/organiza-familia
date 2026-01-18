@@ -23,6 +23,8 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface Transaction {
   date: string | Date;
@@ -32,12 +34,16 @@ interface Transaction {
 
 interface CashFlowChartProps {
   data: Transaction[];
+  openingBalance?: number;
 }
 
-const CashFlowChart = ({ data }: CashFlowChartProps) => {
+const CashFlowChart = ({ data, openingBalance = 0 }: CashFlowChartProps) => {
   const [interval, setInterval] = useState<"day" | "week" | "month">("month");
+  const [isCumulative, setIsCumulative] = useState(false);
 
   const chartData = useMemo(() => {
+    // If we have no data, we might still want to show the opening balance?
+    // But usually chart needs points.
     if (!data || data.length === 0) return [];
 
     // Parse dates and sort
@@ -67,7 +73,7 @@ const CashFlowChart = ({ data }: CashFlowChartProps) => {
       intervals = [startDate];
     }
 
-    let accumulatedBalance = 0;
+    let accumulatedBalance = isCumulative ? openingBalance : 0;
 
     return intervals.map((date) => {
       let income = 0;
@@ -104,7 +110,7 @@ const CashFlowChart = ({ data }: CashFlowChartProps) => {
         balance: accumulatedBalance,
       };
     });
-  }, [data, interval]);
+  }, [data, interval, isCumulative, openingBalance]);
 
   if (!data || data.length === 0) {
     return (
@@ -145,8 +151,13 @@ const CashFlowChart = ({ data }: CashFlowChartProps) => {
   return (
     <div className="w-full h-full flex flex-col bg-card rounded-xl">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          {/* Title handled by parent */}
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="cumulative-mode"
+            checked={isCumulative}
+            onCheckedChange={setIsCumulative}
+          />
+          <Label htmlFor="cumulative-mode" className="text-xs sm:text-sm font-medium text-muted-foreground">Acumulado</Label>
         </div>
         <div className="flex bg-muted/50 p-1 rounded-xl border border-border/50">
           <Button
