@@ -58,20 +58,85 @@ const TasksCalendar = () => {
   const handleAddToGoogleCalendar = async (task: ScheduledTaskWithGoogle) => {
     toast({ title: "Sincronizando...", description: "Adicionando tarefa ao Google Calendar." });
     try {
-      const taskPayload = { id: task.id, title: task.title, description: task.description, date: task.schedule_date };
-      const { error } = await supabase.functions.invoke('google-calendar-integration', { body: JSON.stringify(taskPayload) });
+      // Get the current session to access provider_token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.provider_token) {
+        // Need to re-authenticate with Google to get calendar scope
+        toast({ 
+          title: "Permissão necessária", 
+          description: "Vamos te redirecionar para autorizar o acesso ao seu calendário." 
+        });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
+        if (signInError) {
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
+        }
+        return;
+      }
+
+      const taskPayload = { 
+        id: task.id, 
+        title: task.title, 
+        description: task.description, 
+        date: task.schedule_date,
+        provider_token: session.provider_token 
+      };
+      
+      const { data, error } = await supabase.functions.invoke('google-calendar-integration', { 
+        body: taskPayload 
+      });
+      
       if (error) throw error;
+      
+      if (data?.needsReauth) {
+        toast({ 
+          title: "Permissão necessária", 
+          description: "Reconecte sua conta Google com permissão de calendário." 
+        });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
+        if (signInError) {
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
+        }
+        return;
+      }
+      
       toast({ title: "Sucesso!", description: "Tarefa adicionada ao seu Google Calendar." });
       loadTasks();
     } catch (error: any) {
-      if (error.context?.response_status === 403) {
-        toast({ title: "Permissão necessária", description: "Vamos te redirecionar para autorizar o acesso ao seu calendário." });
-        const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { scopes: 'https://www.googleapis.com/auth/calendar', redirectTo: window.location.href, queryParams: { prompt: 'consent', access_type: 'offline' } } });
+      console.error('Google Calendar error:', error);
+      if (error?.context?.status === 403 || error?.message?.includes('403')) {
+        toast({ title: "Permissão necessária", description: "Reconecte sua conta Google com permissão de calendário." });
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ 
+          provider: 'google', 
+          options: { 
+            scopes: 'https://www.googleapis.com/auth/calendar', 
+            redirectTo: window.location.href, 
+            queryParams: { prompt: 'consent', access_type: 'offline' } 
+          } 
+        });
         if (signInError) {
-          toast({ title: "Erro de Autenticação", description: "Ocorreu um erro ao obter a permissão.", variant: "destructive" });
+          toast({ title: "Erro de Autenticação", description: signInError.message, variant: "destructive" });
         }
       } else {
-        toast({ title: "Erro", description: "Falha ao adicionar o evento ao Google Calendar.", variant: "destructive" });
+        toast({ 
+          title: "Erro", 
+          description: error?.message || "Falha ao adicionar o evento ao Google Calendar.", 
+          variant: "destructive" 
+        });
       }
     }
   };
