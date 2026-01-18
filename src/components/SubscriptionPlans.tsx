@@ -249,10 +249,17 @@ export const SubscriptionPlans = () => {
       <div className="mt-16 text-center">
         <div className="bg-muted/50 rounded-lg p-8 max-w-4xl mx-auto">
           <h3 className="text-2xl font-bold mb-4">Garantia de 30 dias</h3>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-6">
             Experimente qualquer plano por 30 dias. Se não ficar satisfeito,
             devolvemos seu dinheiro sem perguntas.
           </p>
+          <Button 
+            onClick={() => window.open('https://buy.stripe.com/3cIdRbdpY6bM7N5ctNe7m08', '_blank')}
+            className="gap-2"
+          >
+            <Zap className="h-4 w-4" />
+            Comece seus 30 dias grátis
+          </Button>
         </div>
       </div>
     </div>

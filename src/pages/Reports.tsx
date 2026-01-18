@@ -48,12 +48,15 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
 
-const ExpensePieChart = lazy(
-  () => import("@/components/charts/ExpensePieChart"),
+const ExpenseByCategoryBarChart = lazy(
+  () => import("@/components/charts/ExpenseByCategoryBarChart"),
 );
-const IncomeExpenseBarChart = lazy(
-  () => import("@/components/charts/IncomeExpenseBarChart"),
+const CashFlowChart = lazy(
+  () => import("@/components/charts/CashFlowChart"),
 );
+
+import { CategoryManager } from "@/components/CategoryManager";
+import { useUserCategories } from "@/hooks/useUserCategories";
 
 interface Transaction {
   id: string;
@@ -87,6 +90,10 @@ const ReportsPage = () => {
   const { scope } = useBudgetScope();
   const navigate = useNavigate();
   const {
+    userCategories,
+    refetch: refetchCategories,
+  } = useUserCategories();
+  const {
     connected: bankConnected,
     accounts,
     transactions: bankTransactions,
@@ -101,6 +108,7 @@ const ReportsPage = () => {
     from: subDays(new Date(), 29),
     to: new Date(),
   });
+
   const [category, setCategory] = useState<string>("all");
   const [member, setMember] = useState<string>("all");
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
@@ -108,6 +116,48 @@ const ReportsPage = () => {
   const [filteredBankTransactions, setFilteredBankTransactions] = useState<
     any[]
   >([]);
+
+  const manualOpeningBalance = useMemo(() => {
+    if (!dateRange?.from) return 0;
+    return transactions
+      .filter((t) => {
+        if (!t.date) return false;
+        // The dates are in YYYY-MM-DD string format
+        const tDate = new Date(t.date.replace(/-/g, "/"));
+        // We want everything strictly before the start date
+        // Note: dateRange.from usually has time 00:00:00
+        return tDate < dateRange.from!;
+      })
+      .reduce((acc, t) => acc + (t.type === "income" ? t.amount : -t.amount), 0);
+  }, [transactions, dateRange]);
+
+  const bankOpeningBalance = useMemo(() => {
+    if (!dateRange?.from) return 0;
+
+    let filtered = bankTransactions;
+    if (selectedAccountIds.length > 0) {
+      filtered = filtered.filter((t) =>
+        selectedAccountIds.includes(t.accountId),
+      );
+    }
+
+    return filtered
+      .filter((t) => {
+        const transactionDate = new Date(t.date);
+        return transactionDate < dateRange.from!;
+      })
+      .reduce((acc, t) => {
+        let amount = t.amount;
+        // Apply credit card logic correction if needed (same as main filter)
+        if (amount > 0) {
+           const account = accounts.find((a) => a.id === t.accountId);
+           if (account?.type === "CREDIT") {
+             amount = -Math.abs(amount);
+           }
+        }
+        return acc + amount;
+      }, 0);
+  }, [bankTransactions, dateRange, selectedAccountIds, accounts]);
 
   const handleAccountSelection = (accountId: string) => {
     setSelectedAccountIds((prev) => {
@@ -222,6 +272,7 @@ const ReportsPage = () => {
     };
     fetchTransactions();
   }, [user, scope]);
+
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -395,51 +446,14 @@ const ReportsPage = () => {
     }));
   }, [filteredBankTransactions]);
 
-  // Bank income vs expense data for charts
-  const bankIncomeVsExpenseData = useMemo(() => {
-    const monthlyData = filteredBankTransactions.reduce(
-      (acc, t) => {
-        const month = format(new Date(t.date), "MMM/yy", {
-          locale: ptBR,
-        });
-        if (!acc[month]) {
-          acc[month] = { name: month, income: 0, expense: 0 };
-        }
-        if (t.amount > 0) {
-          acc[month].income += t.amount;
-        } else {
-          acc[month].expense += Math.abs(t.amount);
-        }
-        return acc;
-      },
-      {} as Record<string, { name: string; income: number; expense: number }>,
-    );
-
-    return Object.values(monthlyData) as { name: string; income: number; expense: number; }[];
+  // Bank transactions prepared for CashFlowChart
+  const bankTransactionsForChart = useMemo(() => {
+    return filteredBankTransactions.map((t) => ({
+      date: t.date,
+      amount: Math.abs(t.amount),
+      type: t.amount >= 0 ? ("income" as const) : ("expense" as const),
+    }));
   }, [filteredBankTransactions]);
-
-  const incomeVsExpenseData = useMemo(() => {
-    const monthlyData = filteredTransactions.reduce(
-      (acc, t) => {
-        if (!t.date) return acc;
-        const month = format(new Date(t.date.replace(/-/g, "/")), "MMM/yy", {
-          locale: ptBR,
-        });
-        if (!acc[month]) {
-          acc[month] = { name: month, income: 0, expense: 0 };
-        }
-        if (t.type === "income") {
-          acc[month].income += t.amount;
-        } else {
-          acc[month].expense += t.amount;
-        }
-        return acc;
-      },
-      {} as Record<string, { name: string; income: number; expense: number }>,
-    );
-
-    return Object.values(monthlyData);
-  }, [filteredTransactions]);
 
   const ChartLoader = () => (
     <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -457,6 +471,7 @@ const ReportsPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <CategoryManager onCategoriesChange={refetchCategories} />
           {bankConnected && (
             <Button 
               variant="outline" 
@@ -614,19 +629,25 @@ const ReportsPage = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base sm:text-lg">Despesas por Categoria</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px] sm:h-[300px]">
+              <CardContent className="h-[280px] sm:h-[320px]">
                 <Suspense fallback={<ChartLoader />}>
-                  <ExpensePieChart data={expenseByCategory} />
+                  <ExpenseByCategoryBarChart 
+                    data={expenseByCategory} 
+                    userCategories={userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
+                  />
                 </Suspense>
               </CardContent>
             </Card>
             <Card ref={barChartRef}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg">Receitas vs. Despesas</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Fluxo de Caixa</CardTitle>
               </CardHeader>
-              <CardContent className="h-[250px] sm:h-[300px]">
+              <CardContent className="h-[300px] sm:h-[350px]">
                 <Suspense fallback={<ChartLoader />}>
-                  <IncomeExpenseBarChart data={incomeVsExpenseData} />
+                  <CashFlowChart
+                    data={filteredTransactions}
+                    openingBalance={manualOpeningBalance}
+                  />
                 </Suspense>
               </CardContent>
             </Card>
@@ -797,19 +818,25 @@ const ReportsPage = () => {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base sm:text-lg">Despesas por Categoria</CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[250px] sm:h-[300px]">
+                  <CardContent className="h-[280px] sm:h-[320px]">
                     <Suspense fallback={<ChartLoader />}>
-                      <ExpensePieChart data={bankExpenseByCategory} />
+                      <ExpenseByCategoryBarChart 
+                        data={bankExpenseByCategory} 
+                        userCategories={userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
+                      />
                     </Suspense>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Receitas vs. Despesas</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Fluxo de Caixa</CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[250px] sm:h-[300px]">
+                  <CardContent className="h-[300px] sm:h-[350px]">
                     <Suspense fallback={<ChartLoader />}>
-                      <IncomeExpenseBarChart data={bankIncomeVsExpenseData} />
+                      <CashFlowChart
+                        data={bankTransactionsForChart}
+                        openingBalance={bankOpeningBalance}
+                      />
                     </Suspense>
                   </CardContent>
                 </Card>

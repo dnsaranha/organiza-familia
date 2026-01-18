@@ -267,6 +267,7 @@ export type Database = {
           full_name: string | null
           id: string
           pluggy_item_id: string | null
+          subscription_plan: string | null
           updated_at: string | null
         }
         Insert: {
@@ -274,6 +275,7 @@ export type Database = {
           full_name?: string | null
           id: string
           pluggy_item_id?: string | null
+          subscription_plan?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -281,6 +283,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           pluggy_item_id?: string | null
+          subscription_plan?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -569,6 +572,180 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_permissions: {
+        Row: {
+          budget_access: string | null
+          budget_detail: string | null
+          calendar_access: string | null
+          calendar_detail: string | null
+          can_create_groups: boolean | null
+          created_at: string | null
+          dashboard_access: string | null
+          dashboard_detail: string | null
+          forecast_access: string | null
+          forecast_detail: string | null
+          forecast_months_limit: number | null
+          forecast_scenarios: boolean | null
+          goals_access: string | null
+          goals_detail: string | null
+          groups_access: string | null
+          groups_detail: string | null
+          id: string
+          investments_access: string | null
+          investments_analytics: boolean | null
+          investments_detail: string | null
+          max_budget_accounts: number | null
+          max_goals: number | null
+          max_groups: number | null
+          max_investment_assets: number | null
+          max_members_per_group: number | null
+          max_tasks: number | null
+          max_transactions_per_month: number | null
+          open_finance_access: string | null
+          open_finance_detail: string | null
+          pluggy_access: string | null
+          pluggy_detail: string | null
+          push_notifications_access: string | null
+          push_notifications_detail: string | null
+          pwa_settings_access: string | null
+          pwa_settings_detail: string | null
+          reports_access: string | null
+          reports_detail: string | null
+          reports_export: boolean | null
+          reports_months_limit: number | null
+          subscription_status: string
+          tasks_access: string | null
+          tasks_detail: string | null
+          transactions_access: string | null
+          transactions_detail: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget_access?: string | null
+          budget_detail?: string | null
+          calendar_access?: string | null
+          calendar_detail?: string | null
+          can_create_groups?: boolean | null
+          created_at?: string | null
+          dashboard_access?: string | null
+          dashboard_detail?: string | null
+          forecast_access?: string | null
+          forecast_detail?: string | null
+          forecast_months_limit?: number | null
+          forecast_scenarios?: boolean | null
+          goals_access?: string | null
+          goals_detail?: string | null
+          groups_access?: string | null
+          groups_detail?: string | null
+          id?: string
+          investments_access?: string | null
+          investments_analytics?: boolean | null
+          investments_detail?: string | null
+          max_budget_accounts?: number | null
+          max_goals?: number | null
+          max_groups?: number | null
+          max_investment_assets?: number | null
+          max_members_per_group?: number | null
+          max_tasks?: number | null
+          max_transactions_per_month?: number | null
+          open_finance_access?: string | null
+          open_finance_detail?: string | null
+          pluggy_access?: string | null
+          pluggy_detail?: string | null
+          push_notifications_access?: string | null
+          push_notifications_detail?: string | null
+          pwa_settings_access?: string | null
+          pwa_settings_detail?: string | null
+          reports_access?: string | null
+          reports_detail?: string | null
+          reports_export?: boolean | null
+          reports_months_limit?: number | null
+          subscription_status: string
+          tasks_access?: string | null
+          tasks_detail?: string | null
+          transactions_access?: string | null
+          transactions_detail?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget_access?: string | null
+          budget_detail?: string | null
+          calendar_access?: string | null
+          calendar_detail?: string | null
+          can_create_groups?: boolean | null
+          created_at?: string | null
+          dashboard_access?: string | null
+          dashboard_detail?: string | null
+          forecast_access?: string | null
+          forecast_detail?: string | null
+          forecast_months_limit?: number | null
+          forecast_scenarios?: boolean | null
+          goals_access?: string | null
+          goals_detail?: string | null
+          groups_access?: string | null
+          groups_detail?: string | null
+          id?: string
+          investments_access?: string | null
+          investments_analytics?: boolean | null
+          investments_detail?: string | null
+          max_budget_accounts?: number | null
+          max_goals?: number | null
+          max_groups?: number | null
+          max_investment_assets?: number | null
+          max_members_per_group?: number | null
+          max_tasks?: number | null
+          max_transactions_per_month?: number | null
+          open_finance_access?: string | null
+          open_finance_detail?: string | null
+          pluggy_access?: string | null
+          pluggy_detail?: string | null
+          push_notifications_access?: string | null
+          push_notifications_detail?: string | null
+          pwa_settings_access?: string | null
+          pwa_settings_detail?: string | null
+          reports_access?: string | null
+          reports_detail?: string | null
+          reports_export?: boolean | null
+          reports_months_limit?: number | null
+          subscription_status?: string
+          tasks_access?: string | null
+          tasks_detail?: string | null
+          transactions_access?: string | null
+          transactions_detail?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_from_admin: boolean | null
+          is_read: boolean | null
+          message: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_from_admin?: boolean | null
+          is_read?: boolean | null
+          message: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_from_admin?: boolean | null
+          is_read?: boolean | null
+          message?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -626,6 +803,53 @@ export type Database = {
           },
         ]
       }
+      user_categories: {
+        Row: {
+          color: string
+          created_at: string
+          group_id: string | null
+          icon: string
+          id: string
+          is_default: boolean
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          group_id?: string | null
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          group_id?: string | null
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_categories_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "family_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           carry_over_balance: boolean
@@ -646,6 +870,27 @@ export type Database = {
           month_start_day?: number
           theme?: string
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -748,12 +993,21 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_user_id_by_email: { Args: { email: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       import_transactions: {
         Args: {
           transactions: Database["public"]["CompositeTypes"]["transaction_import_type"][]
         }
         Returns: Json
       }
+      is_admin: { Args: never; Returns: boolean }
       is_group_member: {
         Args: { _group_id: string; _user_id?: string }
         Returns: boolean
@@ -769,6 +1023,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       stripe_order_status: "pending" | "completed" | "canceled"
       stripe_subscription_status:
         | "not_started"
@@ -916,6 +1171,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       stripe_order_status: ["pending", "completed", "canceled"],
       stripe_subscription_status: [
         "not_started",

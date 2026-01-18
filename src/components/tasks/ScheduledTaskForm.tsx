@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Combobox } from "@/components/ui/combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
+import { useUserCategories } from "@/hooks/useUserCategories";
 
 export interface ScheduledTask {
   id: string;
@@ -61,6 +62,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   const [categories, setCategories] = useState<{ label: string; value: string }[]>([]);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
+  const { getAllIncomeCategories, getAllExpenseCategories } = useUserCategories();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -84,7 +86,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
       loadGroups();
       loadCategories();
     }
-  }, [user]);
+  }, [user, getAllIncomeCategories, getAllExpenseCategories]);
 
   useEffect(() => {
     if (initialData) {
@@ -145,19 +147,10 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   const loadCategories = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('category')
-        .not('category', 'is', null)
-        .order('category', { ascending: true });
-
-      if (error) throw error;
-
-      const transactionCategories = [...new Set(data.map(item => item.category))];
-
-      // Import all categories from budget-categories
-      const { incomeCategories, expenseCategories } = await import('@/lib/budget-categories');
-      const allCategories = [...new Set([...incomeCategories, ...expenseCategories, ...transactionCategories])];
+      // Get user categories combined with system defaults
+      const allIncomeCategories = getAllIncomeCategories();
+      const allExpenseCategories = getAllExpenseCategories();
+      const allCategories = [...new Set([...allIncomeCategories, ...allExpenseCategories])];
 
       setCategories(allCategories.sort().map(c => ({ label: c, value: c })));
 
@@ -209,7 +202,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           notification_email: formData.notification_email,
           notification_push: formData.notification_push,
           user_id: user?.id,
-          group_id: formData.group_id === 'personal' ? null : formData.group_id,
+          group_id: (!formData.group_id || formData.group_id === 'personal' || formData.group_id === '') ? null : formData.group_id,
           value: valueWithSign,
           category: formData.category,
           created_at: initialData?.created_at || localCreatedAt,

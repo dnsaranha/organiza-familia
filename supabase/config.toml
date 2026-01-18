@@ -4,11 +4,16 @@ project_id = "deipytqxqkmyadabtjnd"
 verify_jwt = false
 
 [functions.stripe-checkout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
 
+[functions.stripe-customer-portal]
+verify_jwt = false
+
+[functions.stripe-sync-subscription]
+verify_jwt = false
 # Pluggy Edge Functions - tornar públicas para evitar 401 quando usuário não estiver autenticado
 [functions.pluggy-connect-token]
 verify_jwt = false

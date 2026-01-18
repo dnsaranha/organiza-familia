@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
+import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 
 const TasksCalendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -20,6 +21,7 @@ const TasksCalendar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canAdd: canAddTask } = useCanAdd('maxTasks', tasks.length);
 
   useEffect(() => {
     if (user) {
@@ -207,6 +209,13 @@ const TasksCalendar = () => {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <LimitAlert
+        limitKey="maxTasks"
+        currentCount={tasks.length}
+        itemName="tarefas"
+        className="mb-4"
+      />
+      
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Calendário de Tarefas</h1>
@@ -227,6 +236,7 @@ const TasksCalendar = () => {
             <Button
                 size="sm"
                 className="flex-1 sm:flex-none"
+                disabled={!canAddTask}
                 onClick={() => {
                     setSelectedTask(null);
                     setIsFormOpen(true);
@@ -239,13 +249,13 @@ const TasksCalendar = () => {
       </div>
 
        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-auto flex justify-center md:block">
-             <div className="border rounded-md p-4 bg-background shadow-sm">
+          <div className="w-full md:w-auto md:block">
+             <div className="border-y border-x-0 md:border md:rounded-md p-0 md:p-4 bg-background shadow-none md:shadow-sm -mx-2 sm:-mx-4 md:mx-0 w-[calc(100%+1rem)] sm:w-[calc(100%+2rem)] md:w-auto">
                 <Calendar
                     mode="single"
                     selected={date}
                     onSelect={setDate}
-                    className="p-0"
+                    className="p-0 w-full [&_td]:w-full [&_td]:md:w-9 [&_th]:w-full [&_th]:md:w-9 [&_td_button]:w-full [&_td_button]:md:w-9"
                     locale={ptBR}
                     modifiers={{
                         hasTask: daysWithTasks

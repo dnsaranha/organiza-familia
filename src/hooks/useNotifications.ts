@@ -20,13 +20,32 @@ export const useNotifications = () => {
     return 'denied';
   };
 
-  const sendNotification = (title: string, options?: NotificationOptions) => {
+  const sendNotification = async (title: string, options?: NotificationOptions) => {
     if ('Notification' in window && permission === 'granted') {
-      new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        ...options,
-      });
+      try {
+        // Try using Service Worker for notifications (required in some contexts)
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification(title, {
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            ...options,
+          });
+        } else {
+          // Fallback to regular Notification API
+          new Notification(title, {
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            ...options,
+          });
+        }
+      } catch (error) {
+        // Fallback para toast se as notificações falharem
+        toast({
+          title,
+          description: options?.body,
+        });
+      }
     } else {
       // Fallback para toast se as notificações não estiverem disponíveis
       toast({
