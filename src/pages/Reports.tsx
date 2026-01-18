@@ -108,6 +108,7 @@ const ReportsPage = () => {
     from: subDays(new Date(), 29),
     to: new Date(),
   });
+
   const [category, setCategory] = useState<string>("all");
   const [member, setMember] = useState<string>("all");
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
@@ -115,6 +116,48 @@ const ReportsPage = () => {
   const [filteredBankTransactions, setFilteredBankTransactions] = useState<
     any[]
   >([]);
+
+  const manualOpeningBalance = useMemo(() => {
+    if (!dateRange?.from) return 0;
+    return transactions
+      .filter((t) => {
+        if (!t.date) return false;
+        // The dates are in YYYY-MM-DD string format
+        const tDate = new Date(t.date.replace(/-/g, "/"));
+        // We want everything strictly before the start date
+        // Note: dateRange.from usually has time 00:00:00
+        return tDate < dateRange.from!;
+      })
+      .reduce((acc, t) => acc + (t.type === "income" ? t.amount : -t.amount), 0);
+  }, [transactions, dateRange]);
+
+  const bankOpeningBalance = useMemo(() => {
+    if (!dateRange?.from) return 0;
+
+    let filtered = bankTransactions;
+    if (selectedAccountIds.length > 0) {
+      filtered = filtered.filter((t) =>
+        selectedAccountIds.includes(t.accountId),
+      );
+    }
+
+    return filtered
+      .filter((t) => {
+        const transactionDate = new Date(t.date);
+        return transactionDate < dateRange.from!;
+      })
+      .reduce((acc, t) => {
+        let amount = t.amount;
+        // Apply credit card logic correction if needed (same as main filter)
+        if (amount > 0) {
+           const account = accounts.find((a) => a.id === t.accountId);
+           if (account?.type === "CREDIT") {
+             amount = -Math.abs(amount);
+           }
+        }
+        return acc + amount;
+      }, 0);
+  }, [bankTransactions, dateRange, selectedAccountIds, accounts]);
 
   const handleAccountSelection = (accountId: string) => {
     setSelectedAccountIds((prev) => {
@@ -601,7 +644,10 @@ const ReportsPage = () => {
               </CardHeader>
               <CardContent className="h-[300px] sm:h-[350px]">
                 <Suspense fallback={<ChartLoader />}>
-                  <CashFlowChart data={filteredTransactions} />
+                  <CashFlowChart
+                    data={filteredTransactions}
+                    openingBalance={manualOpeningBalance}
+                  />
                 </Suspense>
               </CardContent>
             </Card>
@@ -787,7 +833,10 @@ const ReportsPage = () => {
                   </CardHeader>
                   <CardContent className="h-[300px] sm:h-[350px]">
                     <Suspense fallback={<ChartLoader />}>
-                      <CashFlowChart data={bankTransactionsForChart} />
+                      <CashFlowChart
+                        data={bankTransactionsForChart}
+                        openingBalance={bankOpeningBalance}
+                      />
                     </Suspense>
                   </CardContent>
                 </Card>
