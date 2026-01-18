@@ -1,5 +1,16 @@
 project_id = "deipytqxqkmyadabtjnd"
 
+[auth.external.google]
+enabled = true
+client_id = "YOUR_GOOGLE_CLIENT_ID"
+secret = "YOUR_GOOGLE_SECRET"
+scopes = ["https://www.googleapis.com/auth/calendar"]
+
+[auth.external.apple]
+enabled = true
+client_id = "YOUR_APPLE_CLIENT_ID"
+secret = "YOUR_APPLE_SECRET"
+
 [functions.send-notification]
 verify_jwt = false
 
