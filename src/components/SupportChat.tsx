@@ -177,25 +177,26 @@ export const SupportChat = () => {
   const sendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setSending(true);
+    
+    // Optimistic update
+    const tempId = crypto.randomUUID();
+    const tempMessage: Message = {
+        id: tempId,
+        message: newMessage.trim(),
+        is_from_admin: false,
+        created_at: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
+
+    // Scroll to bottom immediately
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 50);
+
     try {
-      // Optimistic update
-      const tempId = crypto.randomUUID();
-      const tempMessage: Message = {
-          id: tempId,
-          message: newMessage.trim(),
-          is_from_admin: false,
-          created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, tempMessage]);
-      setNewMessage('');
-
-      // Scroll to bottom immediately
-       setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 50);
-
       const { data, error } = await supabase.from('support_messages').insert({
         user_id: user.id,
         message: tempMessage.message,
@@ -211,7 +212,7 @@ export const SupportChat = () => {
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
       // Remove temp message on error
-       setMessages(prev => prev.filter(m => m.id !== tempId));
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
     }

@@ -373,6 +373,7 @@ export type Database = {
           category: string | null
           created_at: string
           description: string | null
+          google_calendar_event_id: string | null
           group_id: string | null
           id: string
           is_completed: boolean | null
@@ -395,6 +396,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
@@ -417,6 +419,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
