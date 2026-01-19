@@ -183,6 +183,31 @@ const TasksCalendar = () => {
 
   const deleteTask = async (taskId: string) => {
     try {
+      // First, get the task to check if it has a Google Calendar event
+      const taskToDelete = tasks.find(t => t.id === taskId);
+      
+      // Delete from Google Calendar if synced
+      if (taskToDelete?.google_calendar_event_id && hasGoogleConnection) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.provider_token) {
+            await supabase.functions.invoke('google-calendar-integration', {
+              body: {
+                action: 'delete',
+                id: taskId,
+                title: taskToDelete.title,
+                date: taskToDelete.schedule_date,
+                google_calendar_event_id: taskToDelete.google_calendar_event_id,
+                provider_token: session.provider_token
+              }
+            });
+          }
+        } catch (gcError) {
+          console.error('Failed to delete from Google Calendar:', gcError);
+          // Continue with local deletion
+        }
+      }
+      
       const { error } = await supabase.from('scheduled_tasks').delete().eq('id', taskId);
       if (error) throw error;
       toast({ title: "Tarefa removida" });
