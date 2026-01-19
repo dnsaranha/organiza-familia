@@ -6,6 +6,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const CALENDAR_NAME = 'Organiza';
+
+// Get or create the "Organiza" calendar
+async function getOrCreateOrganizaCalendar(providerToken: string): Promise<string> {
+  // First, list existing calendars to check if "Organiza" already exists
+  const listResponse = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+    headers: {
+      'Authorization': `Bearer ${providerToken}`,
+    },
+  });
+
+  if (!listResponse.ok) {
+    const errorData = await listResponse.json();
+    console.error('Error listing calendars:', errorData);
+    throw new Error('Falha ao listar calendários');
+  }
+
+  const calendarList = await listResponse.json();
+  
+  // Check if "Organiza" calendar already exists
+  const organizaCalendar = calendarList.items?.find(
+    (cal: any) => cal.summary === CALENDAR_NAME
+  );
+
+  if (organizaCalendar) {
+    console.log('Found existing Organiza calendar:', organizaCalendar.id);
+    return organizaCalendar.id;
+  }
+
+  // Create new "Organiza" calendar
+  console.log('Creating new Organiza calendar...');
+  const createResponse = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${providerToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      summary: CALENDAR_NAME,
+      description: 'Tarefas criadas pelo App Organiza',
+      timeZone: 'America/Sao_Paulo',
+    }),
+  });
+
+  if (!createResponse.ok) {
+    const errorData = await createResponse.json();
+    console.error('Error creating calendar:', errorData);
+    throw new Error('Falha ao criar calendário Organiza');
+  }
+
+  const newCalendar = await createResponse.json();
+  console.log('Created new Organiza calendar:', newCalendar.id);
+  
+  // Set calendar color to make it distinct (optional - green color)
+  try {
+    await fetch(`https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(newCalendar.id)}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${providerToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        colorId: '10', // Green
+      }),
+    });
+  } catch (e) {
+    console.log('Could not set calendar color:', e);
+  }
+
+  return newCalendar.id;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -15,7 +87,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    // Get the authorization header from the request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -24,13 +95,11 @@ serve(async (req) => {
       );
     }
 
-    // Create client with user's token to get their session
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false }
     });
 
-    // Get user from the token
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
@@ -43,7 +112,6 @@ serve(async (req) => {
       );
     }
 
-    // Get provider token from user's identities
     const googleIdentity = user.identities?.find(id => id.provider === 'google');
     
     if (!googleIdentity) {
@@ -53,10 +121,8 @@ serve(async (req) => {
       );
     }
 
-    // We need the provider_token which is stored in the session, not in identities
-    // The provider_token is only available during the OAuth flow and needs to be passed from the client
-    // Let's check if it's in the request body
     const body = await req.json();
+    const { action = 'create' } = body;
     
     if (!body || !body.title || !body.date || !body.id) {
       return new Response(
@@ -65,8 +131,6 @@ serve(async (req) => {
       );
     }
 
-    // Try to get the provider token from the session
-    // The client needs to pass the access token or we need to get it from the session
     const providerToken = body.provider_token;
     
     if (!providerToken) {
@@ -79,9 +143,21 @@ serve(async (req) => {
       );
     }
 
+    // Get or create the "Organiza" calendar
+    let calendarId: string;
+    try {
+      calendarId = await getOrCreateOrganizaCalendar(providerToken);
+    } catch (error) {
+      console.error('Error getting/creating calendar:', error);
+      return new Response(
+        JSON.stringify({ error: 'Falha ao acessar calendário Organiza', needsReauth: true }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const event = {
       summary: body.title,
-      description: body.description || `Criado pelo App Organiza a partir da tarefa ID: ${body.id}`,
+      description: body.description || `Criado pelo App Organiza - ID: ${body.id}`,
       start: {
         dateTime: new Date(body.date).toISOString(),
         timeZone: 'America/Sao_Paulo',
@@ -92,16 +168,98 @@ serve(async (req) => {
       },
     };
 
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Handle UPDATE action
+    if (action === 'update' && body.google_calendar_event_id) {
+      console.log('Updating Google Calendar event:', body.google_calendar_event_id);
+      
+      const updateResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${body.google_calendar_event_id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${providerToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(event),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        console.error('Google Calendar update error:', errorData);
+        
+        // If event not found, try to create a new one
+        if (updateResponse.status === 404) {
+          console.log('Event not found, creating new one...');
+          // Fall through to create logic below
+        } else {
+          return new Response(
+            JSON.stringify({ error: 'Falha ao atualizar evento no Google Calendar', details: errorData }),
+            { status: updateResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        const updatedEvent = await updateResponse.json();
+        console.log('Calendar event updated:', updatedEvent.id);
+        
+        return new Response(
+          JSON.stringify({ ...updatedEvent, action: 'updated' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Handle DELETE action
+    if (action === 'delete' && body.google_calendar_event_id) {
+      console.log('Deleting Google Calendar event:', body.google_calendar_event_id);
+      
+      const deleteResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${body.google_calendar_event_id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${providerToken}`,
+          },
+        }
+      );
+
+      if (!deleteResponse.ok && deleteResponse.status !== 404) {
+        const errorData = await deleteResponse.json();
+        console.error('Google Calendar delete error:', errorData);
+        return new Response(
+          JSON.stringify({ error: 'Falha ao excluir evento no Google Calendar', details: errorData }),
+          { status: deleteResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Clear the google_calendar_event_id from the task
+      await supabaseAdmin
+        .from('scheduled_tasks')
+        .update({ google_calendar_event_id: null })
+        .eq('id', body.id);
+
+      return new Response(
+        JSON.stringify({ success: true, action: 'deleted' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // CREATE new event
     console.log('Creating Google Calendar event:', event);
 
-    const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${providerToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(event),
-    });
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${providerToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -128,7 +286,6 @@ serve(async (req) => {
     console.log('Calendar event created:', calendarEvent.id);
 
     // Update the task with the Google Calendar event ID
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const { error: updateError } = await supabaseAdmin
       .from('scheduled_tasks')
       .update({ google_calendar_event_id: calendarEvent.id })
@@ -139,7 +296,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify(calendarEvent),
+      JSON.stringify({ ...calendarEvent, action: 'created' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
