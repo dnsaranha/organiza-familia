@@ -213,6 +213,8 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
       };
 
       let error;
+      let savedTaskId = initialData?.id;
+      
       if (initialData?.id) {
           const { error: updateError } = await supabase
               .from('scheduled_tasks')
@@ -220,15 +222,42 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
               .eq('id', initialData.id);
           error = updateError;
       } else {
-          const { error: insertError } = await supabase
+          const { data: insertedTask, error: insertError } = await supabase
               .from('scheduled_tasks')
               .insert(taskData)
               .select()
               .single();
           error = insertError;
+          if (insertedTask) {
+            savedTaskId = insertedTask.id;
+          }
       }
 
       if (error) throw error;
+
+      // Sync with Google Calendar if task has google_calendar_event_id (update existing event)
+      if (initialData?.id && (initialData as any).google_calendar_event_id) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.provider_token) {
+            await supabase.functions.invoke('google-calendar-integration', {
+              body: {
+                action: 'update',
+                id: initialData.id,
+                title: formData.title,
+                description: formData.description,
+                date: scheduleDateTime,
+                google_calendar_event_id: (initialData as any).google_calendar_event_id,
+                provider_token: session.provider_token
+              }
+            });
+            console.log('Google Calendar event updated');
+          }
+        } catch (gcError) {
+          console.error('Failed to update Google Calendar event:', gcError);
+          // Don't fail the whole operation if Google sync fails
+        }
+      }
 
       if (formData.notification_push) {
         const scheduleTime = new Date(scheduleDateTime);
