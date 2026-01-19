@@ -105,12 +105,13 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          scopes: 'https://www.googleapis.com/auth/calendar', // <--- LINHA NOVA
+          scopes: 'https://www.googleapis.com/auth/calendar',
           redirectTo: `${window.location.origin}/auth`,
-          queryParams: { // <--- LINHA NOVA
-            access_type: 'offline', // <--- LINHA NOVA
-            prompt: 'consent', // <--- LINHA NOVA
-          }, // <--- LINHA NOVA
+          queryParams: {
+            access_type: 'offline',
+            // Removido prompt: 'consent' - o Google só pedirá consentimento na primeira vez
+            // ou quando novos scopes forem adicionados
+          },
         }
       });
 
