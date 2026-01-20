@@ -74,6 +74,42 @@ export type Database = {
         }
         Relationships: []
       }
+      google_calendar_sync: {
+        Row: {
+          calendar_id: string
+          channel_expiration: string | null
+          channel_id: string | null
+          created_at: string
+          id: string
+          resource_id: string | null
+          sync_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id: string
+          channel_expiration?: string | null
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          resource_id?: string | null
+          sync_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string
+          channel_expiration?: string | null
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          resource_id?: string | null
+          sync_token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           created_at: string
@@ -370,14 +406,17 @@ export type Database = {
       }
       scheduled_tasks: {
         Row: {
+          calendar_id: string | null
           category: string | null
           created_at: string
           description: string | null
+          end_date: string | null
           google_calendar_event_id: string | null
           group_id: string | null
           id: string
           is_completed: boolean | null
           is_recurring: boolean | null
+          last_modified_source: string | null
           notification_email: boolean | null
           notification_push: boolean | null
           notified_at: string | null
@@ -386,6 +425,7 @@ export type Database = {
           recurrence_interval: number | null
           recurrence_pattern: string | null
           schedule_date: string
+          status: string | null
           task_type: string
           title: string
           updated_at: string
@@ -393,14 +433,17 @@ export type Database = {
           value: number | null
         }
         Insert: {
+          calendar_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
+          end_date?: string | null
           google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_recurring?: boolean | null
+          last_modified_source?: string | null
           notification_email?: boolean | null
           notification_push?: boolean | null
           notified_at?: string | null
@@ -409,6 +452,7 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_pattern?: string | null
           schedule_date: string
+          status?: string | null
           task_type: string
           title: string
           updated_at?: string
@@ -416,14 +460,17 @@ export type Database = {
           value?: number | null
         }
         Update: {
+          calendar_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
+          end_date?: string | null
           google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_recurring?: boolean | null
+          last_modified_source?: string | null
           notification_email?: boolean | null
           notification_push?: boolean | null
           notified_at?: string | null
@@ -432,6 +479,7 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_pattern?: string | null
           schedule_date?: string
+          status?: string | null
           task_type?: string
           title?: string
           updated_at?: string
