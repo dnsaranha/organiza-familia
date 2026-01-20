@@ -14,11 +14,11 @@ import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTa
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 import { useGoogleCalendarSync } from "@/hooks/useGoogleCalendarSync";
 
-interface ScheduledTaskWithGoogle extends Omit<ScheduledTask, 'status'> {
+interface ScheduledTaskWithGoogle extends Omit<ScheduledTask, 'status' | 'last_modified_source'> {
   google_calendar_event_id?: string | null;
   calendar_id?: string | null;
-  status?: string;
-  last_modified_source?: string;
+  status?: string | null;
+  last_modified_source?: string | null;
 }
 
 const TasksCalendar = () => {
@@ -148,8 +148,20 @@ const TasksCalendar = () => {
         const shouldCreateNext = !task.recurrence_end_date || nextDate <= new Date(task.recurrence_end_date);
         if (shouldCreateNext) {
           const { id: _id, google_calendar_event_id: _gid, calendar_id: _cid, ...taskWithoutIds } = task;
-          await supabase.from('scheduled_tasks').insert({
-            ...taskWithoutIds,
+          await supabase.from('scheduled_tasks').insert([{
+            title: taskWithoutIds.title,
+            task_type: taskWithoutIds.task_type,
+            user_id: user?.id,
+            description: taskWithoutIds.description,
+            category: taskWithoutIds.category,
+            value: taskWithoutIds.value,
+            notification_email: taskWithoutIds.notification_email,
+            notification_push: taskWithoutIds.notification_push,
+            is_recurring: taskWithoutIds.is_recurring,
+            recurrence_pattern: taskWithoutIds.recurrence_pattern,
+            recurrence_interval: taskWithoutIds.recurrence_interval,
+            recurrence_end_date: taskWithoutIds.recurrence_end_date,
+            group_id: taskWithoutIds.group_id,
             schedule_date: nextDate.toISOString(),
             is_completed: false,
             status: 'ativo',
@@ -157,7 +169,7 @@ const TasksCalendar = () => {
             google_calendar_event_id: null,
             calendar_id: null,
             last_modified_source: 'organiza',
-          });
+          }]);
         }
       }
       
