@@ -75,15 +75,7 @@ function buildGoogleEvent(task: any, calendarId: string) {
   const startDate = new Date(task.date || task.schedule_date);
   const endDate = task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
-  // Garantir que organizaId está presente
-  if (!task.id) {
-    console.error('CRITICAL: Task ID is missing!', task);
-    throw new Error('Task ID é obrigatório para sincronização');
-  }
-
-  console.log('Building Google Event with organizaId:', task.id, 'title:', task.title);
-
-  const event = {
+  return {
     summary: task.title,
     description: task.description || '',
     start: {
@@ -96,7 +88,7 @@ function buildGoogleEvent(task: any, calendarId: string) {
     },
     extendedProperties: {
       private: {
-        organizaId: String(task.id), // Garantir que é string
+        organizaId: task.id,
         categoria: task.category || '',
         valor: task.value?.toString() || '0',
         tipo: 'tarefa',
@@ -104,9 +96,6 @@ function buildGoogleEvent(task: any, calendarId: string) {
       },
     },
   };
-
-  console.log('Event extendedProperties:', JSON.stringify(event.extendedProperties));
-  return event;
 }
 
 // Create event in Google Calendar
