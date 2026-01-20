@@ -21,6 +21,7 @@ export interface ScheduledTask {
   description?: string;
   task_type: 'payment_reminder' | 'budget_alert' | 'income_reminder' | 'custom';
   schedule_date: string;
+  end_date?: string;
   notification_email: boolean;
   notification_push: boolean;
   is_completed: boolean;
@@ -33,6 +34,10 @@ export interface ScheduledTask {
   recurrence_interval?: number;
   recurrence_end_date?: string;
   parent_task_id?: string;
+  google_calendar_event_id?: string;
+  calendar_id?: string;
+  status?: 'ativo' | 'cancelado' | 'concluido';
+  last_modified_source?: 'organiza' | 'google';
 }
 
 interface FamilyGroup {
