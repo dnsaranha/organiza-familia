@@ -14,11 +14,11 @@ import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTa
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 import { useGoogleCalendarSync } from "@/hooks/useGoogleCalendarSync";
 
-interface ScheduledTaskWithGoogle extends Omit<ScheduledTask, 'status'> {
+interface ScheduledTaskWithGoogle extends Omit<ScheduledTask, 'status' | 'last_modified_source'> {
   google_calendar_event_id?: string | null;
   calendar_id?: string | null;
-  status?: string;
-  last_modified_source?: string;
+  status?: string | null;
+  last_modified_source?: string | null;
 }
 
 const TasksCalendar = () => {
@@ -147,15 +147,25 @@ const TasksCalendar = () => {
         }
         const shouldCreateNext = !task.recurrence_end_date || nextDate <= new Date(task.recurrence_end_date);
         if (shouldCreateNext) {
-          const { id: _id, google_calendar_event_id: _gid, calendar_id: _cid, ...taskWithoutIds } = task;
           await supabase.from('scheduled_tasks').insert({
-            ...taskWithoutIds,
+            user_id: user?.id || '',
+            title: task.title,
+            description: task.description,
+            task_type: task.task_type,
+            category: task.category,
+            value: task.value,
             schedule_date: nextDate.toISOString(),
+            end_date: task.end_date,
             is_completed: false,
             status: 'ativo',
+            is_recurring: task.is_recurring,
+            recurrence_pattern: task.recurrence_pattern,
+            recurrence_interval: task.recurrence_interval,
+            recurrence_end_date: task.recurrence_end_date,
             parent_task_id: task.parent_task_id || task.id,
-            google_calendar_event_id: null,
-            calendar_id: null,
+            group_id: task.group_id,
+            notification_email: task.notification_email,
+            notification_push: task.notification_push,
             last_modified_source: 'organiza',
           });
         }
