@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,10 @@ import { Header } from '@/components/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle, Users, Shield, Send, Loader2, RefreshCw } from 'lucide-react';
+import { 
+  MessageCircle, Users, Shield, Send, Loader2, RefreshCw, 
+  Search, CheckCheck, Clock, ArrowLeft 
+} from 'lucide-react';
 
 interface SupportMessage {
   id: string;
@@ -27,6 +30,13 @@ interface UserWithMessages {
   email: string;
   messages: SupportMessage[];
   unread_count: number;
+  last_message_at: string;
+}
+
+interface UserStats {
+  total_users: number;
+  users_with_subscription: number;
+  users_today: number;
 }
 
 export default function AdminPage() {
@@ -36,6 +46,9 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -106,6 +119,7 @@ export default function AdminPage() {
         email: profileMap[userId] || 'Usuário',
         messages: grouped[userId],
         unread_count: grouped[userId].filter(m => !m.is_read && !m.is_from_admin).length,
+        last_message_at: grouped[userId][grouped[userId].length - 1]?.created_at || '',
       }));
 
       // Sort by most recent message
