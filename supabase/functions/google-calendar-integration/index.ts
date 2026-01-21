@@ -75,9 +75,22 @@ function buildGoogleEvent(task: any, calendarId: string) {
   const startDate = new Date(task.date || task.schedule_date);
   const endDate = task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
+  // Build description with Task ID
+  const descriptionParts: string[] = [];
+  if (task.description) {
+    descriptionParts.push(task.description);
+  }
+  descriptionParts.push(`\n---\n📋 Task ID: ${task.id}`);
+  if (task.category) {
+    descriptionParts.push(`📁 Categoria: ${task.category}`);
+  }
+  if (task.value && task.value !== 0) {
+    descriptionParts.push(`💰 Valor: R$ ${Math.abs(task.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+  }
+
   return {
     summary: task.title,
-    description: task.description || '',
+    description: descriptionParts.join('\n'),
     start: {
       dateTime: startDate.toISOString(),
       timeZone: 'America/Sao_Paulo',
