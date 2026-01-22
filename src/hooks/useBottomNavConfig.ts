@@ -9,7 +9,7 @@ export interface NavItem {
 }
 
 export const allNavItems: NavItem[] = [
-  { id: "home", label: "Home", icon: Home, path: "/" },
+  { id: "home", label: "Home", icon: Home, path: "/dashboard" },
   { id: "investments", label: "Invest.", icon: TrendingUp, path: "/investments" },
   { id: "groups", label: "Grupos", icon: Users, path: "/groups" },
   { id: "tasks", label: "Tarefas", icon: CheckSquare, path: "/tasks" },

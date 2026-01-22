@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Pricing from "./pages/Pricing";
@@ -92,6 +93,8 @@ const App = () => {
               <SupportChat />
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
+                {/* Public Routes - No login required */}
+                <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/success" element={<Success />} />
@@ -108,9 +111,9 @@ const App = () => {
                   }
                 />
 
-                {/* App Routes */}
+                {/* App Routes - Require login */}
                 <Route
-                  path="/"
+                  path="/dashboard"
                   element={
                     <AppShell>
                       <Index />
