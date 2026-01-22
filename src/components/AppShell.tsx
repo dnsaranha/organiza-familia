@@ -103,7 +103,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     <div className="min-h-screen bg-background w-full">
       <header className="sticky top-0 z-40 w-full border-b bg-background">
         <div className="container flex h-14 sm:h-16 items-center justify-between px-4">
-          <NavLink to="/" className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
+          <NavLink to="/dashboard" className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
             <div className="rounded-full p-1.5 sm:p-2 bg-gradient-primary shadow-glow flex-shrink-0">
               <PiggyBank className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
             </div>
@@ -251,7 +251,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       <Sidebar collapsible="icon">
         <div className="flex h-full flex-col">
           <SidebarHeader className="flex p-4">
-            <NavLink to="/" className="flex items-center gap-3 justify-center">
+            <NavLink to="/dashboard" className="flex items-center gap-3 justify-center">
               <div className="rounded-full p-2 bg-gradient-primary shadow-glow flex items-center gap-3 justify-center">
                 <PiggyBank className="h-6 w-6 text-primary-foreground" />
               </div>
@@ -273,7 +273,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
             </div>
             <SidebarMenu className="justify-center items-start">
               <SidebarMenuItem>
-                <NavLink to="/" className="w-full">
+                <NavLink to="/dashboard" className="w-full">
                   {({ isActive }) => (
                     <SidebarMenuButton isActive={isActive}>
                       <Home className="size-4" />

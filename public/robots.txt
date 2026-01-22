@@ -12,3 +12,17 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /budget
+Disallow: /groups
+Disallow: /reports
+Disallow: /investments
+Disallow: /tasks
+Disallow: /goals
+Disallow: /forecast
+Disallow: /admin
+Disallow: /connect
+
+Sitemap: https://organizagff.vercel.app/sitemap.xml
+Allow: /

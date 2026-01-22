@@ -78,9 +78,9 @@ export default function Auth() {
 
       if (error) throw error;
 
-      // If user has an active or trialing subscription, navigate to home
+      // If user has an active or trialing subscription, navigate to dashboard
       if (data && (data.subscription_status === 'active' || data.subscription_status === 'trialing')) {
-        navigate("/");
+        navigate("/dashboard");
       } else {
         // Show subscription dialog for users without active subscription
         setShowSubscriptionDialog(true);
@@ -94,7 +94,7 @@ export default function Auth() {
 
   const handleContinueFree = () => {
     setShowSubscriptionDialog(false);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
@@ -132,7 +132,7 @@ export default function Auth() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`
+          emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
 
@@ -231,7 +231,7 @@ export default function Auth() {
       
       setIsPasswordReset(false);
       setNewPassword("");
-      navigate("/");
+      navigate("/dashboard");
     } catch (error: any) {
       setError(error.message || "Erro ao redefinir senha");
     } finally {
