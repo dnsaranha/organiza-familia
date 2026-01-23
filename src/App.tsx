@@ -94,7 +94,8 @@ const App = () => {
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
                 {/* Public Routes - No login required */}
-                <Route path="/" element={<Landing />} />
+                <Route path="/" element={<Auth />} />
+                <Route path="/welcome" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/success" element={<Success />} />
