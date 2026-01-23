@@ -2,6 +2,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import {
   PiggyBank,
   Target,
   Calendar,
@@ -15,6 +22,12 @@ import {
   Wallet,
   Bell,
 } from "lucide-react";
+
+// Import screenshot images
+import screenshotDashboard from "@/assets/screenshot-dashboard.png";
+import screenshotReports from "@/assets/screenshot-reports.png";
+import screenshotCalendar from "@/assets/screenshot-calendar.png";
+import screenshotGoals from "@/assets/screenshot-goals.png";
 
 const Landing = () => {
   const features = [
@@ -57,6 +70,29 @@ const Landing = () => {
     "Dados seguros e criptografados",
     "Planos flexíveis para cada necessidade",
     "Suporte em português",
+  ];
+
+  const screenshots = [
+    {
+      image: screenshotDashboard,
+      title: "Dashboard",
+      description: "Visão geral das suas finanças",
+    },
+    {
+      image: screenshotReports,
+      title: "Relatórios",
+      description: "Gráficos e análises detalhadas",
+    },
+    {
+      image: screenshotCalendar,
+      title: "Calendário",
+      description: "Agenda de pagamentos e lembretes",
+    },
+    {
+      image: screenshotGoals,
+      title: "Metas",
+      description: "Acompanhe seus objetivos",
+    },
   ];
 
   return (
@@ -125,6 +161,57 @@ const Landing = () => {
                 </Button>
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* App Screenshots Carousel */}
+      <section className="py-16 bg-card/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Conheça o App
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Veja como o Organiza pode transformar sua gestão financeira
+            </p>
+          </div>
+          <div className="max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+            <Carousel
+              opts={{
+                align: "center",
+                loop: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent>
+                {screenshots.map((screenshot, index) => (
+                  <CarouselItem key={index}>
+                    <div className="p-2">
+                      <Card className="border-0 shadow-xl overflow-hidden bg-gradient-to-b from-card to-card/80">
+                        <CardContent className="flex flex-col items-center p-4">
+                          <div className="relative w-full aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl mb-4 bg-muted">
+                            <img
+                              src={screenshot.image}
+                              alt={screenshot.title}
+                              className="w-full h-full object-cover object-top"
+                            />
+                          </div>
+                          <h3 className="text-xl font-semibold text-foreground mb-1">
+                            {screenshot.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground text-center">
+                            {screenshot.description}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-0 -translate-x-1/2" />
+              <CarouselNext className="right-0 translate-x-1/2" />
+            </Carousel>
           </div>
         </div>
       </section>
