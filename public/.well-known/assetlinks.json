@@ -3,8 +3,8 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "com.example.app",
+    "package_name": "app.vercel.organizagff.twa",
     "sha256_cert_fingerprints":
-    ["00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF"]
+    ["0D:DB:2B:63:3C:66:34:6C:C7:43:43:8C:F4:A4:4E:91:8A:2C:9E:81:F2:F5:8A:4F:97:75:39:6B:4F:58:65:6E"]
   }
 }]
