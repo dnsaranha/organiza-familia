@@ -1,0 +1,66 @@
+{
+  "packageId": "app.vercel.organizagff.twa",
+  "host": "organizagff.vercel.app",
+  "name": "Organiza - Gestão Financeira",
+  "launcherName": "Organiza",
+  "display": "standalone",
+  "themeColor": "#3B82F6",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#3B82F6",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://organizagff.vercel.app/icons/icon-512x512.png",
+  "maskableIconUrl": "https://organizagff.vercel.app/icons/icon-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "/home/user/organiza-familia/android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Transações",
+      "shortName": "Transações",
+      "url": "https://organizagff.vercel.app/?tab=transactions",
+      "chosenIconUrl": "https://organizagff.vercel.app/icons/icon-96x96.png"
+    },
+    {
+      "name": "Relatórios",
+      "shortName": "Relatórios",
+      "url": "https://organizagff.vercel.app/reports",
+      "chosenIconUrl": "https://organizagff.vercel.app/icons/icon-96x96.png"
+    },
+    {
+      "name": "Tarefas",
+      "shortName": "Tarefas",
+      "url": "https://organizagff.vercel.app/tasks",
+      "chosenIconUrl": "https://organizagff.vercel.app/icons/icon-96x96.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://organizagff.vercel.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://organizagff.vercel.app/",
+  "minSdkVersion": 21,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}
