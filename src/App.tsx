@@ -31,6 +31,7 @@ import { SupportChat } from "./components/SupportChat";
 import AdminPage from "./pages/Admin";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import DeleteAccount from "./pages/DeleteAccount";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,6 +102,7 @@ const App = () => {
                 <Route path="/success" element={<Success />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/delete-account" element={<DeleteAccount />} />
 
                 {/* Test Route */}
                 <Route

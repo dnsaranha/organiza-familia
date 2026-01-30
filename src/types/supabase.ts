@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       family_groups: {
         Row: {
           created_at: string
@@ -71,6 +101,42 @@ export type Database = {
           sector?: string | null
           ticker?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      google_calendar_sync: {
+        Row: {
+          calendar_id: string
+          channel_expiration: string | null
+          channel_id: string | null
+          created_at: string
+          id: string
+          resource_id: string | null
+          sync_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id: string
+          channel_expiration?: string | null
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          resource_id?: string | null
+          sync_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string
+          channel_expiration?: string | null
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          resource_id?: string | null
+          sync_token?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -370,13 +436,17 @@ export type Database = {
       }
       scheduled_tasks: {
         Row: {
+          calendar_id: string | null
           category: string | null
           created_at: string
           description: string | null
+          end_date: string | null
+          google_calendar_event_id: string | null
           group_id: string | null
           id: string
           is_completed: boolean | null
           is_recurring: boolean | null
+          last_modified_source: string | null
           notification_email: boolean | null
           notification_push: boolean | null
           notified_at: string | null
@@ -385,6 +455,7 @@ export type Database = {
           recurrence_interval: number | null
           recurrence_pattern: string | null
           schedule_date: string
+          status: string | null
           task_type: string
           title: string
           updated_at: string
@@ -392,13 +463,17 @@ export type Database = {
           value: number | null
         }
         Insert: {
+          calendar_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
+          end_date?: string | null
+          google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_recurring?: boolean | null
+          last_modified_source?: string | null
           notification_email?: boolean | null
           notification_push?: boolean | null
           notified_at?: string | null
@@ -407,6 +482,7 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_pattern?: string | null
           schedule_date: string
+          status?: string | null
           task_type: string
           title: string
           updated_at?: string
@@ -414,13 +490,17 @@ export type Database = {
           value?: number | null
         }
         Update: {
+          calendar_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
+          end_date?: string | null
+          google_calendar_event_id?: string | null
           group_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_recurring?: boolean | null
+          last_modified_source?: string | null
           notification_email?: boolean | null
           notification_push?: boolean | null
           notified_at?: string | null
@@ -429,6 +509,7 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_pattern?: string | null
           schedule_date?: string
+          status?: string | null
           task_type?: string
           title?: string
           updated_at?: string
@@ -716,6 +797,36 @@ export type Database = {
         }
         Relationships: []
       }
+      support_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_from_admin: boolean | null
+          is_read: boolean | null
+          message: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_from_admin?: boolean | null
+          is_read?: boolean | null
+          message: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_from_admin?: boolean | null
+          is_read?: boolean | null
+          message?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -844,6 +955,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       stripe_user_orders: {
@@ -943,12 +1075,20 @@ export type Database = {
         }
       }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       import_transactions: {
         Args: {
           transactions: Database["public"]["CompositeTypes"]["transaction_import_type"][]
         }
         Returns: Json
       }
+      is_admin: { Args: never; Returns: boolean }
       is_group_member: {
         Args: { _group_id: string; _user_id?: string }
         Returns: boolean
@@ -964,6 +1104,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       stripe_order_status: "pending" | "completed" | "canceled"
       stripe_subscription_status:
         | "not_started"
@@ -1111,6 +1252,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       stripe_order_status: ["pending", "completed", "canceled"],
       stripe_subscription_status: [
         "not_started",

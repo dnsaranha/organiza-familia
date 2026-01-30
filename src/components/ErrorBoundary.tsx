@@ -29,18 +29,26 @@ class ErrorBoundary extends React.Component<
     console.error("Component Stack:", errorInfo.componentStack);
 
     // Automatically reload if it's a chunk load error (common after deployments)
+    const message = (error?.message ?? "").toLowerCase();
     if (
-      error.message.includes("Failed to fetch dynamically imported module") ||
-      error.message.includes("Importing a module script failed")
+      message.includes("failed to fetch dynamically imported module") ||
+      message.includes("importing a module script failed") ||
+      message.includes("loading chunk") ||
+      message.includes("chunkloaderror")
     ) {
       console.log("Chunk load error detected, reloading...");
       window.location.reload();
       return;
     }
 
-    // Report to monitoring service if available
-    if (typeof window !== "undefined" && (window as any).reportError) {
-      (window as any).reportError(error);
+    // Avoid calling a non-existent global (can itself cause a Script error in some environments)
+    try {
+      const reporter = (typeof window !== "undefined" && (window as any)?.reportError)
+        ? (window as any).reportError
+        : null;
+      if (typeof reporter === "function") reporter(error);
+    } catch {
+      // no-op
     }
   }
 
