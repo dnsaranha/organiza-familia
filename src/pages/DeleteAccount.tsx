@@ -8,6 +8,7 @@ import { ArrowLeft, AlertTriangle, Trash2, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAccountDeletion } from "@/hooks/useAccountDeletion";
 import {
   AlertDialog,
   AlertDialogAction,

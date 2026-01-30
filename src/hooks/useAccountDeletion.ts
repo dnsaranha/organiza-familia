@@ -12,7 +12,7 @@ export const useAccountDeletion = () => {
     async (params: ProcessDeletionParams) => {
       try {
         const { data, error } = await supabase.functions.invoke(
-          "supabase-functions-process-account-deletion",
+          "process-account-deletion",
           {
             body: params,
           }
