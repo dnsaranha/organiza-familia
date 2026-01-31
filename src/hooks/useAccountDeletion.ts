@@ -19,12 +19,16 @@ export const useAccountDeletion = () => {
         );
 
         if (error) {
-          throw new Error(error.message || "Failed to process account deletion");
+          // Melhor tratamento de erro para preservar a mensagem original
+          throw new Error(
+            `Failed to process account deletion: ${error.details || error.message || "Unknown error"}`
+          );
         }
 
         return { success: true, data };
       } catch (error) {
         console.error("Error processing account deletion:", error);
+        // Relançar o erro com a mensagem mais informativa
         throw error;
       }
     },
