@@ -69,12 +69,22 @@ Deno.serve(async (req) => {
       targetUserId = userList.id;
     }
 
+    // Unlink account deletion requests to allow user deletion (break FK constraint)
+    const { error: updateRequestsError } = await supabase
+      .from("account_deletion_requests")
+      .update({ user_id: null })
+      .eq("user_id", targetUserId);
+
+    if (updateRequestsError) {
+      console.error("Error unlinking deletion requests:", updateRequestsError);
+    }
+
     // Delete all user data in order (respecting foreign keys)
     const tablesToDelete = [
       { table: "investment_transactions", column: "user_id" },
       { table: "scheduled_tasks", column: "user_id" },
       { table: "transactions", column: "user_id" },
-      { table: "goals", column: "user_id" },
+      { table: "savings_goals", column: "user_id" },
       { table: "budget_items", column: "user_id" },
       { table: "budgets", column: "user_id" },
       { table: "family_group_members", column: "user_id" },
@@ -82,6 +92,8 @@ Deno.serve(async (req) => {
       { table: "connected_accounts", column: "user_id" },
       { table: "subscription_permissions", column: "user_id" },
       { table: "user_preferences", column: "user_id" },
+      { table: "stripe_customers", column: "user_id" },
+      { table: "user_categories", column: "user_id" },
       { table: "profiles", column: "id" },
     ];
 
