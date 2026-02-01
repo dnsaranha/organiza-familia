@@ -1,10 +1,27 @@
-
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "app.vercel.organizagff.twa",
-    "sha256_cert_fingerprints":
-    ["0D:DB:2B:63:3C:66:34:6C:C7:43:43:8C:F4:A4:4E:91:8A:2C:9E:81:F2:F5:8A:4F:97:75:39:6B:4F:58:65:6E"]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.organizagff.twa",
+      "sha256_cert_fingerprints": [
+        "0D:DB:2B:63:3C:66:34:6C:C7:43:43:8C:F4:A4:4E:91:8A:2C:9E:81:F2:F5:8A:4F:97:75:39:6B:4F:58:65:6E"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.organiza.twa",
+      "sha256_cert_fingerprints": [
+        "70:84:D5:54:15:FB:91:36:D8:8E:5F:C2:B4:79:70:76:5C:6D:50:47:25:D9:B3:F5:89:39:AB:AD:15:EE:94:3B"
+      ]
+    }
   }
-}]
+]
