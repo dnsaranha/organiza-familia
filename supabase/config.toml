@@ -4,7 +4,6 @@ project_id = "deipytqxqkmyadabtjnd"
 enabled = true
 client_id = "YOUR_GOOGLE_CLIENT_ID"
 secret = "YOUR_GOOGLE_SECRET"
-scopes = ["https://www.googleapis.com/auth/calendar"]
 
 [auth.external.apple]
 enabled = true
