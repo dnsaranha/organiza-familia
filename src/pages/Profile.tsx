@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, Smartphone, Tags } from "lucide-react";
+import { Trash2, Loader2, Smartphone, Tags, AlertTriangle } from "lucide-react";
 import { BottomNavConfig } from "@/components/BottomNavConfig";
 import { CategoryManager } from "@/components/CategoryManager";
 
@@ -376,6 +376,21 @@ export default function Profile() {
 
               <Separator />
 
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/")}
+                >
+                  Voltar
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </div>
+
+              <Separator />
+
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-destructive">
                   Zona de Perigo
@@ -389,7 +404,7 @@ export default function Profile() {
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm" disabled={clearingData}>
+                      <Button type="button" variant="destructive" size="sm" disabled={clearingData}>
                         {clearingData ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
@@ -415,19 +430,27 @@ export default function Profile() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/")}
-                >
-                  Voltar
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Salvando..." : "Salvar Alterações"}
-                </Button>
+                <div className="flex items-center justify-between rounded-lg border border-destructive/50 p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Excluir Conta
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Solicite a exclusão permanente da sua conta e todos os seus dados.
+                    </p>
+                  </div>
+                  <Button 
+                    type="button"
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => {
+                      navigate("/delete-account");
+                    }}
+                  >
+                    Excluir Conta
+                  </Button>
+                </div>
               </div>
             </form>
           </CardContent>
