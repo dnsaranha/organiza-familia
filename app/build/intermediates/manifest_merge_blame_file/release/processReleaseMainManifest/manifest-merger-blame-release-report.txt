@@ -23,8 +23,8 @@
 23-->
 24<manifest xmlns:android="http://schemas.android.com/apk/res/android"
 25    package="app.organiza.twa"
-26    android:versionCode="5"
-27    android:versionName="5" >
+26    android:versionCode="7"
+27    android:versionName="7" >
 28
 29    <uses-sdk
 30        android:minSdkVersion="21"
