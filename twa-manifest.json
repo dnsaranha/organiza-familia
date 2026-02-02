@@ -1,5 +1,5 @@
 {
-  "packageId": "app.vercel.organizagff.twa",
+  "packageId": "app.organiza.twa",
   "host": "organizagff.vercel.app",
   "name": "Organiza - Gestão Financeira",
   "launcherName": "Organiza",
@@ -20,8 +20,8 @@
     "path": "/home/user/organiza-familia/android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "5",
+  "appVersionCode": 5,
   "shortcuts": [
     {
       "name": "Transações",
@@ -62,5 +62,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "5"
 }
