@@ -13,6 +13,7 @@ interface Message {
   id: string;
   message: string;
   is_from_admin: boolean;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -56,14 +57,10 @@ export const SupportChat = () => {
     };
   }, []);
 
-  // Helper to calculate unread count
+  // Helper to calculate unread count from database is_read field
   const calculateUnread = useCallback((msgs: Message[]) => {
-    const lastSeen = localStorage.getItem('support_chat_last_seen_at');
-    const count = msgs.filter(m => {
-        if (!m.is_from_admin) return false;
-        if (!lastSeen) return true;
-        return new Date(m.created_at) > new Date(lastSeen);
-    }).length;
+    // Count unread admin messages using the database field
+    const count = msgs.filter(m => m.is_from_admin && !m.is_read).length;
     setUnreadCount(count);
     if (count > 0) setIsVisible(true);
   }, []);
@@ -184,6 +181,7 @@ export const SupportChat = () => {
         id: tempId,
         message: newMessage.trim(),
         is_from_admin: false,
+        is_read: true,
         created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, tempMessage]);
@@ -218,14 +216,41 @@ export const SupportChat = () => {
     }
   };
 
+  // Mark admin messages as read in the database
+  const markMessagesAsRead = useCallback(async () => {
+    if (!user) return;
+    
+    const unreadIds = messages
+      .filter(m => m.is_from_admin && !m.is_read)
+      .map(m => m.id);
+    
+    if (unreadIds.length === 0) return;
+    
+    try {
+      await supabase
+        .from('support_messages')
+        .update({ is_read: true })
+        .in('id', unreadIds);
+      
+      // Update local state
+      setMessages(prev => prev.map(m => 
+        unreadIds.includes(m.id) ? { ...m, is_read: true } : m
+      ));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Error marking messages as read:', err);
+    }
+  }, [user, messages]);
+
   const handleOpenChat = () => {
     setIsOpen(true);
     setUnreadCount(0);
+    // Mark messages as read when opening chat
+    markMessagesAsRead();
   };
 
   const handleCloseChat = () => {
     setIsOpen(false);
-    localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
     if (unreadCount === 0) {
       setIsVisible(false);
     }
