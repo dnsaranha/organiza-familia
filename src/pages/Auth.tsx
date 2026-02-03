@@ -47,14 +47,14 @@ export default function Auth() {
     // Check if user is already logged in or if this is a password reset flow
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       // Check if URL has reset=true parameter
       const resetParam = searchParams.get('reset');
       if (resetParam === 'true') {
         setIsPasswordReset(true);
         return;
       }
-      
+
       if (session) {
         // Check if user has a subscription
         await checkSubscription(session.user.id);
@@ -71,24 +71,26 @@ export default function Auth() {
       const syncResult = await supabase.functions.invoke('stripe-sync-subscription');
       console.log('Sync result:', syncResult);
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('stripe_user_subscriptions')
         .select('subscription_status')
         .maybeSingle();
 
       if (error) throw error;
 
-      // If user has an active or trialing subscription, navigate to dashboard
-      if (data && (data.subscription_status === 'active' || data.subscription_status === 'trialing')) {
+      // If user has ANY subscription record (even canceled), they already made a choice
+      // Only show subscription dialog for truly new users with no record at all
+      if (data) {
+        // User has a subscription record - go directly to dashboard
         navigate("/dashboard");
       } else {
-        // Show subscription dialog for users without active subscription
+        // No subscription record at all - new user, show subscription options
         setShowSubscriptionDialog(true);
       }
     } catch (err) {
       console.error('Erro ao verificar assinatura:', err);
-      // If error checking subscription, show dialog
-      setShowSubscriptionDialog(true);
+      // If error checking subscription, go to dashboard instead of blocking
+      navigate("/dashboard");
     }
   };
 
@@ -142,7 +144,7 @@ export default function Auth() {
         title: "Conta criada com sucesso!",
         description: "Verifique seu email para confirmar a conta.",
       });
-      
+
       // After signup, show subscription dialog
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -172,7 +174,7 @@ export default function Auth() {
         title: "Login realizado com sucesso!",
         description: "Bem-vindo ao Organiza!",
       });
-      
+
       // Check subscription after login
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -228,7 +230,7 @@ export default function Auth() {
         title: "Senha redefinida!",
         description: "Sua senha foi atualizada com sucesso.",
       });
-      
+
       setIsPasswordReset(false);
       setNewPassword("");
       navigate("/dashboard");
@@ -325,7 +327,7 @@ export default function Auth() {
                 <TabsTrigger value="login">Entrar</TabsTrigger>
                 <TabsTrigger value="signup">Criar Conta</TabsTrigger>
               </TabsList>
-              
+
               {error && (
                 <Alert variant="destructive" className="mb-4">
                   <AlertCircle className="h-4 w-4" />
@@ -370,7 +372,7 @@ export default function Auth() {
                   >
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
-                  
+
                   <Button
                     type="button"
                     variant="link"
@@ -599,7 +601,7 @@ export default function Auth() {
             }
           </DialogDescription>
         </DialogHeader>
-        
+
         {resetSuccess ? (
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="rounded-full p-3 bg-green-100 dark:bg-green-900">
