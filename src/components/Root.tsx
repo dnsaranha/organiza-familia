@@ -1,13 +1,14 @@
-import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { useEffect } from "react";
 
 export default function Root() {
   useEffect(() => {
-    // Set page title
+    // Set document metadata
+    document.documentElement.lang = "pt-BR";
     document.title = "Organiza - Gestão Financeira Familiar";
-    
-    // Set meta description
+
+    // Update meta description
     let metaDescription = document.querySelector('meta[name="description"]');
     if (!metaDescription) {
       metaDescription = document.createElement('meta');
@@ -15,26 +16,21 @@ export default function Root() {
       document.head.appendChild(metaDescription);
     }
     metaDescription.setAttribute('content', 'Gerencie o orçamento da sua família de forma simples e eficiente com o Organiza. App PWA completo para gestão financeira pessoal e familiar.');
-    
-    // Set html lang
-    document.documentElement.lang = 'pt-BR';
-    
+
     // Add structured data
-    const structuredData = {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Organiza - Gestão Financeira Familiar",
-      "url": "https://organizagff.vercel.app/",
-    };
-    
-    let ldScript = document.getElementById('structured-data-ld') as HTMLScriptElement | null;
-    if (!ldScript) {
-      ldScript = document.createElement('script');
-      ldScript.id = 'structured-data-ld';
-      ldScript.type = 'application/ld+json';
-      document.head.appendChild(ldScript);
+    const existingScript = document.querySelector('script[type="application/ld+json"]');
+    if (!existingScript) {
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Organiza - Gestão Financeira Familiar",
+        "url": "https://organizagff.vercel.app/",
+      };
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.textContent = JSON.stringify(structuredData);
+      document.head.appendChild(script);
     }
-    ldScript.textContent = JSON.stringify(structuredData);
   }, []);
 
   return (
