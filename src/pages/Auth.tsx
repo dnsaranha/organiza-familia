@@ -71,24 +71,26 @@ export default function Auth() {
       const syncResult = await supabase.functions.invoke('stripe-sync-subscription');
       console.log('Sync result:', syncResult);
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('stripe_user_subscriptions')
         .select('subscription_status')
         .maybeSingle();
 
       if (error) throw error;
 
-      // If user has an active or trialing subscription, navigate to dashboard
-      if (data && (data.subscription_status === 'active' || data.subscription_status === 'trialing')) {
+      // If user has ANY subscription record (even canceled), they already made a choice
+      // Only show subscription dialog for truly new users with no record at all
+      if (data) {
+        // User has a subscription record - go directly to dashboard
         navigate("/dashboard");
       } else {
-        // Show subscription dialog for users without active subscription
+        // No subscription record at all - new user, show subscription options
         setShowSubscriptionDialog(true);
       }
     } catch (err) {
       console.error('Erro ao verificar assinatura:', err);
-      // If error checking subscription, show dialog
-      setShowSubscriptionDialog(true);
+      // If error checking subscription, go to dashboard instead of blocking
+      navigate("/dashboard");
     }
   };
 

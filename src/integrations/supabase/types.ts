@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       family_groups: {
         Row: {
           created_at: string
@@ -1012,6 +1045,10 @@ export type Database = {
     }
     Functions: {
       bulk_upsert_assets: { Args: { assets_data: Json }; Returns: undefined }
+      delete_user_data: {
+        Args: { user_id_to_delete: string }
+        Returns: undefined
+      }
       get_group_members: {
         Args: { p_group_id: string }
         Returns: {
