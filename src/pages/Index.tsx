@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FinancialSummaryCard } from "@/components/FinancialSummaryCard";
-import { FinancialCard } from "@/components/FinancialCard";
 import { TransactionList } from "@/components/TransactionList";
 import { ScheduledTasks } from "@/components/ScheduledTasks";
 import { FamilyGroups } from "@/components/FamilyGroups";
@@ -12,15 +11,12 @@ import { useOpenBanking } from "@/hooks/useOpenBanking";
 import { supabase } from "@/integrations/supabase/client";
 import { useBudgetScope } from "@/contexts/BudgetScopeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { accountTypeMapping, mapAccountSubtype } from "@/lib/account-mapping";
+import { mapAccountSubtype } from "@/lib/account-mapping";
 import {
   Wallet,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
   Building2,
   CreditCard,
+  DollarSign,
 } from "lucide-react";
 
 interface FinancialData {
@@ -32,9 +28,7 @@ interface FinancialData {
 const Index = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [financialData, setFinancialData] = useState<FinancialData | null>(
-    null,
-  );
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const { scope } = useBudgetScope();
@@ -62,7 +56,6 @@ const Index = () => {
     const handleTransactionUpdate = () => {
       handleDataRefresh();
     };
-
     window.addEventListener("transaction-updated", handleTransactionUpdate);
     return () => {
       window.removeEventListener("transaction-updated", handleTransactionUpdate);
@@ -71,17 +64,20 @@ const Index = () => {
 
   const fetchFinancialData = async () => {
     if (!user) return;
-
     setLoadingData(true);
+
     try {
+      // 1. Fetch User Preferences
       const { data: preferences } = await supabase
         .from("user_preferences")
-        .select("month_start_day")
+        .select("month_start_day, carry_over_balance")
         .eq("user_id", user.id)
         .maybeSingle();
 
       const monthStartDay = preferences?.month_start_day || 1;
+      const carryOverBalance = preferences?.carry_over_balance || false;
 
+      // 2. Fetch all transactions (manual and bank)
       let query = supabase.from("transactions").select("type, amount, date");
       if (scope === "personal") {
         query = query.is("group_id", null).eq("user_id", user.id);
@@ -90,29 +86,7 @@ const Index = () => {
       }
       const { data: manualTransactions, error } = await query;
       if (error) throw error;
-
-      const now = new Date();
-      let monthStartDate = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        monthStartDay,
-      );
-      if (now.getDate() < monthStartDay) {
-        monthStartDate.setMonth(monthStartDate.getMonth() - 1);
-      }
-      let monthEndDate = new Date(
-        monthStartDate.getFullYear(),
-        monthStartDate.getMonth() + 1,
-        monthStartDay - 1,
-      );
-      monthEndDate.setHours(23, 59, 59, 999);
       
-      let prevMonthStartDate = new Date(monthStartDate);
-      prevMonthStartDate.setMonth(prevMonthStartDate.getMonth() - 1);
-      let prevMonthEndDate = new Date(monthStartDate);
-      prevMonthEndDate.setDate(prevMonthEndDate.getDate() - 1);
-      prevMonthEndDate.setHours(23, 59, 59, 999);
-
       const combinedTransactions = [
         ...(manualTransactions || []).map((t) => ({ ...t, source: "manual" })),
         ...(bankTransactions || []).map((t) => ({
@@ -122,39 +96,46 @@ const Index = () => {
         })),
       ];
 
+      // 3. Define current financial month dates
+      const now = new Date();
+      let monthStartDate = new Date(now.getFullYear(), now.getMonth(), monthStartDay);
+      if (now.getDate() < monthStartDay) {
+        monthStartDate.setMonth(monthStartDate.getMonth() - 1);
+      }
+      monthStartDate.setHours(0, 0, 0, 0); // Start of the day
+
+      // 4. Process all transactions based on preferences
       let monthlyIncome = 0;
       let monthlyExpenses = 0;
-      let previousMonthIncome = 0;
-      let previousMonthExpenses = 0;
+      let previousBalance = 0;
 
       for (const t of combinedTransactions) {
         const transactionDate = new Date(t.date);
-        if (
-          transactionDate >= monthStartDate &&
-          transactionDate <= monthEndDate
-        ) {
+
+        if (transactionDate >= monthStartDate) {
+          // Transactions within the current financial month
           if (t.type === "income") {
             monthlyIncome += Math.abs(t.amount);
           } else {
             monthlyExpenses += Math.abs(t.amount);
           }
-        } else if (
-            transactionDate >= prevMonthStartDate &&
-            transactionDate <= prevMonthEndDate
-        ) {
-            if (t.type === "income") {
-                previousMonthIncome += Math.abs(t.amount);
-            } else {
-                previousMonthExpenses += Math.abs(t.amount);
-            }
+        } else {
+          // Transactions before the current financial month
+          if (t.type === "income") {
+            previousBalance += Math.abs(t.amount);
+          } else {
+            previousBalance -= Math.abs(t.amount);
+          }
         }
       }
-      
-      const previousMonthBalance = previousMonthIncome - previousMonthExpenses;
-      const monthlyBalance = previousMonthBalance + monthlyIncome - monthlyExpenses;
+
+      // 5. Calculate final balance based on carryOverBalance preference
+      const finalBalance = carryOverBalance
+        ? previousBalance + monthlyIncome - monthlyExpenses
+        : monthlyIncome - monthlyExpenses;
 
       setFinancialData({
-        balance: monthlyBalance,
+        balance: finalBalance,
         monthlyIncome,
         monthlyExpenses,
       });
@@ -184,11 +165,7 @@ const Index = () => {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  const monthlyBalance = financialData?.balance ?? 0;
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,7 +183,7 @@ const Index = () => {
 
         <div className="mb-6 sm:mb-8">
           <FinancialSummaryCard
-            balance={monthlyBalance}
+            balance={financialData?.balance ?? 0}
             income={financialData?.monthlyIncome ?? 0}
             expenses={financialData?.monthlyExpenses ?? 0}
             isLoading={loadingData || bankLoading}
