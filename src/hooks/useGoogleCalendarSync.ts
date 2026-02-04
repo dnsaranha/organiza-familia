@@ -27,20 +27,22 @@ export function useGoogleCalendarSync() {
       title: 'Permissão necessária',
       description: 'Redirecionando para autorizar acesso ao Google Calendar...',
     });
-    
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         scopes: 'https://www.googleapis.com/auth/calendar',
         redirectTo: window.location.href,
-        queryParams: { prompt: 'consent', access_type: 'offline' },
+        // Removing `prompt: 'consent'` ensures the user is only prompted on the first auth.
+        // `access_type: 'offline'` is kept to ensure we get a refresh token for background access.
+        queryParams: { access_type: 'offline' },
       },
     });
   }, [toast]);
 
   const invokeCalendarFunction = useCallback(async (body: any): Promise<any> => {
     const providerToken = await getProviderToken();
-    
+
     if (!providerToken) {
       await requestReauth();
       return { needsReauth: true };
@@ -51,7 +53,8 @@ export function useGoogleCalendarSync() {
     });
 
     if (error) throw error;
-    
+
+    // If the function returns `needsReauth`, it means the token was likely expired or revoked.
     if (data?.needsReauth) {
       await requestReauth();
       return data;
