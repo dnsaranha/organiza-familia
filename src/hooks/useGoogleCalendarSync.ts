@@ -33,7 +33,9 @@ export function useGoogleCalendarSync() {
       options: {
         scopes: 'https://www.googleapis.com/auth/calendar',
         redirectTo: window.location.href,
-        queryParams: { prompt: 'consent', access_type: 'offline' },
+        // Removing `prompt: 'consent'` ensures the user is only prompted on the first auth.
+        // `access_type: 'offline'` is kept to ensure we get a refresh token for background access.
+        queryParams: { access_type: 'offline' },
       },
     });
   }, [toast]);
@@ -52,6 +54,7 @@ export function useGoogleCalendarSync() {
 
     if (error) throw error;
     
+    // If the function returns `needsReauth`, it means the token was likely expired or revoked.
     if (data?.needsReauth) {
       await requestReauth();
       return data;
