@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowUpRight, ArrowDownRight, Clock, AlertTriangle, User, Calendar as CalendarIcon, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp } from "lucide-react";
+import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,6 @@ import * as XLSX from 'xlsx';
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ErrorBoundary from "./ErrorBoundary";
@@ -24,9 +23,9 @@ import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { TransactionForm } from "./TransactionForm";
-import { expenseCategories, incomeCategories } from "@/lib/budget-categories";
 import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 import { useUserCategories } from "@/hooks/useUserCategories";
+import { autoCategorize } from "@/lib/finance-utils";
 
 type Transaction = Tables<'transactions'>;
 
@@ -49,75 +48,23 @@ interface ImportedRow {
   Tipo?: 'income' | 'expense' | 'receita' | 'despesa';
 }
 
-// Helper function to infer category from description
-const inferCategoryFromDescription = (description: string, type: 'income' | 'expense'): string => {
-  const desc = description.toLowerCase();
-  
-  // Income categories inference
-  if (type === 'income') {
-    if (desc.includes('salario') || desc.includes('salário') || desc.includes('pgto') || desc.includes('pagamento')) return 'Salário';
-    if (desc.includes('freelance') || desc.includes('serviço') || desc.includes('servico')) return 'Freelance';
-    if (desc.includes('dividendo') || desc.includes('rendimento') || desc.includes('juros') || desc.includes('investimento')) return 'Investimentos';
-    if (desc.includes('presente') || desc.includes('gift')) return 'Presente';
-    if (desc.includes('bonus') || desc.includes('bônus')) return 'Bônus';
-    if (desc.includes('aluguel')) return 'Aluguel Recebido';
-    return 'Outros';
-  }
-  
-  // Expense categories inference
-  if (desc.includes('aluguel') || desc.includes('rent') || desc.includes('condominio') || desc.includes('condomínio')) return 'Aluguel';
-  if (desc.includes('agua') || desc.includes('água') || desc.includes('saneamento')) return 'Água';
-  if (desc.includes('luz') || desc.includes('energia') || desc.includes('eletric')) return 'Luz';
-  if (desc.includes('internet') || desc.includes('wifi') || desc.includes('net') || desc.includes('banda larga')) return 'Internet';
-  if (desc.includes('telefone') || desc.includes('celular') || desc.includes('tel') || desc.includes('mobile')) return 'Telefone';
-  if (desc.includes('mercado') || desc.includes('supermercado') || desc.includes('compras') || desc.includes('pão de açúcar') || desc.includes('carrefour') || desc.includes('extra')) return 'Mercado';
-  if (desc.includes('restaurante') || desc.includes('lanche') || desc.includes('pizza') || desc.includes('hamburger') || desc.includes('ifood') || desc.includes('rappi')) return 'Restaurante';
-  if (desc.includes('uber') || desc.includes('99') || desc.includes('taxi') || desc.includes('táxi') || desc.includes('combustivel') || desc.includes('combustível') || desc.includes('gasolina') || desc.includes('posto')) return 'Transporte';
-  if (desc.includes('farmacia') || desc.includes('farmácia') || desc.includes('drogaria') || desc.includes('medic') || desc.includes('hospital') || desc.includes('consulta') || desc.includes('exame')) return 'Saúde';
-  if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('prime') || desc.includes('cinema') || desc.includes('show') || desc.includes('ingresso') || desc.includes('lazer')) return 'Entretenimento';
-  if (desc.includes('roupa') || desc.includes('shopping') || desc.includes('loja') || desc.includes('compra')) return 'Compras';
-  if (desc.includes('curso') || desc.includes('escola') || desc.includes('faculdade') || desc.includes('livro') || desc.includes('udemy') || desc.includes('alura')) return 'Educação';
-  if (desc.includes('viagem') || desc.includes('hotel') || desc.includes('passagem') || desc.includes('airbnb') || desc.includes('booking')) return 'Viagem';
-  if (desc.includes('investimento') || desc.includes('aplicação') || desc.includes('aplicacao') || desc.includes('ação') || desc.includes('acao') || desc.includes('fii')) return 'Investimentos';
-  if (desc.includes('poupança') || desc.includes('poupanca') || desc.includes('reserva')) return 'Poupança';
-  
-  return 'Outros';
-};
-
 // Helper function to parse value removing currency symbols
 const parseValueFromString = (value: string | number): number => {
   if (typeof value === 'number') return Math.abs(value);
-  
   const strValue = String(value).trim();
-  
-  // Check if it's negative (has minus sign or parentheses)
   const isNegative = strValue.startsWith('-') || strValue.startsWith('(');
-  
-  // Remove R$, $, spaces, and currency symbols
-  let cleanValue = strValue
-    .replace(/R\$\s*/gi, '')
-    .replace(/\$\s*/g, '')
-    .replace(/[()]/g, '')
-    .replace(/-/g, '')
-    .trim();
-  
-  // Handle Brazilian format (1.234,56) vs American format (1,234.56)
-  // If there's a comma followed by exactly 2 digits at the end, it's Brazilian format
+  let cleanValue = strValue.replace(/R\$\s*/gi, '').replace(/\$\s*/g, '').replace(/[()]/g, '').replace(/-/g, '').trim();
   if (/,\d{2}$/.test(cleanValue)) {
-    // Brazilian format: remove dots (thousands), convert comma to dot (decimal)
     cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
   } else if (/\.\d{2}$/.test(cleanValue)) {
-    // American format: remove commas (thousands)
     cleanValue = cleanValue.replace(/,/g, '');
   } else {
-    // Fallback: remove all dots and commas except the last one
     const parts = cleanValue.split(/[.,]/);
     if (parts.length > 1) {
       const lastPart = parts.pop();
       cleanValue = parts.join('') + '.' + lastPart;
     }
   }
-  
   const parsed = parseFloat(cleanValue);
   return isNaN(parsed) ? 0 : Math.abs(parsed);
 };
@@ -125,22 +72,14 @@ const parseValueFromString = (value: string | number): number => {
 // Helper function to parse date in multiple formats
 const parseDateString = (dateStr: string | number): Date | null => {
   if (!dateStr) return null;
-  
-  // Handle Excel serial date number
   if (typeof dateStr === 'number') {
-    // Excel serial date: days since 1899-12-30
     const excelEpoch = new Date(1899, 11, 30);
     const date = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000);
     if (!isNaN(date.getTime())) return date;
   }
-  
   const str = String(dateStr).trim();
-  
-  // Try ISO format first (yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss)
   let date = new Date(str);
   if (!isNaN(date.getTime()) && str.includes('-') && str.length >= 10) return date;
-  
-  // Try dd/mm/yyyy format
   const ddmmyyyy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
   const match = str.match(ddmmyyyy);
   if (match) {
@@ -148,8 +87,6 @@ const parseDateString = (dateStr: string | number): Date | null => {
     date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     if (!isNaN(date.getTime())) return date;
   }
-  
-  // Try dd/mm/yy format
   const ddmmyy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/;
   const matchYY = str.match(ddmmyy);
   if (matchYY) {
@@ -158,7 +95,6 @@ const parseDateString = (dateStr: string | number): Date | null => {
     date = new Date(fullYear, parseInt(month) - 1, parseInt(day));
     if (!isNaN(date.getTime())) return date;
   }
-  
   return null;
 };
 
@@ -260,42 +196,16 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   };
   
   const handleDownloadTemplate = () => {
-    // Create template with example rows
     const templateData = [
-      { 
-        'Data': '15/01/2024', 
-        'Descrição': 'Salário mensal', 
-        'Categoria': 'Salário', 
-        'Valor': 'R$ 5.000,00', 
-        'Tipo': 'receita' 
-      },
-      { 
-        'Data': '16/01/2024', 
-        'Descrição': 'Compras no supermercado', 
-        'Categoria': 'Mercado', 
-        'Valor': 'R$ 450,50', 
-        'Tipo': 'despesa' 
-      },
+      { 'Data': '15/01/2024', 'Descrição': 'Salário mensal', 'Categoria': 'Salário', 'Valor': 'R$ 5.000,00', 'Tipo': 'receita' },
+      { 'Data': '16/01/2024', 'Descrição': 'Compras no supermercado', 'Categoria': 'Mercado', 'Valor': 'R$ 450,50', 'Tipo': 'despesa' },
     ];
-    
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 12 },  // Data
-      { wch: 30 },  // Descrição
-      { wch: 15 },  // Categoria
-      { wch: 15 },  // Valor
-      { wch: 10 },  // Tipo
-    ];
-    
+    worksheet['!cols'] = [ { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 10 } ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
     XLSX.writeFile(workbook, "modelo_importacao_transacoes.xlsx");
-    
-    toast.success("Arquivo modelo baixado!", { 
-      description: "Use este modelo para importar suas transações." 
-    });
+    toast.success("Arquivo modelo baixado!", { description: "Use este modelo para importar suas transações." });
     setShowImportDialog(false);
   };
 
@@ -321,33 +231,26 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          // Get date from Data or Data/Hora field
           const dateStr = row['Data'] || row['Data/Hora'];
           if (!dateStr || !row.Valor) { ignoredCount++; continue; }
-          
-          // Check for existing ID
           if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          // Parse date with multiple format support
           const transactionDate = parseDateString(dateStr);
           if (!transactionDate) { ignoredCount++; continue; }
           
-          // Parse value removing currency symbols
           const transactionValue = parseValueFromString(row.Valor);
           if (isNaN(transactionValue) || transactionValue === 0) { ignoredCount++; continue; }
           
-          // Determine transaction type
           const rawType = row.Tipo?.toLowerCase();
           let transactionType: 'income' | 'expense' = 'expense';
           if (rawType === 'income' || rawType === 'receita') {
             transactionType = 'income';
           }
           
-          // Auto-categorize if category is empty
           let category = row.Categoria?.trim();
           if (!category) {
             const description = row.Descrição || '';
-            category = inferCategoryFromDescription(description, transactionType);
+            category = autoCategorize(description, userCategories, transactionType) || 'Outros';
           }
           
           const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${category}`;
@@ -362,7 +265,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             group_id: importGroupId 
           };
           
-          // Only include ID if it was provided
           if (row.ID) {
             transactionData.id = row.ID;
           }
@@ -433,7 +335,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                 </div>
                 <div className="flex flex-col md:flex-row gap-2 w-full">
                   <Select value={budgetFilter} onValueChange={setBudgetFilter}><SelectTrigger className="w-full md:w-[240px]"><SelectValue placeholder="Filtrar por orçamento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent></Select>
-                  <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className="w-full md:w-auto justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`) : format(dateRange.from, "LLL dd, y")) : (<span>Selecione</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
+                  <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className="w-full md:w-auto justify-start text-left font-normal"><LucideIcons.Calendar className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`) : format(dateRange.from, "LLL dd, y")) : (<span>Selecione</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
                 </div>
               </div>
 
@@ -498,7 +400,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             onSave={() => {
               setEditingTransaction(null);
               onTransactionChange();
-              fetchTransactions(); // Adicionado para re-buscar a lista
+              fetchTransactions();
             }}
             onCancel={() => setEditingTransaction(null)}
           />
@@ -518,7 +420,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Import Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -528,7 +429,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             </DialogDescription>
           </DialogHeader>
           
-          {/* Group Selection */}
           <div className="space-y-3 py-2">
             <label className="text-sm font-medium">Importar para:</label>
             <Select value={importGroupId || 'personal'} onValueChange={(v) => setImportGroupId(v === 'personal' ? null : v)}>

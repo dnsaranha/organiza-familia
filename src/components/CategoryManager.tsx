@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Loader2, Settings2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Settings2, X } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +35,7 @@ interface UserCategory {
   icon: string;
   color: string;
   is_default: boolean;
+  keywords: string[] | null;
 }
 
 interface CategoryManagerProps {
@@ -50,22 +51,28 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
   const { scope } = useBudgetScope();
 
   // Form state
-  const [editingCategory, setEditingCategory] = useState<UserCategory | null>(null);
+  const [editingCategory, setEditingCategory] = useState<UserCategory | null>(
+    null,
+  );
   const [name, setName] = useState("");
   const [type, setType] = useState<"income" | "expense">("expense");
   const [icon, setIcon] = useState("CircleDot");
   const [color, setColor] = useState("hsl(var(--primary))");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
 
   const fetchCategories = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      let query = supabase.from("user_categories").select("*");
+      let query = supabase.from("user_categories").select("*_id,name,type,icon,color,is_default,keywords");
 
       if (scope === "personal") {
         query = query.is("group_id", null).eq("user_id", user.id);
       } else {
-        query = query.or(`group_id.eq.${scope},and(group_id.is.null,user_id.eq.${user.id})`);
+        query = query.or(
+          `group_id.eq.${scope},and(group_id.is.null,user_id.eq.${user.id})`,
+        );
       }
 
       const { data, error } = await query.order("name");
@@ -91,6 +98,8 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
     setType("expense");
     setIcon("CircleDot");
     setColor("hsl(var(--primary))");
+    setKeywords([]);
+    setKeywordInput("");
   };
 
   const handleEdit = (category: UserCategory) => {
@@ -99,6 +108,7 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
     setType(category.type as "income" | "expense");
     setIcon(category.icon);
     setColor(category.color);
+    setKeywords(category.keywords || []);
   };
 
   const handleSave = async () => {
@@ -114,6 +124,7 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
         icon,
         color,
         is_default: false,
+        keywords: keywords.length > 0 ? keywords : null,
       };
 
       if (editingCategory) {
@@ -162,6 +173,21 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
     }
   };
 
+  const handleKeywordInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      const newKeyword = keywordInput.trim();
+      if (newKeyword && !keywords.includes(newKeyword)) {
+        setKeywords([...keywords, newKeyword]);
+      }
+      setKeywordInput("");
+    }
+  };
+
+  const removeKeyword = (keywordToRemove: string) => {
+    setKeywords(keywords.filter((keyword) => keyword !== keywordToRemove));
+  };
+
   const IconComponent = (LucideIcons as any)[icon] || LucideIcons.CircleDot;
 
   return (
@@ -172,25 +198,53 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
           <span className="hidden sm:inline">Gerenciar Categorias</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Gerenciar Categorias</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+        <div className="grid md:grid-cols-2 gap-6 flex-1 overflow-hidden">
           {/* Form */}
-          <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <Label htmlFor="cat-name">Nome da Categoria</Label>
+          <div className="space-y-4 p-1 flex flex-col">
+            <h3 className="text-lg font-medium">
+              {editingCategory ? "Editar Categoria" : "Nova Categoria"}
+            </h3>
+            <div className="space-y-3">
+                <Label htmlFor="cat-name">Nome</Label>
                 <Input
                   id="cat-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Assinaturas"
                 />
-              </div>
+            </div>
 
+            <div className="space-y-3">
+              <Label>Palavras-chave para auto-categorização</Label>
+              <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-background">
+                {keywords.map((kw, index) => (
+                  <Badge key={index} variant="secondary">
+                    {kw}
+                    <button
+                      onClick={() => removeKeyword(kw)}
+                      className="ml-1 rounded-full hover:bg-destructive/50"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Input
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={handleKeywordInput}
+                  placeholder="Adicionar palavra..."
+                  className="flex-1 bg-transparent border-none focus:ring-0 h-auto p-0 m-0"
+                />
+              </div>
+                <p className="text-xs text-muted-foreground">Pressione Enter ou vírgula para adicionar.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
@@ -236,10 +290,11 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <div className="col-span-2">
+              <div className="space-y-2">
                 <Label>Cor</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
+                <div className="flex flex-wrap gap-2">
                   {AVAILABLE_COLORS.map((c) => (
                     <button
                       key={c}
@@ -251,9 +306,8 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
                   ))}
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleSave}
                 disabled={!name.trim() || saving}
@@ -278,9 +332,9 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
           </div>
 
           {/* Categories List */}
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 border-l pl-6">
             <Label className="mb-2 block">Suas Categorias</Label>
-            <ScrollArea className="h-[200px] border rounded-lg">
+            <ScrollArea className="h-full pr-4">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -290,34 +344,40 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
                   Nenhuma categoria personalizada
                 </div>
               ) : (
-                <div className="p-2 space-y-1">
+                <div className="space-y-2">
                   {categories.map((cat) => {
                     const CatIcon = (LucideIcons as any)[cat.icon] || LucideIcons.CircleDot;
                     return (
                       <div
                         key={cat.id}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 group"
+                        className="flex items-start justify-between p-2 rounded-lg hover:bg-muted/50 group"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-3">
                           <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1"
                             style={{ backgroundColor: cat.color }}
                           >
                             <CatIcon className="h-4 w-4 text-white" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{cat.name}</p>
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="outline" className="text-xs mb-1">
                               {cat.type === "income" ? "Receita" : "Despesa"}
                             </Badge>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {(cat.keywords || []).map(kw => (
+                                    <Badge key={kw} variant="secondary" className="text-[10px]">{kw}</Badge>
+                                ))}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => handleEdit(cat)}
+                            disabled={cat.is_default}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -326,6 +386,7 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
                             size="icon"
                             className="h-8 w-8 text-destructive"
                             onClick={() => handleDelete(cat.id)}
+                            disabled={cat.is_default}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
