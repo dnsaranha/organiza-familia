@@ -2,28 +2,53 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Add startup logging
-console.log("🚀 App initialization started at:", new Date().toISOString());
+// Avoid console usage in environments where it can throw (e.g., some cross-origin iframe contexts)
+const safeLog = {
+  log: (...args: unknown[]) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.log(...args);
+    } catch {
+      // no-op
+    }
+  },
+  warn: (...args: unknown[]) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.warn(...args);
+    } catch {
+      // no-op
+    }
+  },
+  error: (...args: unknown[]) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.error(...args);
+    } catch {
+      // no-op
+    }
+  },
+};
 
-// Add error handling for the root element
+safeLog.log("App initialization started at:", new Date().toISOString());
+
 const rootElement = document.getElementById("root");
 if (!rootElement) {
-  console.error("❌ Root element not found");
+  safeLog.error("Root element not found");
   throw new Error("Root element not found");
 }
 
 try {
-  console.log("📦 Creating React root...");
+  safeLog.log("Creating React root...");
   const root = createRoot(rootElement);
 
-  console.log("🎨 Rendering App component...");
+  safeLog.log("Rendering App component...");
   root.render(<App />);
 
-  console.log("✅ App rendered successfully at:", new Date().toISOString());
+  safeLog.log("App rendered successfully at:", new Date().toISOString());
 } catch (error) {
-  console.error("❌ Failed to render app:", error);
+  safeLog.error("Failed to render app:", error);
 
-  // Fallback error display
   rootElement.innerHTML = `
     <div style="
       min-height: 100vh;
@@ -40,8 +65,8 @@ try {
         <p style="color: #6b7280; margin-bottom: 1rem;">
           There was an error initializing the application.
         </p>
-        <button 
-          onclick="window.location.reload()" 
+        <button
+          onclick="window.location.reload()"
           style="
             padding: 0.5rem 1rem;
             background-color: #3b82f6;
@@ -72,17 +97,14 @@ try {
 // Defer service worker registration to avoid blocking startup
 setTimeout(() => {
   if ("serviceWorker" in navigator) {
-    console.log("🔧 Registering service worker...");
+    safeLog.log("Registering service worker...");
     navigator.serviceWorker
       .register("/service-worker.js")
       .then((registration) => {
-        console.log(
-          "✅ Service Worker registered with scope:",
-          registration.scope,
-        );
+        safeLog.log("Service Worker registered with scope:", registration.scope);
       })
       .catch((error) => {
-        console.warn("⚠️ Service Worker registration failed:", error);
+        safeLog.warn("Service Worker registration failed:", error);
       });
   }
 }, 1000);
