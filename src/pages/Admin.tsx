@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   MessageCircle, Users, Shield, Send, Loader2, RefreshCw, 
   Search, TrendingUp, CreditCard, UserCheck, UserPlus,
-  Clock, Calendar, BarChart3, DollarSign, Target, CheckCircle2, ChevronLeft, ChevronRight
+  Clock, Calendar, BarChart3, DollarSign, Target, CheckCircle2
 } from 'lucide-react';
 
 interface SupportMessage {
@@ -64,9 +64,6 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
-  const [totalUsersCount, setTotalUsersCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const usersPerPage = 50;
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -153,29 +150,17 @@ export default function AdminPage() {
     }
   };
 
-  const fetchUsers = async (page: number = 1) => {
+  const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      // Get total count
-      const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      setTotalUsersCount(count || 0);
-
-      // Get paginated users
-      const from = (page - 1) * usersPerPage;
-      const to = from + usersPerPage - 1;
-
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, full_name, subscription_plan, updated_at')
         .order('updated_at', { ascending: false })
-        .range(from, to);
+        .limit(100);
 
       if (error) throw error;
       setUsers(profiles || []);
-      setCurrentPage(page);
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -606,33 +591,6 @@ export default function AdminPage() {
                     </Table>
                   </div>
                 )}
-                
-                {/* Pagination Controls */}
-                {!usersLoading && totalUsersCount > usersPerPage && (
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="text-sm text-muted-foreground">
-                      Mostrando {((currentPage - 1) * usersPerPage) + 1} - {Math.min(currentPage * usersPerPage, totalUsersCount)} de {totalUsersCount} usuários
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fetchUsers(currentPage - 1)}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fetchUsers(currentPage + 1)}
-                        disabled={currentPage * usersPerPage >= totalUsersCount}
-                      >
-                        Próxima <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -712,7 +670,6 @@ export default function AdminPage() {
               </Card>
             </div>
           </TabsContent>
-
         </Tabs>
       </div>
     </div>

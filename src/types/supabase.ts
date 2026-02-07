@@ -23,7 +23,6 @@ export type Database = {
           processed_by: string | null
           reason: string | null
           status: string | null
-          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -33,7 +32,6 @@ export type Database = {
           processed_by?: string | null
           reason?: string | null
           status?: string | null
-          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -43,7 +41,6 @@ export type Database = {
           processed_by?: string | null
           reason?: string | null
           status?: string | null
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -895,7 +892,6 @@ export type Database = {
           icon: string
           id: string
           is_default: boolean
-          keywords: string[] | null
           name: string
           type: string
           updated_at: string
@@ -908,7 +904,6 @@ export type Database = {
           icon?: string
           id?: string
           is_default?: boolean
-          keywords?: string[] | null
           name: string
           type: string
           updated_at?: string
@@ -921,7 +916,6 @@ export type Database = {
           icon?: string
           id?: string
           is_default?: boolean
-          keywords?: string[] | null
           name?: string
           type?: string
           updated_at?: string
@@ -1048,10 +1042,6 @@ export type Database = {
     }
     Functions: {
       bulk_upsert_assets: { Args: { assets_data: Json }; Returns: undefined }
-      delete_user_data: {
-        Args: { user_id_to_delete: string }
-        Returns: undefined
-      }
       get_group_members: {
         Args: { p_group_id: string }
         Returns: {
