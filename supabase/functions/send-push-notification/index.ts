@@ -33,7 +33,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Processing push notification for user:", userId);
 
     // Configure VAPID
-    const vapidPublicKey = Deno.env.get("VITE_VAPID_PUBLIC_KEY");
+    const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
     const vapidSubject = "mailto:admin@organiza.app";
 

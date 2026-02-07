@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from './use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 // Base64 to Uint8Array conversion for VAPID keys
 const urlBase64ToUint8Array = (base64String: string) => {
@@ -17,15 +18,28 @@ const urlBase64ToUint8Array = (base64String: string) => {
   return outputArray;
 };
 
-// Temp VAPID key - in production this should be from environment
-const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa40HI8Gk-N5UYb-tKh4YWPiVtQ9MrxF8QXI11Y7Gf43YNH5QaQ8w5pJgYjVK0';
-
 export const usePushNotifications = () => {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
+  const [vapidKey, setVapidKey] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Fetch VAPID key from edge function
+  const fetchVapidKey = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-vapid-key');
+      if (error) throw error;
+      if (data?.vapidPublicKey) {
+        setVapidKey(data.vapidPublicKey);
+        return data.vapidPublicKey;
+      }
+    } catch (err) {
+      console.error('Error fetching VAPID key:', err);
+    }
+    return null;
+  }, []);
 
   useEffect(() => {
     // Check if push notifications are supported
@@ -83,13 +97,22 @@ export const usePushNotifications = () => {
         return false;
       }
 
+      // Fetch VAPID key if not already loaded
+      let currentVapidKey = vapidKey;
+      if (!currentVapidKey) {
+        currentVapidKey = await fetchVapidKey();
+        if (!currentVapidKey) {
+          throw new Error('Could not fetch VAPID key');
+        }
+      }
+
       // Get service worker registration
       const registration = await navigator.serviceWorker.ready;
       
       // Subscribe to push service
       const pushSubscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        applicationServerKey: urlBase64ToUint8Array(currentVapidKey)
       });
 
       setSubscription(pushSubscription);
