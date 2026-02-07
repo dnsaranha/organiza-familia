@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowUpRight, ArrowDownRight, Clock, AlertTriangle, User, Calendar as CalendarIcon, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp } from "lucide-react";
+import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,6 @@ import * as XLSX from 'xlsx';
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ErrorBoundary from "./ErrorBoundary";
@@ -24,9 +23,9 @@ import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { TransactionForm } from "./TransactionForm";
-import { expenseCategories, incomeCategories } from "@/lib/budget-categories";
 import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 import { useUserCategories } from "@/hooks/useUserCategories";
+import { autoCategorize } from "@/lib/finance-utils";
 
 type Transaction = Tables<'transactions'>;
 
@@ -49,75 +48,23 @@ interface ImportedRow {
   Tipo?: 'income' | 'expense' | 'receita' | 'despesa';
 }
 
-// Helper function to infer category from description
-const inferCategoryFromDescription = (description: string, type: 'income' | 'expense'): string => {
-  const desc = description.toLowerCase();
-  
-  // Income categories inference
-  if (type === 'income') {
-    if (desc.includes('salario') || desc.includes('salário') || desc.includes('pgto') || desc.includes('pagamento')) return 'Salário';
-    if (desc.includes('freelance') || desc.includes('serviço') || desc.includes('servico')) return 'Freelance';
-    if (desc.includes('dividendo') || desc.includes('rendimento') || desc.includes('juros') || desc.includes('investimento')) return 'Investimentos';
-    if (desc.includes('presente') || desc.includes('gift')) return 'Presente';
-    if (desc.includes('bonus') || desc.includes('bônus')) return 'Bônus';
-    if (desc.includes('aluguel')) return 'Aluguel Recebido';
-    return 'Outros';
-  }
-  
-  // Expense categories inference
-  if (desc.includes('aluguel') || desc.includes('rent') || desc.includes('condominio') || desc.includes('condomínio')) return 'Aluguel';
-  if (desc.includes('agua') || desc.includes('água') || desc.includes('saneamento')) return 'Água';
-  if (desc.includes('luz') || desc.includes('energia') || desc.includes('eletric')) return 'Luz';
-  if (desc.includes('internet') || desc.includes('wifi') || desc.includes('net') || desc.includes('banda larga')) return 'Internet';
-  if (desc.includes('telefone') || desc.includes('celular') || desc.includes('tel') || desc.includes('mobile')) return 'Telefone';
-  if (desc.includes('mercado') || desc.includes('supermercado') || desc.includes('compras') || desc.includes('pão de açúcar') || desc.includes('carrefour') || desc.includes('extra')) return 'Mercado';
-  if (desc.includes('restaurante') || desc.includes('lanche') || desc.includes('pizza') || desc.includes('hamburger') || desc.includes('ifood') || desc.includes('rappi')) return 'Restaurante';
-  if (desc.includes('uber') || desc.includes('99') || desc.includes('taxi') || desc.includes('táxi') || desc.includes('combustivel') || desc.includes('combustível') || desc.includes('gasolina') || desc.includes('posto')) return 'Transporte';
-  if (desc.includes('farmacia') || desc.includes('farmácia') || desc.includes('drogaria') || desc.includes('medic') || desc.includes('hospital') || desc.includes('consulta') || desc.includes('exame')) return 'Saúde';
-  if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('prime') || desc.includes('cinema') || desc.includes('show') || desc.includes('ingresso') || desc.includes('lazer')) return 'Entretenimento';
-  if (desc.includes('roupa') || desc.includes('shopping') || desc.includes('loja') || desc.includes('compra')) return 'Compras';
-  if (desc.includes('curso') || desc.includes('escola') || desc.includes('faculdade') || desc.includes('livro') || desc.includes('udemy') || desc.includes('alura')) return 'Educação';
-  if (desc.includes('viagem') || desc.includes('hotel') || desc.includes('passagem') || desc.includes('airbnb') || desc.includes('booking')) return 'Viagem';
-  if (desc.includes('investimento') || desc.includes('aplicação') || desc.includes('aplicacao') || desc.includes('ação') || desc.includes('acao') || desc.includes('fii')) return 'Investimentos';
-  if (desc.includes('poupança') || desc.includes('poupanca') || desc.includes('reserva')) return 'Poupança';
-  
-  return 'Outros';
-};
-
 // Helper function to parse value removing currency symbols
 const parseValueFromString = (value: string | number): number => {
   if (typeof value === 'number') return Math.abs(value);
-  
   const strValue = String(value).trim();
-  
-  // Check if it's negative (has minus sign or parentheses)
   const isNegative = strValue.startsWith('-') || strValue.startsWith('(');
-  
-  // Remove R$, $, spaces, and currency symbols
-  let cleanValue = strValue
-    .replace(/R\$\s*/gi, '')
-    .replace(/\$\s*/g, '')
-    .replace(/[()]/g, '')
-    .replace(/-/g, '')
-    .trim();
-  
-  // Handle Brazilian format (1.234,56) vs American format (1,234.56)
-  // If there's a comma followed by exactly 2 digits at the end, it's Brazilian format
+  let cleanValue = strValue.replace(/R\$\s*/gi, '').replace(/\$\s*/g, '').replace(/[()]/g, '').replace(/-/g, '').trim();
   if (/,\d{2}$/.test(cleanValue)) {
-    // Brazilian format: remove dots (thousands), convert comma to dot (decimal)
     cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
   } else if (/\.\d{2}$/.test(cleanValue)) {
-    // American format: remove commas (thousands)
     cleanValue = cleanValue.replace(/,/g, '');
   } else {
-    // Fallback: remove all dots and commas except the last one
     const parts = cleanValue.split(/[.,]/);
     if (parts.length > 1) {
       const lastPart = parts.pop();
       cleanValue = parts.join('') + '.' + lastPart;
     }
   }
-  
   const parsed = parseFloat(cleanValue);
   return isNaN(parsed) ? 0 : Math.abs(parsed);
 };
@@ -125,22 +72,14 @@ const parseValueFromString = (value: string | number): number => {
 // Helper function to parse date in multiple formats
 const parseDateString = (dateStr: string | number): Date | null => {
   if (!dateStr) return null;
-  
-  // Handle Excel serial date number
   if (typeof dateStr === 'number') {
-    // Excel serial date: days since 1899-12-30
     const excelEpoch = new Date(1899, 11, 30);
     const date = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000);
     if (!isNaN(date.getTime())) return date;
   }
-  
   const str = String(dateStr).trim();
-  
-  // Try ISO format first (yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss)
   let date = new Date(str);
   if (!isNaN(date.getTime()) && str.includes('-') && str.length >= 10) return date;
-  
-  // Try dd/mm/yyyy format
   const ddmmyyyy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
   const match = str.match(ddmmyyyy);
   if (match) {
@@ -148,8 +87,6 @@ const parseDateString = (dateStr: string | number): Date | null => {
     date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     if (!isNaN(date.getTime())) return date;
   }
-  
-  // Try dd/mm/yy format
   const ddmmyy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/;
   const matchYY = str.match(ddmmyy);
   if (matchYY) {
@@ -158,7 +95,6 @@ const parseDateString = (dateStr: string | number): Date | null => {
     date = new Date(fullYear, parseInt(month) - 1, parseInt(day));
     if (!isNaN(date.getTime())) return date;
   }
-  
   return null;
 };
 
@@ -168,8 +104,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const { userCategories } = useUserCategories();
-
+  const { userCategories, loading: categoriesLoading } = useUserCategories();
+  const [transactionCategories, setTransactionCategories] = useState<string[]>([]);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -178,6 +114,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [budgetFilter, setBudgetFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
 
@@ -191,6 +128,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         query = query.is('group_id', null);
       } else if (budgetFilter !== 'all') {
         query = query.eq('group_id', budgetFilter);
+      }
+
+      if (categoryFilter !== 'all') {
+        query = query.eq('category', categoryFilter);
       }
 
       if (dateRange?.from) {
@@ -211,7 +152,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     } finally {
       setLoading(false);
     }
-  }, [budgetFilter, dateRange]);
+  }, [budgetFilter, categoryFilter, dateRange]);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -225,8 +166,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     const savedFilters = localStorage.getItem('transactionFilters');
     if (savedFilters) {
       try {
-        const { budget, date } = JSON.parse(savedFilters) as { budget: string; date: { from?: string, to?: string }};
+        const { budget, category, date } = JSON.parse(savedFilters) as { budget: string; category: string; date: { from?: string, to?: string }};
         if (budget) setBudgetFilter(budget);
+        if (category) setCategoryFilter(category);
         if (date) setDateRange({ from: date.from ? new Date(date.from) : undefined, to: date.to ? new Date(date.to) : undefined });
       } catch (e) {
         console.error("Failed to parse filters from localStorage", e);
@@ -238,9 +180,29 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   useEffect(() => {
     if (user) {
       fetchTransactions();
-      localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, date: dateRange }));
+      localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, category: categoryFilter, date: dateRange }));
     }
-  }, [user?.id, budgetFilter, dateRange, fetchTransactions]);
+  }, [user?.id, budgetFilter, categoryFilter, dateRange, fetchTransactions]);
+
+  // Fetch unique categories from transactions history
+  useEffect(() => {
+    const fetchTransactionCategories = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('category')
+        .not('category', 'is', null);
+      
+      if (!error && data) {
+        // Extract unique categories names
+        const uniqueCats = Array.from(new Set(data.map(t => t.category).filter(Boolean)));
+        setTransactionCategories(uniqueCats);
+      }
+    };
+    
+    fetchTransactionCategories();
+  }, [user]);
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));
@@ -251,7 +213,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   };
 
   const handleImportClick = () => {
-    setImportGroupId(null); // Reset to personal by default
+    setImportGroupId(null);
     setShowImportDialog(true);
   };
   
@@ -260,42 +222,16 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   };
   
   const handleDownloadTemplate = () => {
-    // Create template with example rows
     const templateData = [
-      { 
-        'Data': '15/01/2024', 
-        'Descrição': 'Salário mensal', 
-        'Categoria': 'Salário', 
-        'Valor': 'R$ 5.000,00', 
-        'Tipo': 'receita' 
-      },
-      { 
-        'Data': '16/01/2024', 
-        'Descrição': 'Compras no supermercado', 
-        'Categoria': 'Mercado', 
-        'Valor': 'R$ 450,50', 
-        'Tipo': 'despesa' 
-      },
+      { 'Data': '15/01/2024', 'Descrição': 'Salário mensal', 'Categoria': 'Salário', 'Valor': 'R$ 5.000,00', 'Tipo': 'receita' },
+      { 'Data': '16/01/2024', 'Descrição': 'Compras no supermercado', 'Categoria': 'Mercado', 'Valor': 'R$ 450,50', 'Tipo': 'despesa' },
     ];
-    
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 12 },  // Data
-      { wch: 30 },  // Descrição
-      { wch: 15 },  // Categoria
-      { wch: 15 },  // Valor
-      { wch: 10 },  // Tipo
-    ];
-    
+    worksheet['!cols'] = [ { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 10 } ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
     XLSX.writeFile(workbook, "modelo_importacao_transacoes.xlsx");
-    
-    toast.success("Arquivo modelo baixado!", { 
-      description: "Use este modelo para importar suas transações." 
-    });
+    toast.success("Arquivo modelo baixado!", { description: "Use este modelo para importar suas transações." });
     setShowImportDialog(false);
   };
 
@@ -321,33 +257,26 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         const newTransactions: TablesInsert<'transactions'>[] = [];
 
         for (const row of importedData) {
-          // Get date from Data or Data/Hora field
           const dateStr = row['Data'] || row['Data/Hora'];
           if (!dateStr || !row.Valor) { ignoredCount++; continue; }
-          
-          // Check for existing ID
           if (row.ID && existingIdSet.has(row.ID)) { ignoredCount++; continue; }
           
-          // Parse date with multiple format support
           const transactionDate = parseDateString(dateStr);
           if (!transactionDate) { ignoredCount++; continue; }
           
-          // Parse value removing currency symbols
           const transactionValue = parseValueFromString(row.Valor);
           if (isNaN(transactionValue) || transactionValue === 0) { ignoredCount++; continue; }
           
-          // Determine transaction type
           const rawType = row.Tipo?.toLowerCase();
           let transactionType: 'income' | 'expense' = 'expense';
           if (rawType === 'income' || rawType === 'receita') {
             transactionType = 'income';
           }
           
-          // Auto-categorize if category is empty
           let category = row.Categoria?.trim();
           if (!category) {
             const description = row.Descrição || '';
-            category = inferCategoryFromDescription(description, transactionType);
+            category = autoCategorize(description, userCategories, transactionType) || 'Outros';
           }
           
           const compositeKey = `${transactionDate.toISOString()}|${transactionValue}|${category}`;
@@ -362,7 +291,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             group_id: importGroupId 
           };
           
-          // Only include ID if it was provided
           if (row.ID) {
             transactionData.id = row.ID;
           }
@@ -413,6 +341,11 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const renderSkeleton = () => ( <div className="space-y-4"> {[...Array(3)].map((_, i) => ( <div key={i} className="flex items-center justify-between p-3"> <div className="flex items-center gap-3"> <Skeleton className="h-10 w-10 rounded-full" /> <div className="space-y-2"> <Skeleton className="h-4 w-[150px]" /> <Skeleton className="h-3 w-[100px]" /> </div> </div> <Skeleton className="h-6 w-[80px]" /> </div> ))} </div> );
   const fallbackUI = ( <Card><CardHeader><CardTitle>Erro</CardTitle></CardHeader><CardContent><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Erro ao carregar o histórico</AlertTitle><AlertDescription>Não foi possível carregar o histórico. Tente novamente.</AlertDescription></Alert></CardContent></Card> );
 
+  const allSortedCategories = Array.from(new Set([
+    ...userCategories.map(c => c.name),
+    ...transactionCategories
+  ])).sort((a, b) => a.localeCompare(b));
+
   return (
     <ErrorBoundary fallback={fallbackUI}>
       <Card className="bg-gradient-card shadow-card border">
@@ -425,20 +358,45 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
-               <div className="flex flex-col gap-4 mb-4">
-                <div className="flex gap-2 justify-start md:justify-end">
-                   <input type="file" ref={importFileInputRef} className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                {/* Filter Controls */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Select value={budgetFilter} onValueChange={setBudgetFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por orçamento" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">Todos Orçamentos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent>
+                  </Select>
+                  
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por categoria" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas Categorias</SelectItem>
+                      {allSortedCategories.map(categoryName => ( 
+                        <SelectItem key={categoryName} value={categoryName}>{categoryName}</SelectItem> 
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button id="date" variant={"outline"} className={"w-full sm:w-auto justify-start text-left font-normal"}>
+                        <LucideIcons.Calendar className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "d/MM/yy")} - ${format(dateRange.to, "d/MM/yy")}`) : format(dateRange.from, "d/MM/yy")) : (<span>Período</span>)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 justify-start sm:justify-end flex-shrink-0">
+                  <input type="file" ref={importFileInputRef} className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
                   <Button variant="outline" size="sm" onClick={handleImportClick}><Upload className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Importar</span></Button>
                   <Button variant="outline" size="sm" onClick={handleExport} disabled={transactions.length === 0}><Download className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Exportar</span></Button>
-                </div>
-                <div className="flex flex-col md:flex-row gap-2 w-full">
-                  <Select value={budgetFilter} onValueChange={setBudgetFilter}><SelectTrigger className="w-full md:w-[240px]"><SelectValue placeholder="Filtrar por orçamento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent></Select>
-                  <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className="w-full md:w-auto justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`) : format(dateRange.from, "LLL dd, y")) : (<span>Selecione</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
                 </div>
               </div>
 
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
-                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada.</p></div> : (
+                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada para os filtros selecionados.</p></div> : (
                     transactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
@@ -498,7 +456,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             onSave={() => {
               setEditingTransaction(null);
               onTransactionChange();
-              fetchTransactions(); // Adicionado para re-buscar a lista
+              fetchTransactions();
             }}
             onCancel={() => setEditingTransaction(null)}
           />
@@ -518,7 +476,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Import Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -528,7 +485,6 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
             </DialogDescription>
           </DialogHeader>
           
-          {/* Group Selection */}
           <div className="space-y-3 py-2">
             <label className="text-sm font-medium">Importar para:</label>
             <Select value={importGroupId || 'personal'} onValueChange={(v) => setImportGroupId(v === 'personal' ? null : v)}>

@@ -1,16 +1,8 @@
-export interface Transaction {
-  id: string;
-  ticker: string;
-  asset_name: string;
-  asset_type: string;
-  transaction_type: "buy" | "sell";
-  quantity: number;
-  price: number;
-  transaction_date: string;
-  fees: number;
-  notes: string | null;
-  user_id?: string;
-}
+import { Tables } from "@/integrations/supabase/types";
+
+// Re-exporting for broader use
+export type InvestmentTransaction = Tables<'investment_transactions'>;
+export type UserCategory = Tables<'user_categories'>;
 
 export interface Position {
   ticker: string;
@@ -21,10 +13,14 @@ export interface Position {
   averagePrice: number;
 }
 
-export const calculateManualPositions = (transactions: Transaction[]): Position[] => {
-  const byTicker: Record<string, Transaction[]> = {};
+/**
+ * Calculates current investment positions based on a list of transactions.
+ * @param transactions - A list of investment transactions.
+ * @returns An array of calculated positions.
+ */
+export const calculateManualPositions = (transactions: InvestmentTransaction[]): Position[] => {
+  const byTicker: Record<string, InvestmentTransaction[]> = {};
 
-  // Group transactions by ticker
   transactions.forEach(t => {
     const ticker = t.ticker.toUpperCase();
     if (!byTicker[ticker]) byTicker[ticker] = [];
@@ -34,7 +30,6 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
   const positions: Position[] = [];
 
   for (const ticker in byTicker) {
-    // Sort by date ascending for correct average price calculation
     const txs = byTicker[ticker].sort((a, b) =>
       new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime()
     );
@@ -42,21 +37,19 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
     let quantity = 0;
     let totalCostBasis = 0;
     let assetName = txs[0]?.asset_name || ticker;
-    let assetType = txs[0]?.asset_type || 'OTHER'; // Default to 'OTHER' if not specified
+    let assetType = txs[0]?.asset_type || 'OTHER';
 
     for (const t of txs) {
-      // Update asset name and type to the most recent one if available
       if (t.asset_name) assetName = t.asset_name;
       if (t.asset_type) assetType = t.asset_type;
 
       if (t.transaction_type === 'buy') {
-        const cost = (t.quantity * t.price) + t.fees;
+        const cost = (t.quantity * t.price) + (t.fees || 0);
         totalCostBasis += cost;
         quantity += t.quantity;
       } else if (t.transaction_type === 'sell') {
          if (quantity > 0) {
             const avgPrice = totalCostBasis / quantity;
-            // When selling, we reduce the cost basis proportionally
             const costOfSold = t.quantity * avgPrice;
             totalCostBasis -= costOfSold;
             quantity -= t.quantity;
@@ -64,12 +57,11 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
       }
     }
 
-    // Filter out closed positions or near-zero quantities
     if (quantity > 0.000001) {
         positions.push({
             ticker,
             asset_name: assetName,
-            asset_type: assetType, // Include asset_type
+            asset_type: assetType,
             quantity,
             totalCost: totalCostBasis,
             averagePrice: totalCostBasis / quantity
@@ -78,4 +70,44 @@ export const calculateManualPositions = (transactions: Transaction[]): Position[
   }
 
   return positions;
+};
+
+/**
+ * Auto-categorizes a transaction based on its description and user-defined category keywords.
+ * @param description - The transaction description.
+ * @param categories - An array of user-defined categories with their keywords.
+ * @param type - The transaction type ('income' or 'expense').
+ * @returns The name of the matched category or null if no match is found.
+ */
+export const autoCategorize = (
+  description: string,
+  categories: UserCategory[],
+  type: 'income' | 'expense'
+): string | null => {
+  if (!description || !categories) {
+    return null;
+  }
+
+  const lowerCaseDescription = description.toLowerCase();
+
+  // Create a map for faster lookups
+  const categoryMap = new Map<string, string[]>();
+  for (const category of categories) {
+    if (category.type === type && category.keywords) {
+        categoryMap.set(category.name, category.keywords.map(kw => kw.toLowerCase()));
+    }
+  }
+
+  // Iterate through the map to find a match
+  for (const [categoryName, keywords] of categoryMap.entries()) {
+    for (const keyword of keywords) {
+      // Using a regex with word boundaries to avoid partial matches (e.g., 'art' in 'cart')
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(lowerCaseDescription)) {
+        return categoryName;
+      }
+    }
+  }
+
+  return null;
 };

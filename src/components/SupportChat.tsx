@@ -103,8 +103,8 @@ export const SupportChat = () => {
                 setUnreadCount(prev => prev + 1);
                 setIsVisible(true);
               } else {
-                // If chat is open, update timestamp to mark as seen immediately
-                localStorage.setItem('support_chat_last_seen_at', new Date().toISOString());
+                // If chat is open, immediately mark the new message as read
+                markMessagesAsRead();
               }
             }
           })
@@ -125,74 +125,34 @@ export const SupportChat = () => {
   }, [user, calculateUnread]);
 
   // Scroll management
-  const scrollToMessage = useCallback(() => {
-    if (!scrollRef.current) return;
-
-    // If opening chat, try to scroll to last visualized message
-    const lastSeen = localStorage.getItem('support_chat_last_seen_at');
-    let targetMessageId: string | null = null;
-
-    if (lastSeen && messages.length > 0) {
-        // Find the LAST message that was <= lastSeen
-        // Since messages are sorted ascending:
-        // iterate backwards? or just filter.
-        const seenMessages = messages.filter(m => new Date(m.created_at) <= new Date(lastSeen));
-        if (seenMessages.length > 0) {
-            targetMessageId = seenMessages[seenMessages.length - 1].id;
-        }
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }, []);
 
-    if (targetMessageId) {
-        const element = document.getElementById(`msg-${targetMessageId}`);
-        if (element) {
-            element.scrollIntoView({ behavior: 'auto', block: 'start' });
-            return;
-        }
-    }
-
-    // Fallback: Scroll to bottom
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
-
-
-  // Effect to handle scroll on Open
+  // Effect to scroll to bottom when chat opens or new messages arrive
   useEffect(() => {
       if (isOpen) {
-          // Use setTimeout to ensure DOM is rendered
-          setTimeout(scrollToMessage, 100);
+          setTimeout(scrollToBottom, 50);
       }
-  }, [isOpen, scrollToMessage]);
-
-
-  useEffect(() => {
-      if (isOpen) {
-          setTimeout(scrollToMessage, 100);
-      }
-  }, [messages, isOpen, scrollToMessage]);
-
+  }, [isOpen, messages, scrollToBottom]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setSending(true);
 
-    // Optimistic update
     const tempId = crypto.randomUUID();
     const tempMessage: Message = {
         id: tempId,
         message: newMessage.trim(),
         is_from_admin: false,
-        is_read: true,
+        is_read: true, // User's own messages are always considered read
         created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage('');
-
-    // Scroll to bottom immediately
-    setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
-    }, 50);
+    scrollToBottom(); // Optimistic scroll
 
     try {
       const { data, error } = await supabase.from('support_messages').insert({
@@ -202,14 +162,12 @@ export const SupportChat = () => {
       }).select().single();
       if (error) throw error;
 
-      // Replace temp message with real one to get real ID and created_at
       if (data) {
           setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
       }
 
     } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
-      // Remove temp message on error
+      toast({ title: 'Erro ao enviar mensagem', description: err.message, variant: 'destructive' });
       setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
@@ -227,30 +185,34 @@ export const SupportChat = () => {
     if (unreadIds.length === 0) return;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('support_messages')
         .update({ is_read: true })
         .in('id', unreadIds);
 
-      // Update local state
+      if (error) throw error; // Throw error to be caught below
+
+      // Update local state ONLY on successful DB update
       setMessages(prev => prev.map(m => 
         unreadIds.includes(m.id) ? { ...m, is_read: true } : m
       ));
       setUnreadCount(0);
     } catch (err) {
       console.error('Error marking messages as read:', err);
+      // Do not hide the count if the update fails
+      toast({ title: 'Erro de Sincronização', description: 'Não foi possível marcar as mensagens como lidas. Verifique sua conexão.', variant: 'destructive' });
     }
-  }, [user, messages]);
+  }, [user, messages, toast]);
 
   const handleOpenChat = () => {
     setIsOpen(true);
-    setUnreadCount(0);
     // Mark messages as read when opening chat
     markMessagesAsRead();
   };
 
   const handleCloseChat = () => {
     setIsOpen(false);
+    // Hide bubble only if there are no unread messages
     if (unreadCount === 0) {
       setIsVisible(false);
     }
@@ -266,7 +228,7 @@ export const SupportChat = () => {
       {isVisible && !isOpen && (
         <Button
           onClick={handleOpenChat}
-          className="fixed bottom-20 right-4 z-[100] rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90"
+          className="fixed bottom-20 right-4 z-[100] rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90 animate-in fade-in zoom-in-95"
           size="icon"
         >
           <MessageCircle className="h-6 w-6" />
@@ -282,10 +244,10 @@ export const SupportChat = () => {
       )}
 
       {isOpen && (
-        <Card className="fixed bottom-20 right-4 z-[100] w-[calc(100vw-2rem)] max-w-80 h-80 md:h-96 shadow-xl flex flex-col">
+        <Card className="fixed bottom-20 right-4 z-[100] w-[calc(100vw-2rem)] max-w-sm h-96 md:h-[28rem] shadow-xl flex flex-col animate-in fade-in-90 slide-in-from-bottom-4">
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b flex-shrink-0">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" /> Suporte
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" /> Suporte ao Cliente
             </CardTitle>
             <Button variant="ghost" size="icon" onClick={handleCloseChat}>
               <X className="h-4 w-4" />
@@ -296,14 +258,14 @@ export const SupportChat = () => {
               {loading && messages.length === 0 ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Envie uma mensagem para iniciar o chat.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma mensagem ainda. Envie uma para começar!</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {messages.map((msg) => (
-                    <div key={msg.id} id={`msg-${msg.id}`} className={`flex ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
-                      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${msg.is_from_admin ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
-                        {msg.is_from_admin && <Badge variant="outline" className="mb-1 text-xs">Suporte</Badge>}
-                        <p>{msg.message}</p>
+                    <div key={msg.id} id={`msg-${msg.id}`} className={`flex text-sm ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
+                      <div className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.is_from_admin ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground'}`}>
+                         <p>{msg.message}</p>
+                         <p className="text-xs text-right mt-1 ${msg.is_from_admin ? 'text-muted-foreground' : 'text-blue-200'}">{new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit'})}</p>
                       </div>
                     </div>
                   ))}
