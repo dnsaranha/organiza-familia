@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp } from "lucide-react";
+import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -104,7 +104,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const { userCategories } = useUserCategories();
+  const { userCategories, loading: categoriesLoading } = useUserCategories();
 
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -114,6 +114,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [budgetFilter, setBudgetFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
 
@@ -127,6 +128,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         query = query.is('group_id', null);
       } else if (budgetFilter !== 'all') {
         query = query.eq('group_id', budgetFilter);
+      }
+
+      if (categoryFilter !== 'all') {
+        query = query.eq('category', categoryFilter);
       }
 
       if (dateRange?.from) {
@@ -147,7 +152,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     } finally {
       setLoading(false);
     }
-  }, [budgetFilter, dateRange]);
+  }, [budgetFilter, categoryFilter, dateRange]);
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -161,8 +166,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     const savedFilters = localStorage.getItem('transactionFilters');
     if (savedFilters) {
       try {
-        const { budget, date } = JSON.parse(savedFilters) as { budget: string; date: { from?: string, to?: string }};
+        const { budget, category, date } = JSON.parse(savedFilters) as { budget: string; category: string; date: { from?: string, to?: string }};
         if (budget) setBudgetFilter(budget);
+        if (category) setCategoryFilter(category);
         if (date) setDateRange({ from: date.from ? new Date(date.from) : undefined, to: date.to ? new Date(date.to) : undefined });
       } catch (e) {
         console.error("Failed to parse filters from localStorage", e);
@@ -174,9 +180,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   useEffect(() => {
     if (user) {
       fetchTransactions();
-      localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, date: dateRange }));
+      localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, category: categoryFilter, date: dateRange }));
     }
-  }, [user?.id, budgetFilter, dateRange, fetchTransactions]);
+  }, [user?.id, budgetFilter, categoryFilter, dateRange, fetchTransactions]);
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));
@@ -187,7 +193,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   };
 
   const handleImportClick = () => {
-    setImportGroupId(null); // Reset to personal by default
+    setImportGroupId(null);
     setShowImportDialog(true);
   };
   
@@ -315,6 +321,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const renderSkeleton = () => ( <div className="space-y-4"> {[...Array(3)].map((_, i) => ( <div key={i} className="flex items-center justify-between p-3"> <div className="flex items-center gap-3"> <Skeleton className="h-10 w-10 rounded-full" /> <div className="space-y-2"> <Skeleton className="h-4 w-[150px]" /> <Skeleton className="h-3 w-[100px]" /> </div> </div> <Skeleton className="h-6 w-[80px]" /> </div> ))} </div> );
   const fallbackUI = ( <Card><CardHeader><CardTitle>Erro</CardTitle></CardHeader><CardContent><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Erro ao carregar o histórico</AlertTitle><AlertDescription>Não foi possível carregar o histórico. Tente novamente.</AlertDescription></Alert></CardContent></Card> );
 
+  const allSortedCategories = [...userCategories].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <ErrorBoundary fallback={fallbackUI}>
       <Card className="bg-gradient-card shadow-card border">
@@ -327,20 +335,40 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
-               <div className="flex flex-col gap-4 mb-4">
-                <div className="flex gap-2 justify-start md:justify-end">
-                   <input type="file" ref={importFileInputRef} className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                {/* Filter Controls */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Select value={budgetFilter} onValueChange={setBudgetFilter}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por orçamento" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">Todos Orçamentos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent>
+                  </Select>
+                  
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter} disabled={categoriesLoading}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por categoria" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">Todas Categorias</SelectItem>{allSortedCategories.map(cat => ( <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem> ))}</SelectContent>
+                  </Select>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button id="date" variant={"outline"} className={"w-full sm:w-auto justify-start text-left font-normal"}>
+                        <LucideIcons.Calendar className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "d/MM/yy")} - ${format(dateRange.to, "d/MM/yy")}`) : format(dateRange.from, "d/MM/yy")) : (<span>Período</span>)}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 justify-start sm:justify-end flex-shrink-0">
+                  <input type="file" ref={importFileInputRef} className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
                   <Button variant="outline" size="sm" onClick={handleImportClick}><Upload className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Importar</span></Button>
                   <Button variant="outline" size="sm" onClick={handleExport} disabled={transactions.length === 0}><Download className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Exportar</span></Button>
-                </div>
-                <div className="flex flex-col md:flex-row gap-2 w-full">
-                  <Select value={budgetFilter} onValueChange={setBudgetFilter}><SelectTrigger className="w-full md:w-[240px]"><SelectValue placeholder="Filtrar por orçamento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent></Select>
-                  <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className="w-full md:w-auto justify-start text-left font-normal"><LucideIcons.Calendar className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}`) : format(dateRange.from, "LLL dd, y")) : (<span>Selecione</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
                 </div>
               </div>
 
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
-                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada.</p></div> : (
+                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada para os filtros selecionados.</p></div> : (
                     transactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
