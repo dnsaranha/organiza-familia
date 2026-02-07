@@ -164,7 +164,7 @@ const CashFlowChart = ({ data, openingBalance = 0 }: CashFlowChartProps) => {
             variant={interval === "day" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setInterval("day")}
-            className={`h-7 text-xs font-bold rounded-lg transition-all ${interval === "day" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`h-7 text-xs font-bold rounded-lg transition-all ${interval === "day" ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
             Diário
           </Button>
@@ -172,7 +172,7 @@ const CashFlowChart = ({ data, openingBalance = 0 }: CashFlowChartProps) => {
             variant={interval === "week" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setInterval("week")}
-            className={`h-7 text-xs font-bold rounded-lg transition-all ${interval === "week" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`h-7 text-xs font-bold rounded-lg transition-all ${interval === "week" ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "text-muted-foreground hover:text-foreground"}`}
           >
             Semanal
           </Button>
