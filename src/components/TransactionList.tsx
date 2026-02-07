@@ -105,7 +105,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const { user } = useAuth();
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const { userCategories, loading: categoriesLoading } = useUserCategories();
-
+  const [transactionCategories, setTransactionCategories] = useState<string[]>([]);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -183,6 +183,26 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
       localStorage.setItem('transactionFilters', JSON.stringify({ budget: budgetFilter, category: categoryFilter, date: dateRange }));
     }
   }, [user?.id, budgetFilter, categoryFilter, dateRange, fetchTransactions]);
+
+  // Fetch unique categories from transactions history
+  useEffect(() => {
+    const fetchTransactionCategories = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('category')
+        .not('category', 'is', null);
+      
+      if (!error && data) {
+        // Extract unique categories names
+        const uniqueCats = Array.from(new Set(data.map(t => t.category).filter(Boolean)));
+        setTransactionCategories(uniqueCats);
+      }
+    };
+    
+    fetchTransactionCategories();
+  }, [user]);
 
   const handleExport = () => {
     const dataToExport = transactions.map(t => ({ 'ID': t.id, 'Data/Hora': format(new Date(t.date), "yyyy-MM-dd'T'HH:mm:ss"), 'Descrição': t.description, 'Categoria': t.category, 'Valor': t.amount, 'Tipo': t.type }));
@@ -321,7 +341,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const renderSkeleton = () => ( <div className="space-y-4"> {[...Array(3)].map((_, i) => ( <div key={i} className="flex items-center justify-between p-3"> <div className="flex items-center gap-3"> <Skeleton className="h-10 w-10 rounded-full" /> <div className="space-y-2"> <Skeleton className="h-4 w-[150px]" /> <Skeleton className="h-3 w-[100px]" /> </div> </div> <Skeleton className="h-6 w-[80px]" /> </div> ))} </div> );
   const fallbackUI = ( <Card><CardHeader><CardTitle>Erro</CardTitle></CardHeader><CardContent><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Erro ao carregar o histórico</AlertTitle><AlertDescription>Não foi possível carregar o histórico. Tente novamente.</AlertDescription></Alert></CardContent></Card> );
 
-  const allSortedCategories = [...userCategories].sort((a, b) => a.name.localeCompare(b.name));
+  const allSortedCategories = Array.from(new Set([
+    ...userCategories.map(c => c.name),
+    ...transactionCategories
+  ])).sort((a, b) => a.localeCompare(b));
 
   return (
     <ErrorBoundary fallback={fallbackUI}>
@@ -343,9 +366,14 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                     <SelectContent><SelectItem value="all">Todos Orçamentos</SelectItem><SelectItem value="personal">Pessoal</SelectItem>{groups.map(group => ( <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem> ))}</SelectContent>
                   </Select>
                   
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter} disabled={categoriesLoading}>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por categoria" /></SelectTrigger>
-                    <SelectContent><SelectItem value="all">Todas Categorias</SelectItem>{allSortedCategories.map(cat => ( <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem> ))}</SelectContent>
+                    <SelectContent>
+                      <SelectItem value="all">Todas Categorias</SelectItem>
+                      {allSortedCategories.map(categoryName => ( 
+                        <SelectItem key={categoryName} value={categoryName}>{categoryName}</SelectItem> 
+                      ))}
+                    </SelectContent>
                   </Select>
 
                   <Popover>
