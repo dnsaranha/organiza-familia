@@ -2,8 +2,8 @@ import { Tables } from "@/integrations/supabase/types";
 
 // Re-exporting for broader use
 export type InvestmentTransaction = Tables<'investment_transactions'>;
+export type Transaction = Tables<'investment_transactions'>; // Alias for compatibility
 export type UserCategory = Tables<'user_categories'>;
-
 export interface Position {
   ticker: string;
   asset_name: string;
@@ -81,7 +81,7 @@ export const calculateManualPositions = (transactions: InvestmentTransaction[]):
  */
 export const autoCategorize = (
   description: string,
-  categories: UserCategory[],
+  categories: { name: string; type: string; keywords?: string[] | null }[],
   type: 'income' | 'expense'
 ): string | null => {
   if (!description || !categories) {

@@ -13,6 +13,7 @@ interface UserCategory {
   icon: string;
   color: string;
   is_default: boolean;
+  keywords: string[] | null;
 }
 
 export const useUserCategories = () => {

@@ -65,7 +65,7 @@ export const CategoryManager = ({ onCategoriesChange }: CategoryManagerProps) =>
     if (!user) return;
     setLoading(true);
     try {
-      let query = supabase.from("user_categories").select("*_id,name,type,icon,color,is_default,keywords");
+      let query = supabase.from("user_categories").select("id,user_id,group_id,name,type,icon,color,is_default,keywords");
 
       if (scope === "personal") {
         query = query.is("group_id", null).eq("user_id", user.id);

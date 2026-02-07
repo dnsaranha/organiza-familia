@@ -895,6 +895,7 @@ export type Database = {
           icon: string
           id: string
           is_default: boolean
+          keywords: string[] | null
           name: string
           type: string
           updated_at: string
@@ -907,6 +908,7 @@ export type Database = {
           icon?: string
           id?: string
           is_default?: boolean
+          keywords?: string[] | null
           name: string
           type: string
           updated_at?: string
@@ -919,6 +921,7 @@ export type Database = {
           icon?: string
           id?: string
           is_default?: boolean
+          keywords?: string[] | null
           name?: string
           type?: string
           updated_at?: string
