@@ -404,7 +404,13 @@ export default function Profile() {
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" size="sm" disabled={clearingData}>
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        size="sm" 
+                        disabled={clearingData}
+                        data-tutorial="clear-data"
+                      >
                         {clearingData ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (

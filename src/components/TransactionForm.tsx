@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Minus, Loader2, Users, AlertTriangle, Pencil } from "lucide-react";
+import { Plus, Minus, Loader2, Users, AlertTriangle, Pencil, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +14,10 @@ import ErrorBoundary from "./ErrorBoundary";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useUserCategories } from "@/hooks/useUserCategories";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type Transaction = Tables<'transactions'>;
 
@@ -35,6 +39,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [date, setDate] = useState<Date>(new Date());
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,6 +68,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
       setAmountValue(transactionToEdit.amount);
       setCategory(transactionToEdit.category);
       setDescription(transactionToEdit.description || '');
+      setDate(new Date(transactionToEdit.date));
       setGroupId(transactionToEdit.group_id);
     } else {
       // Reseta o formulário se não estiver em modo de edição (ex: ao criar uma nova transação)
@@ -70,6 +76,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
       setAmountValue(0);
       setCategory('');
       setDescription('');
+      setDate(new Date());
       setGroupId(null);
     }
   }, [isEditMode, transactionToEdit, setAmountValue]);
@@ -88,8 +95,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
 
     setLoading(true);
     try {
-      const d = new Date();
-      const localDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const localDateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
       const transactionData = {
         user_id: user.id,
@@ -98,7 +104,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         amount: amountValue,
         category,
         description: description || null,
-        date: isEditMode ? transactionToEdit.date : localDateString,
+        date: localDateString,
         updated_at: new Date().toISOString(),
       };
 
@@ -128,6 +134,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         setAmountValue(0);
         setCategory('');
         setDescription('');
+        setDate(new Date());
         setGroupId(null);
       }
 
@@ -173,7 +180,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         <CardContent className="space-y-6">
           {/* Type Selector */}
           {!isEditMode && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg" data-tutorial="transaction-type">
               <Button
                 type="button"
                 variant={type === 'expense' ? 'default' : 'ghost'}
@@ -213,6 +220,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                   className="pl-10"
                   required
                   disabled={loading}
+                  data-tutorial="transaction-amount"
                 />
               </div>
             </div>
@@ -221,7 +229,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             <div className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
               <Select value={category} onValueChange={setCategory} required disabled={loading}>
-                <SelectTrigger>
+                <SelectTrigger data-tutorial="transaction-category">
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -254,6 +262,33 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
               </div>
             )}
 
+            {/* Date Picker */}
+            <div className="space-y-2">
+              <Label htmlFor="date">Data</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                    disabled={loading}
+                    data-tutorial="transaction-date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione a data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
+                    disabled={loading}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
             {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Descrição</Label>
@@ -264,6 +299,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                 onChange={(e) => setDescription(e.target.value)}
                 className="resize-none"
                 disabled={loading}
+                data-tutorial="transaction-description"
               />
             </div>
 
@@ -272,6 +308,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                 type="submit"
                 className="w-full bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
                 disabled={loading}
+                data-tutorial="submit-transaction"
               >
                 {loading ? (
                   <>

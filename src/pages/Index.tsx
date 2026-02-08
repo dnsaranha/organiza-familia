@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBudgetScope } from "@/contexts/BudgetScopeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { mapAccountSubtype } from "@/lib/account-mapping";
+import { Tutorial } from "@/components/Tutorial";
 import {
   Wallet,
   Building2,
@@ -169,6 +170,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Tutorial />
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
         <div className="mb-4 sm:mb-6 md:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">

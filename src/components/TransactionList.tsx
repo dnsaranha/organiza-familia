@@ -348,7 +348,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
   return (
     <ErrorBoundary fallback={fallbackUI}>
-      <Card className="bg-gradient-card shadow-card border">
+      <Card className="bg-gradient-card shadow-card border" data-tutorial="transaction-list">
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-6">
             <div className="flex items-center justify-between">

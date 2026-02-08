@@ -23,6 +23,7 @@ export const BottomNavBar = () => {
           onClick={() => setIsTransactionModalOpen(true)}
           className="absolute bottom-16 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-primary shadow-lg flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors z-50"
           aria-label="Nova Transação"
+          data-tutorial="add-transaction-button"
         >
           <Plus className="h-8 w-8" />
         </button>
