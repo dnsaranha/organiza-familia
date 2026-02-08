@@ -4,6 +4,11 @@
 
 /* Organiza - Sistema de design para gestão financeira familiar */
 
+/* Disable pinch zoom on mobile/tablet */
+html, body {
+  touch-action: manipulation;
+}
+
 @layer base {
   :root {
     /* Background & Surface Colors */
