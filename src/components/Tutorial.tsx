@@ -100,7 +100,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="transaction-amount"]',
@@ -115,7 +115,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="transaction-category"]',
@@ -130,7 +130,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="transaction-date"]',
@@ -145,7 +145,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="transaction-description"]',
@@ -159,7 +159,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="submit-transaction"]',
@@ -174,7 +174,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: "body",
@@ -252,7 +252,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-type"]',
@@ -267,7 +267,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-value"]',
@@ -282,7 +282,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-category"]',
@@ -296,7 +296,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-date"]',
@@ -310,7 +310,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-recurring"]',
@@ -325,7 +325,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: '[data-tutorial="task-submit"]',
@@ -340,7 +340,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+    
     },
     {
       target: "body",
