@@ -297,6 +297,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           <Label htmlFor="title">Título *</Label>
           <Input
             id="title"
+            data-tutorial="task-title"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="Ex: Pagar conta de luz"
@@ -306,7 +307,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         <div className="space-y-2">
           <Label htmlFor="task_type">Tipo de Tarefa</Label>
           <Select value={formData.task_type} onValueChange={(value: any) => setFormData({ ...formData, task_type: value })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger data-tutorial="task-type"><SelectValue /></SelectTrigger>
             <SelectContent>
               {taskTypes.map((type) => (
                 <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
@@ -322,6 +323,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
               <div className="flex items-center gap-2">
                 <Input
                     id="value"
+                    data-tutorial="task-value"
                     type="text"
                     inputMode="numeric"
                     value={amountDisplay}
@@ -349,6 +351,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           </div>
           <div className="space-y-2">
                 <Label htmlFor="category">Categoria *</Label>
+                <div data-tutorial="task-category">
                 <Combobox
                     options={categories}
                     value={formData.category}
@@ -363,6 +366,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
                     searchPlaceholder="Buscar categoria..."
                     noResultsMessage="Nenhuma categoria encontrada."
                 />
+                </div>
           </div>
       </div>
 
@@ -395,6 +399,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           <Label htmlFor="schedule_date">Data *</Label>
           <Input
             id="schedule_date"
+            data-tutorial="task-date"
             type="date"
             value={formData.schedule_date}
             onChange={(e) => setFormData({ ...formData, schedule_date: e.target.value })}
@@ -444,6 +449,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           <Label htmlFor="is_recurring" className="text-sm font-medium">Tarefa Recorrente</Label>
           <Switch
             id="is_recurring"
+            data-tutorial="task-recurring"
             checked={formData.is_recurring}
             onCheckedChange={(checked) => setFormData({ ...formData, is_recurring: checked })}
           />
@@ -500,7 +506,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button type="submit" data-tutorial="task-submit">
           {initialData?.id ? 'Salvar Alterações' : 'Agendar Tarefa'}
         </Button>
       </div>

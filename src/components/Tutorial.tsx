@@ -86,6 +86,20 @@ function getMainSteps(): Step[] {
       spotlightClicks: true,
     },
     {
+      target: "body",
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Formulário de Transação 📝</h3>
+          <p className="text-sm opacity-80">
+            Agora vamos preencher os campos necessários para registrar sua primeira
+            transação. Siga os próximos passos!
+          </p>
+        </div>
+      ),
+      placement: "center",
+      disableBeacon: true,
+    },
+    {
       target: '[data-tutorial="transaction-type"]',
       content: (
         <div>
@@ -254,6 +268,124 @@ function getTasksSteps(): Step[] {
       spotlightClicks: true,
     },
     {
+      target: "body",
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Formulário de Tarefa 📝</h3>
+          <p className="text-sm opacity-80">
+            Agora vamos preencher os campos para criar uma tarefa. Você pode
+            adicionar título, tipo, data, valor, categoria e configurar se será
+            recorrente!
+          </p>
+        </div>
+      ),
+      placement: "center",
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tutorial="task-title"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Título da Tarefa ✏️</h3>
+          <p className="text-sm opacity-80">
+            Digite um título para sua tarefa. Por exemplo: "Pagar conta de luz",
+            "Receber aluguel", etc.
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-type"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Tipo de Tarefa 🏷️</h3>
+          <p className="text-sm opacity-80">
+            Escolha o tipo: lembrete de pagamento, alerta de orçamento, lembrete
+            de receita ou personalizado.
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-date"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Data da Tarefa 📅</h3>
+          <p className="text-sm opacity-80">
+            Selecione quando você quer ser lembrado desta tarefa.
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-value"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Valor da Tarefa 💰</h3>
+          <p className="text-sm opacity-80">
+            Digite o valor associado à tarefa (opcional). Útil para lembretes de
+            pagamento ou receita.
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-category"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Categoria 📂</h3>
+          <p className="text-sm opacity-80">
+            Escolha uma categoria para organizar suas tarefas (opcional).
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-recurring"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Tarefa Recorrente 🔄</h3>
+          <p className="text-sm opacity-80">
+            Ative esta opção para agendar lembretes que se repetem diariamente,
+            semanalmente, mensalmente ou anualmente.
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-submit"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Salvar Tarefa ✅</h3>
+          <p className="text-sm opacity-80">
+            Clique aqui para salvar sua tarefa. Você receberá notificações
+            quando chegar a data agendada!
+          </p>
+        </div>
+      ),
+      placement: "top",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
       target: '[data-tutorial="tasks-search"]',
       content: (
         <div>
@@ -296,6 +428,29 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+    },
+    {
+      target: "body",
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Visualização no Calendário 📆</h3>
+          <p className="text-sm opacity-80 mb-3">
+            A página de calendário mostra todas as suas tarefas organizadas por data:
+          </p>
+          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
+            <li>📅 Visualize tarefas agendadas em cada dia</li>
+            <li>🔵 Indicadores visuais nos dias com tarefas</li>
+            <li>✏️ Clique em uma tarefa para editar ou marcar como concluída</li>
+            <li>🗓️ Navegue entre meses facilmente</li>
+            <li>🔄 Tarefas recorrentes aparecem em todas as datas</li>
+          </ul>
+          <p className="text-sm opacity-80 mt-3">
+            É uma forma visual de gerenciar seus compromissos financeiros!
+          </p>
+        </div>
+      ),
+      placement: "center",
+      disableBeacon: true,
     },
     {
       target: '[data-tutorial="tasks-list"]',
@@ -395,6 +550,8 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
       showSkipButton
       scrollToFirstStep
       disableOverlayClose
+      hideBackButton={false}
+      stepIndex={undefined}
       callback={handleJoyrideCallback}
       locale={locale}
       styles={tooltipStyles}
