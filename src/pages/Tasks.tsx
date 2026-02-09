@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTaskForm";
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
+import { Tutorial } from "@/components/Tutorial";
 
 interface ScheduledTaskWithGoogle extends ScheduledTask {
   google_calendar_event_id?: string | null;
@@ -379,6 +380,7 @@ const TasksPage = () => {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <Tutorial type="tasks" />
       <LimitAlert limitKey="maxTasks" currentCount={tasks.length} itemName="tarefas" className="mb-4" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
         <div>
@@ -393,6 +395,7 @@ const TasksPage = () => {
                 size="sm"
                 className="flex-1 sm:flex-none"
                 onClick={() => navigate('/tasks/calendar')}
+                data-tutorial="tasks-calendar-button"
             >
                 <CalendarIcon className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Ver Calendário</span>
@@ -405,6 +408,7 @@ const TasksPage = () => {
                     setSelectedTask(null);
                     setIsFormOpen(true);
                 }}
+                data-tutorial="tasks-new-button"
             >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Nova Tarefa</span>
@@ -418,6 +422,7 @@ const TasksPage = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
+          data-tutorial="tasks-search"
         />
         <Select 
           value={periodFilter} 
@@ -428,7 +433,7 @@ const TasksPage = () => {
             }
           }}
         >
-          <SelectTrigger className="w-full sm:w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]" data-tutorial="tasks-period-filter">
             <SelectValue placeholder="Filtrar por período" />
           </SelectTrigger>
           <SelectContent>
@@ -446,7 +451,7 @@ const TasksPage = () => {
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-tutorial="tasks-list">
         {filteredTasks.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />

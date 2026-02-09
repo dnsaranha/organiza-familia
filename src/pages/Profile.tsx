@@ -28,9 +28,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, Smartphone, Tags, AlertTriangle } from "lucide-react";
+import { Trash2, Loader2, Smartphone, Tags, AlertTriangle, GraduationCap } from "lucide-react";
 import { BottomNavConfig } from "@/components/BottomNavConfig";
 import { CategoryManager } from "@/components/CategoryManager";
+import { useTutorial } from "@/hooks/useTutorial";
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
+  const { resetAllTutorials } = useTutorial();
 
   const applyTheme = (mode: "light" | "dark") => {
     const root = document.documentElement;
@@ -387,6 +389,52 @@ export default function Profile() {
                 <Button type="submit" disabled={loading}>
                   {loading ? "Salvando..." : "Salvar Alterações"}
                 </Button>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  <h3 className="text-lg font-medium">Tutoriais</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Reveja os tutoriais do app para relembrar como usar os recursos.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetAllTutorials();
+                      toast({
+                        title: "Tutoriais resetados!",
+                        description: "Os tutoriais aparecerão novamente ao visitar as páginas.",
+                      });
+                      navigate("/");
+                    }}
+                  >
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    Rever Tutorial Principal
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetAllTutorials();
+                      toast({
+                        title: "Tutoriais resetados!",
+                        description: "O tutorial de tarefas aparecerá na página de tarefas.",
+                      });
+                      navigate("/tasks");
+                    }}
+                  >
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    Rever Tutorial de Tarefas
+                  </Button>
+                </div>
               </div>
 
               <Separator />
