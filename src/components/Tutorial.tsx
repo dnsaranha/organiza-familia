@@ -1,5 +1,6 @@
-import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
+import Joyride, { CallBackProps, STATUS, Step, ACTIONS, EVENTS } from "react-joyride";
 import { useTutorial, TutorialType } from "@/hooks/useTutorial";
+import { useState, useEffect, useCallback } from "react";
 
 interface TutorialProps {
   type?: TutorialType;
@@ -76,34 +77,21 @@ function getMainSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Adicionar Transação ➕</h3>
           <p className="text-sm opacity-80">
-            Clique neste botão para adicionar uma nova receita ou despesa. Vamos
-            começar adicionando uma receita!
+            Clique neste botão para abrir o formulário de nova transação. 
+            <strong className="block mt-2 text-primary">👆 Clique no botão para continuar!</strong>
           </p>
         </div>
       ),
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-    },
-    {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Formulário de Transação 📝</h3>
-          <p className="text-sm opacity-80">
-            Agora vamos preencher os campos necessários para registrar sua primeira
-            transação. Siga os próximos passos!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
+      hideFooter: true,
     },
     {
       target: '[data-tutorial="transaction-type"]',
       content: (
         <div>
-          <h3 className="text-lg font-semibold mb-2">Tipo de Transação</h3>
+          <h3 className="text-lg font-semibold mb-2">Tipo de Transação 💰</h3>
           <p className="text-sm opacity-80">
             Escolha se é uma <strong>Receita</strong> (dinheiro que entra) ou{" "}
             <strong>Despesa</strong> (dinheiro que sai).
@@ -118,10 +106,10 @@ function getMainSteps(): Step[] {
       target: '[data-tutorial="transaction-amount"]',
       content: (
         <div>
-          <h3 className="text-lg font-semibold mb-2">Valor 💰</h3>
+          <h3 className="text-lg font-semibold mb-2">Valor 💵</h3>
           <p className="text-sm opacity-80">
             Digite o valor da transação. O sistema já formata automaticamente
-            como moeda.
+            como moeda brasileira.
           </p>
         </div>
       ),
@@ -165,8 +153,7 @@ function getMainSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Descrição ✏️</h3>
           <p className="text-sm opacity-80">
-            Digite uma descrição para sua transação. Por exemplo: "Salário",
-            "Freelance", etc.
+            Adicione uma descrição opcional. Ex: "Salário mensal", "Conta de luz", etc.
           </p>
         </div>
       ),
@@ -188,22 +175,6 @@ function getMainSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-    },
-    {
-      target: '[data-tutorial="transaction-list"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">
-            Lista de Transações 📊
-          </h3>
-          <p className="text-sm opacity-80">
-            Todas as suas transações aparecerão aqui. Você pode editar ou
-            excluir qualquer transação clicando nos ícones à direita.
-          </p>
-        </div>
-      ),
-      placement: "top",
-      disableBeacon: true,
     },
     {
       target: "body",
@@ -258,29 +229,15 @@ function getTasksSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Criar Nova Tarefa ➕</h3>
           <p className="text-sm opacity-80">
-            Clique aqui para criar uma nova tarefa. Você pode criar lembretes
-            de pagamento, alertas de orçamento e muito mais!
+            Clique aqui para abrir o formulário de nova tarefa.
+            <strong className="block mt-2 text-primary">👆 Clique no botão para continuar!</strong>
           </p>
         </div>
       ),
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
-    },
-    {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Formulário de Tarefa 📝</h3>
-          <p className="text-sm opacity-80">
-            Agora vamos preencher os campos para criar uma tarefa. Você pode
-            adicionar título, tipo, data, valor, categoria e configurar se será
-            recorrente!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
+      hideFooter: true,
     },
     {
       target: '[data-tutorial="task-title"]',
@@ -313,20 +270,6 @@ function getTasksSteps(): Step[] {
       spotlightClicks: true,
     },
     {
-      target: '[data-tutorial="task-date"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Data da Tarefa 📅</h3>
-          <p className="text-sm opacity-80">
-            Selecione quando você quer ser lembrado desta tarefa.
-          </p>
-        </div>
-      ),
-      placement: "bottom",
-      disableBeacon: true,
-      spotlightClicks: true,
-    },
-    {
       target: '[data-tutorial="task-value"]',
       content: (
         <div>
@@ -347,7 +290,21 @@ function getTasksSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Categoria 📂</h3>
           <p className="text-sm opacity-80">
-            Escolha uma categoria para organizar suas tarefas (opcional).
+            Escolha uma categoria para organizar suas tarefas (obrigatório se houver valor).
+          </p>
+        </div>
+      ),
+      placement: "bottom",
+      disableBeacon: true,
+      spotlightClicks: true,
+    },
+    {
+      target: '[data-tutorial="task-date"]',
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Data da Tarefa 📅</h3>
+          <p className="text-sm opacity-80">
+            Selecione quando você quer ser lembrado desta tarefa.
           </p>
         </div>
       ),
@@ -386,118 +343,6 @@ function getTasksSteps(): Step[] {
       spotlightClicks: true,
     },
     {
-      target: '[data-tutorial="tasks-search"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Buscar Tarefas 🔍</h3>
-          <p className="text-sm opacity-80">
-            Use o campo de busca para encontrar tarefas rapidamente pelo nome,
-            descrição ou categoria.
-          </p>
-        </div>
-      ),
-      placement: "bottom",
-      disableBeacon: true,
-    },
-    {
-      target: '[data-tutorial="tasks-period-filter"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Filtrar por Período 📅</h3>
-          <p className="text-sm opacity-80">
-            Filtre suas tarefas por período: mês atual, próximo mês ou um
-            período personalizado.
-          </p>
-        </div>
-      ),
-      placement: "bottom",
-      disableBeacon: true,
-      spotlightClicks: true,
-    },
-    {
-      target: '[data-tutorial="tasks-calendar-button"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Ver no Calendário 🗓️</h3>
-          <p className="text-sm opacity-80">
-            Clique aqui para visualizar suas tarefas no formato de calendário.
-            Dias com tarefas terão um indicador visual.
-          </p>
-        </div>
-      ),
-      placement: "bottom",
-      disableBeacon: true,
-      spotlightClicks: true,
-    },
-    {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Visualização no Calendário 📆</h3>
-          <p className="text-sm opacity-80 mb-3">
-            A página de calendário mostra todas as suas tarefas organizadas por data:
-          </p>
-          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
-            <li>📅 Visualize tarefas agendadas em cada dia</li>
-            <li>🔵 Indicadores visuais nos dias com tarefas</li>
-            <li>✏️ Clique em uma tarefa para editar ou marcar como concluída</li>
-            <li>🗓️ Navegue entre meses facilmente</li>
-            <li>🔄 Tarefas recorrentes aparecem em todas as datas</li>
-          </ul>
-          <p className="text-sm opacity-80 mt-3">
-            É uma forma visual de gerenciar seus compromissos financeiros!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
-    },
-    {
-      target: '[data-tutorial="tasks-list"]',
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Lista de Tarefas 📝</h3>
-          <p className="text-sm opacity-80">
-            Aqui aparecem todas as suas tarefas. Você pode:
-          </p>
-          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside mt-2">
-            <li>✅ Marcar como concluída</li>
-            <li>✏️ Editar a tarefa</li>
-            <li>🗑️ Excluir a tarefa</li>
-            <li>📅 Sincronizar com Google Calendar</li>
-          </ul>
-        </div>
-      ),
-      placement: "top",
-      disableBeacon: true,
-    },
-    {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">
-            Dica: Tarefas Recorrentes 🔄
-          </h3>
-          <p className="text-sm opacity-80 mb-3">
-            Ao criar uma nova tarefa, ative a opção <strong>"Tarefa Recorrente"</strong> para
-            agendar lembretes automáticos que se repetem:
-          </p>
-          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
-            <li>📆 Diariamente</li>
-            <li>📅 Semanalmente</li>
-            <li>🗓️ Mensalmente (ideal para contas)</li>
-            <li>📊 Anualmente</li>
-          </ul>
-          <p className="text-sm opacity-80 mt-3">
-            Quando concluir uma tarefa recorrente, a próxima ocorrência é criada
-            automaticamente!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
-    },
-    {
       target: "body",
       content: (
         <div>
@@ -512,7 +357,6 @@ function getTasksSteps(): Step[] {
             <li>Configure recorrência para contas fixas</li>
             <li>Visualize no calendário</li>
             <li>Receba notificações por email e push</li>
-            <li>Sincronize com Google Calendar</li>
           </ul>
           <p className="text-xs opacity-60 mt-3">
             💡 Você pode rever este tutorial a qualquer momento no seu Perfil.
@@ -527,31 +371,87 @@ function getTasksSteps(): Step[] {
 
 export function Tutorial({ type = "main", onComplete }: TutorialProps) {
   const { showTutorial, completeTutorial } = useTutorial(type);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [run, setRun] = useState(true);
 
   const steps = type === "main" ? getMainSteps() : getTasksSteps();
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status } = data;
+  // Monitora se o formulário foi aberto para avançar automaticamente
+  useEffect(() => {
+    if (!showTutorial || !run) return;
+
+    const checkFormOpen = () => {
+      // Para o tutorial principal: verifica se o formulário de transação está aberto
+      if (type === "main" && stepIndex === 1) {
+        const transactionType = document.querySelector('[data-tutorial="transaction-type"]');
+        if (transactionType) {
+          setStepIndex(2);
+        }
+      }
+      // Para o tutorial de tarefas: verifica se o formulário de tarefas está aberto
+      if (type === "tasks" && stepIndex === 1) {
+        const taskTitle = document.querySelector('[data-tutorial="task-title"]');
+        if (taskTitle) {
+          setStepIndex(2);
+        }
+      }
+    };
+
+    const interval = setInterval(checkFormOpen, 300);
+    return () => clearInterval(interval);
+  }, [showTutorial, stepIndex, type, run]);
+
+  const handleJoyrideCallback = useCallback((data: CallBackProps) => {
+    const { status, action, index, type: eventType } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
     if (finishedStatuses.includes(status)) {
       completeTutorial();
+      setRun(false);
       onComplete?.();
+      return;
     }
-  };
+
+    // Avança para o próximo passo normalmente
+    if (eventType === EVENTS.STEP_AFTER) {
+      if (action === ACTIONS.NEXT) {
+        setStepIndex(index + 1);
+      } else if (action === ACTIONS.PREV) {
+        setStepIndex(index - 1);
+      }
+    }
+
+    // Se o target não foi encontrado, tenta avançar
+    if (eventType === EVENTS.TARGET_NOT_FOUND) {
+      // Se estamos no passo do botão e o formulário já está aberto, avança
+      if (index === 1) {
+        const formSelector = type === "main" 
+          ? '[data-tutorial="transaction-type"]' 
+          : '[data-tutorial="task-title"]';
+        if (document.querySelector(formSelector)) {
+          setStepIndex(2);
+        }
+      } else {
+        // Tenta avançar para o próximo passo
+        setStepIndex(index + 1);
+      }
+    }
+  }, [completeTutorial, onComplete, type]);
 
   if (!showTutorial) return null;
 
   return (
     <Joyride
       steps={steps}
+      stepIndex={stepIndex}
+      run={run}
       continuous
       showProgress
       showSkipButton
       scrollToFirstStep
       disableOverlayClose
+      disableScrollParentFix
       hideBackButton={false}
-      stepIndex={undefined}
       callback={handleJoyrideCallback}
       locale={locale}
       styles={tooltipStyles}
