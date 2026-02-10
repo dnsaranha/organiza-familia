@@ -42,6 +42,9 @@ const tooltipStyles = {
   spotlight: {
     borderRadius: "8px",
   },
+  overlay: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
 };
 
 const locale = {
@@ -449,7 +452,7 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
       showProgress
       showSkipButton
       scrollToFirstStep
-      disableOverlayClose
+      disableScrolling={false}
       disableScrollParentFix
       hideBackButton={false}
       callback={handleJoyrideCallback}
