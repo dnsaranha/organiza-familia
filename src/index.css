@@ -238,3 +238,30 @@ html, body {
     }
   }
 }
+
+/* Joyride tutorial z-index overrides to appear above Dialog/Sheet overlays */
+.react-joyride__overlay {
+  z-index: 9999 !important;
+}
+
+.react-joyride__spotlight {
+  z-index: 9999 !important;
+}
+
+.__floater {
+  z-index: 10001 !important;
+}
+
+.__floater__body {
+  z-index: 10001 !important;
+}
+
+/* Ensure the joyride tooltip buttons are always clickable */
+[data-test-id="button-primary"],
+[data-test-id="button-back"],
+[data-test-id="button-skip"],
+[data-test-id="button-close"] {
+  position: relative;
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+}

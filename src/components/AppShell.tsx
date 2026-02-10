@@ -51,6 +51,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TransactionForm } from "@/components/TransactionForm";
 import { toggleSupportChat } from "@/components/SupportChat";
+import { useTutorial } from "@/hooks/useTutorial";
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
@@ -59,6 +60,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [isDesktopTransactionOpen, setIsDesktopTransactionOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const { isTutorialActive } = useTutorial();
 
   React.useEffect(() => {
     if (!loading && !user && location.pathname !== "/yfinance-test") {
@@ -469,7 +471,19 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         </header>
         <div className="w-full">{children}</div>
         <Dialog open={isDesktopTransactionOpen} onOpenChange={setIsDesktopTransactionOpen}>
-          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogContent 
+            className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+            onInteractOutside={(e) => {
+              if (isTutorialActive) {
+                e.preventDefault();
+              }
+            }}
+            onEscapeKeyDown={(e) => {
+              if (isTutorialActive) {
+                e.preventDefault();
+              }
+            }}
+          >
             <DialogTitle className="sr-only">Nova Transação</DialogTitle>
              <TransactionForm
               onSave={handleDesktopTransactionSaved}

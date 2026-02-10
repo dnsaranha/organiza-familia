@@ -1,5 +1,6 @@
 import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
 import { useTutorial, TutorialType } from "@/hooks/useTutorial";
+import { useState, useEffect } from "react";
 
 interface TutorialProps {
   type?: TutorialType;
@@ -20,6 +21,13 @@ const tooltipStyles = {
     backgroundColor: "hsl(var(--card))",
     color: "hsl(var(--card-foreground))",
     boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
+    zIndex: 10001,
+  },
+  tooltipContainer: {
+    zIndex: 10001,
+  },
+  overlay: {
+    zIndex: 9999,
   },
   tooltipContent: {
     color: "hsl(var(--card-foreground))",
@@ -84,20 +92,7 @@ function getMainSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-    },
-    {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Formulário de Transação 📝</h3>
-          <p className="text-sm opacity-80">
-            Agora vamos preencher os campos necessários para registrar sua primeira
-            transação. Siga os próximos passos!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-type"]',
@@ -110,9 +105,10 @@ function getMainSteps(): Step[] {
           </p>
         </div>
       ),
-      placement: "bottom",
+      placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-amount"]',
@@ -120,14 +116,15 @@ function getMainSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Valor 💰</h3>
           <p className="text-sm opacity-80">
-            Digite o valor da transação. O sistema já formata automaticamente
+            Digite o valor da transação e clique em "Próximo". O sistema já formata automaticamente
             como moeda.
           </p>
         </div>
       ),
-      placement: "bottom",
+      placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-category"]',
@@ -143,6 +140,7 @@ function getMainSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-date"]',
@@ -158,6 +156,7 @@ function getMainSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-description"]',
@@ -173,6 +172,7 @@ function getMainSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="submit-transaction"]',
@@ -188,6 +188,7 @@ function getMainSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="transaction-list"]',
@@ -266,6 +267,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: "body",
@@ -296,6 +298,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-type"]',
@@ -311,6 +314,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-date"]',
@@ -325,6 +329,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-value"]',
@@ -340,6 +345,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-category"]',
@@ -354,6 +360,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-recurring"]',
@@ -369,6 +376,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="task-submit"]',
@@ -384,6 +392,7 @@ function getTasksSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="tasks-search"]',
@@ -413,6 +422,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: '[data-tutorial="tasks-calendar-button"]',
@@ -428,6 +438,7 @@ function getTasksSteps(): Step[] {
       placement: "bottom",
       disableBeacon: true,
       spotlightClicks: true,
+      disableScrolling: true,
     },
     {
       target: "body",
@@ -527,34 +538,172 @@ function getTasksSteps(): Step[] {
 
 export function Tutorial({ type = "main", onComplete }: TutorialProps) {
   const { showTutorial, completeTutorial } = useTutorial(type);
+  const [stepIndex, setStepIndex] = useState(0);
 
   const steps = type === "main" ? getMainSteps() : getTasksSteps();
 
+  useEffect(() => {
+    // Auto-advance when target element appears
+    const currentStep = steps[stepIndex];
+    if (!currentStep || !currentStep.target || currentStep.target === "body") return;
+
+    const selector = String(currentStep.target);
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(selector)) {
+        // Element is now visible, the tutorial will auto-focus
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    return () => observer.disconnect();
+  }, [stepIndex, steps]);
+
+  // Handle spotlight button clicks - Step 2: Add transaction button
+  useEffect(() => {
+    if (stepIndex !== 1) return; // Only on step 2 (add transaction button)
+
+    const handleSpotlightClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const addTransactionBtn = document.querySelector('[data-tutorial="add-transaction-button"]');
+      
+      if (addTransactionBtn && addTransactionBtn.contains(target)) {
+        // Wait for form to open, then advance
+        setTimeout(() => {
+          setStepIndex(2);
+        }, 300);
+      }
+    };
+
+    document.addEventListener("click", handleSpotlightClick, true);
+    return () => document.removeEventListener("click", handleSpotlightClick, true);
+  }, [stepIndex]);
+
+  // Handle transaction type selection - Step 3: Auto-advance when type is selected
+  useEffect(() => {
+    if (stepIndex !== 2) return; // Only on step 3 (transaction type)
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const typeContainer = document.querySelector('[data-tutorial="transaction-type"]');
+      
+      // Check if click was inside the transaction type selector (on one of the buttons)
+      if (typeContainer && typeContainer.contains(target)) {
+        const clickedButton = target.closest("button");
+        if (clickedButton) {
+          // Wait for selection to complete, then advance
+          setTimeout(() => {
+            setStepIndex(3);
+          }, 400);
+        }
+      }
+    };
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [stepIndex]);
+
+  // Handle amount input - Step 4: Auto-advance when user types a value and presses Enter
+  useEffect(() => {
+    if (stepIndex !== 3) return; // Only on step 4 (transaction amount)
+
+    const handleAmountKeydown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const amountInput = document.querySelector('[data-tutorial="transaction-amount"]');
+      
+      if (amountInput && (amountInput === target || amountInput.contains(target))) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          setTimeout(() => {
+            setStepIndex(4);
+          }, 300);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleAmountKeydown, true);
+    return () => {
+      document.removeEventListener("keydown", handleAmountKeydown, true);
+    };
+  }, [stepIndex]);
+
+  // Handle category selection - Step 5: Prevent form from closing when interacting with category
+  useEffect(() => {
+    if (stepIndex !== 4) return; // Only on step 5 (transaction category)
+
+    const handleCategoryClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const categoryTrigger = document.querySelector('[data-tutorial="transaction-category"]');
+      
+      // Check if click was inside the category selector
+      if (categoryTrigger && (categoryTrigger.contains(target) || target.closest('[role="listbox"]'))) {
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener("click", handleCategoryClick, true);
+    return () => document.removeEventListener("click", handleCategoryClick, true);
+  }, [stepIndex]);
+
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status } = data;
+    const { status, type: callbackType, index } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
     if (finishedStatuses.includes(status)) {
       completeTutorial();
       onComplete?.();
     }
+
+    // Update step index when step changes
+    if (callbackType === "step:after") {
+      setStepIndex(index + 1);
+    }
   };
 
   if (!showTutorial) return null;
 
   return (
-    <Joyride
-      steps={steps}
-      continuous
-      showProgress
-      showSkipButton
-      scrollToFirstStep
-      disableOverlayClose
-      hideBackButton={false}
-      stepIndex={undefined}
-      callback={handleJoyrideCallback}
-      locale={locale}
-      styles={tooltipStyles}
-    />
+    <>
+      <style>{`
+        .react-joyride__overlay {
+          z-index: 9999 !important;
+        }
+        .react-joyride__spotlight {
+          z-index: 9999 !important;
+        }
+        .__floater {
+          z-index: 10001 !important;
+        }
+        .__floater__body {
+          z-index: 10001 !important;
+        }
+      `}</style>
+      <Joyride
+        steps={steps}
+        continuous
+        showProgress
+        showSkipButton
+        scrollToFirstStep
+        disableOverlayClose
+        hideBackButton={false}
+        stepIndex={stepIndex}
+        callback={handleJoyrideCallback}
+        locale={locale}
+        styles={tooltipStyles}
+        floaterProps={{
+          styles: {
+            floater: {
+              zIndex: 10001,
+            },
+          },
+          disableAnimation: true,
+        }}
+      />
+    </>
   );
 }

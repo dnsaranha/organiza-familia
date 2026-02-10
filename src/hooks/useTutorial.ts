@@ -47,5 +47,6 @@ export function useTutorial(type: TutorialType = "main") {
     resetTutorial,
     startTutorial,
     resetAllTutorials,
+    isTutorialActive: showTutorial,
   };
 }
