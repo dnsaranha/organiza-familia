@@ -45,6 +45,6 @@ export const Header = () => {
   };
 
   return (
-    <header className="hidden"></header>
+    <header className="border-b border-border bg-gradient-card shadow-card"></header>
   );
 };
