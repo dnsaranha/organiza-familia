@@ -92,7 +92,7 @@ function getMainSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-      disableScrolling: true,
+      disableScrolling: false,
     },
     {
       target: '[data-tutorial="transaction-type"]',
@@ -132,15 +132,16 @@ function getMainSteps(): Step[] {
         <div>
           <h3 className="text-lg font-semibold mb-2">Categoria 📂</h3>
           <p className="text-sm opacity-80">
-            Escolha uma categoria para organizar melhor suas finanças. Isso
+            Clique aqui para escolher uma categoria para organizar melhor suas finanças. Isso
             ajuda nos relatórios!
           </p>
         </div>
       ),
-      placement: "bottom",
+      placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
       disableScrolling: true,
+      spotlightPadding: 150,
     },
     {
       target: '[data-tutorial="transaction-date"]',
@@ -188,7 +189,8 @@ function getMainSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-      disableScrolling: true,
+      disableScrolling: false,
+      scrollToFirstStep: true,
     },
     {
       target: '[data-tutorial="transaction-list"]',
@@ -211,18 +213,58 @@ function getMainSteps(): Step[] {
       content: (
         <div>
           <h3 className="text-lg font-semibold mb-2">
+            Dica: Gerencie suas Categorias 📂
+          </h3>
+          <p className="text-sm opacity-80 mb-3">
+            Você pode personalizar suas categorias de despesas clicando no menu de categorias. Crie categorias que façam sentido para suas finanças!
+          </p>
+          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
+            <li>✏️ Adicionar novas categorias</li>
+            <li>🎨 Alterar cores e ícones</li>
+            <li>🗑️ Remover categorias não usadas</li>
+            <li>📊 Ver gastos por categoria</li>
+          </ul>
+        </div>
+      ),
+      placement: "center",
+      disableBeacon: true,
+    },
+    {
+      target: "body",
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">
+            Recursos Adicionais 🚀
+          </h3>
+          <p className="text-sm opacity-80 mb-3">
+            O Organiza oferece muitos outros recursos para ajudar na sua gestão financeira:
+          </p>
+          <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
+            <li>📊 Relatórios detalhados e análises</li>
+            <li>🎯 Metas financeiras para alcançar</li>
+            <li>💵 Orçamento mensal com alertas</li>
+            <li>📈 Rastreamento de investimentos</li>
+            <li>📋 Tarefas recorrentes e calendário</li>
+          </ul>
+        </div>
+      ),
+      placement: "center",
+      disableBeacon: true,
+    },
+    {
+      target: "body",
+      content: (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">
             Pronto! Você está preparado! ✨
           </h3>
           <p className="text-sm opacity-80 mb-3">
-            Agora você sabe como adicionar receitas e despesas. Explore os
-            outros recursos do app:
+            Você aprendeu o básico e já pode começar a usar o Organiza. Aqui está um resumo do que você fez:
           </p>
           <ul className="text-sm opacity-80 space-y-1 list-disc list-inside">
-            <li>📊 Relatórios detalhados</li>
-            <li>🎯 Metas financeiras</li>
-            <li>💵 Orçamento mensal</li>
-            <li>📈 Investimentos</li>
-            <li>📋 Tarefas e agenda</li>
+            <li>✅ Adicionou sua primeira transação</li>
+            <li>✅ Aprendeu sobre categorias</li>
+            <li>✅ Descobriu recursos adicionais</li>
           </ul>
           <p className="text-xs opacity-60 mt-3">
             💡 Dica: Você pode rever este tutorial a qualquer momento no seu Perfil.
@@ -270,21 +312,6 @@ function getTasksSteps(): Step[] {
       disableScrolling: true,
     },
     {
-      target: "body",
-      content: (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Formulário de Tarefa 📝</h3>
-          <p className="text-sm opacity-80">
-            Agora vamos preencher os campos para criar uma tarefa. Você pode
-            adicionar título, tipo, data, valor, categoria e configurar se será
-            recorrente!
-          </p>
-        </div>
-      ),
-      placement: "center",
-      disableBeacon: true,
-    },
-    {
       target: '[data-tutorial="task-title"]',
       content: (
         <div>
@@ -315,6 +342,7 @@ function getTasksSteps(): Step[] {
       disableBeacon: true,
       spotlightClicks: true,
       disableScrolling: true,
+      spotlightPadding: 150,
     },
     {
       target: '[data-tutorial="task-date"]',
@@ -392,7 +420,8 @@ function getTasksSteps(): Step[] {
       placement: "top",
       disableBeacon: true,
       spotlightClicks: true,
-      disableScrolling: true,
+      disableScrolling: false,
+      scrollOffset: 100,
     },
     {
       target: '[data-tutorial="tasks-search"]',
@@ -481,6 +510,8 @@ function getTasksSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
+      spotlightClicks: true,
+      spotlightPadding: 20,
     },
     {
       target: "body",
@@ -563,15 +594,23 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
     return () => observer.disconnect();
   }, [stepIndex, steps]);
 
-  // Handle spotlight button clicks - Step 2: Add transaction button
+  // Handle spotlight button clicks - Step 2: Add transaction button or tasks new button
   useEffect(() => {
-    if (stepIndex !== 1) return; // Only on step 2 (add transaction button)
+    if (stepIndex !== 1) return; // Only on step 2
 
     const handleSpotlightClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const addTransactionBtn = document.querySelector('[data-tutorial="add-transaction-button"]');
+      const tasksNewBtn = document.querySelector('[data-tutorial="tasks-new-button"]');
       
       if (addTransactionBtn && addTransactionBtn.contains(target)) {
+        // Wait for form to open, then advance
+        setTimeout(() => {
+          setStepIndex(2);
+        }, 300);
+      } else if (tasksNewBtn && tasksNewBtn.contains(target)) {
+        // Click the button to open the form
+        (tasksNewBtn as HTMLElement).click();
         // Wait for form to open, then advance
         setTimeout(() => {
           setStepIndex(2);
@@ -579,9 +618,46 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
       }
     };
 
+    // Auto-click for tasks when step 2 is reached
+    if (type === "tasks") {
+      const tasksNewBtn = document.querySelector('[data-tutorial="tasks-new-button"]');
+      if (tasksNewBtn) {
+        setTimeout(() => {
+          (tasksNewBtn as HTMLElement).click();
+          setTimeout(() => {
+            setStepIndex(2);
+          }, 300);
+        }, 500);
+      }
+    }
+
     document.addEventListener("click", handleSpotlightClick, true);
     return () => document.removeEventListener("click", handleSpotlightClick, true);
-  }, [stepIndex]);
+  }, [stepIndex, type]);
+
+  // Prevent dialog from closing during tutorial for Tasks
+  // Note: previous code referenced a non-existent `run` variable.
+  useEffect(() => {
+    if (type !== "tasks" || !showTutorial) return;
+    if (stepIndex < 2 || stepIndex > 8) return; // Steps 3-9 (indexes 2-8) are inside the form
+
+    const handleFocusOut = (e: FocusEvent) => {
+      // Keep focus inside the dialog while the tutorial is guiding form steps.
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const dialogElement = document.querySelector('[role="dialog"]');
+    if (dialogElement) {
+      dialogElement.addEventListener("focusout", handleFocusOut, true);
+    }
+
+    return () => {
+      if (dialogElement) {
+        dialogElement.removeEventListener("focusout", handleFocusOut, true);
+      }
+    };
+  }, [stepIndex, showTutorial, type]);
 
   // Handle transaction type selection - Step 3: Auto-advance when type is selected
   useEffect(() => {
@@ -632,23 +708,71 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
     };
   }, [stepIndex]);
 
-  // Handle category selection - Step 5: Prevent form from closing when interacting with category
+  // Handle category selection - Step 5: Auto-advance when category is selected
   useEffect(() => {
     if (stepIndex !== 4) return; // Only on step 5 (transaction category)
 
-    const handleCategoryClick = (e: MouseEvent) => {
+    const handleCategoryButtonClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const categoryTrigger = document.querySelector('[data-tutorial="transaction-category"]');
+      const categoryButton = target.closest('[data-tutorial="transaction-category"]');
       
-      // Check if click was inside the category selector
-      if (categoryTrigger && (categoryTrigger.contains(target) || target.closest('[role="listbox"]'))) {
-        e.stopPropagation();
+      // Check if click was on the category select trigger
+      if (categoryButton && target.closest('button')) {
+        // Update spotlight padding when list opens
+        setTimeout(() => {
+          const updatedSteps = [...steps];
+          updatedSteps[4] = {
+            ...updatedSteps[4],
+            spotlightPadding: 200,
+          };
+          setSteps(updatedSteps);
+        }, 100);
+      }
+      
+      // Check if click was on a SelectItem
+      if (target.closest('[role="option"]')) {
+        setTimeout(() => {
+          setStepIndex(5);
+        }, 400);
       }
     };
 
-    document.addEventListener("click", handleCategoryClick, true);
-    return () => document.removeEventListener("click", handleCategoryClick, true);
-  }, [stepIndex]);
+    document.addEventListener("click", handleCategoryButtonClick, true);
+    return () => document.removeEventListener("click", handleCategoryButtonClick, true);
+  }, [stepIndex, steps]);
+
+  // Handle transaction submit - Step 8: Auto-advance to step 9 when form is submitted
+  useEffect(() => {
+    if (stepIndex !== 7) return; // Only on step 8 (submit transaction/task)
+
+    const handleFormSubmit = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const submitButton = document.querySelector('[data-tutorial="submit-transaction"]');
+      const taskSubmitButton = document.querySelector('[data-tutorial="task-submit"]');
+      
+      if (submitButton && (submitButton === target || submitButton.contains(target))) {
+        setTimeout(() => {
+          setStepIndex(8);
+        }, 500);
+      } else if (taskSubmitButton && (taskSubmitButton === target || taskSubmitButton.contains(target))) {
+        // For tasks, close the dialog and move focus out
+        setTimeout(() => {
+          const dialogOverlay = document.querySelector('[data-radix-dialog-overlay]');
+          if (dialogOverlay) {
+            // Click outside the dialog to close it
+            (dialogOverlay as HTMLElement).click();
+          }
+          // Move to next step after closing
+          setTimeout(() => {
+            setStepIndex(8);
+          }, 400);
+        }, 300);
+      }
+    };
+
+    document.addEventListener("click", handleFormSubmit, true);
+    return () => document.removeEventListener("click", handleFormSubmit, true);
+  }, [stepIndex, type]);
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, type: callbackType, index } = data;

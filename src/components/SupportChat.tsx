@@ -89,28 +89,45 @@ export const SupportChat = () => {
 
         // Subscribe to new messages
         channel = supabase
-          .channel('support_messages')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
-            const newMsg = payload.new as Message;
-            // Prevent duplicate messages if optimistic update already added it
-            setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
+          .channel(`support_messages:${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'support_messages',
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              const newMsg = payload.new as Message;
+              // Prevent duplicate messages if optimistic update already added it
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
 
-            if (newMsg.is_from_admin) {
-              if (!isOpenRef.current) {
-                setUnreadCount(prev => prev + 1);
-                setIsVisible(true);
-              } else {
-                // If chat is open, immediately mark the new message as read
-                markMessagesAsRead();
+              if (newMsg.is_from_admin) {
+                if (!isOpenRef.current) {
+                  setUnreadCount((prev) => prev + 1);
+                  setIsVisible(true);
+                }
               }
             }
-          })
-          .subscribe();
-
+          )
+          .subscribe((status: string) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              // Realtime can be blocked in some environments (offline, adblock, corporate proxy, Tempo canvas).
+              // Avoid spamming the console; users can still use the chat via the normal fetch/insert flows.
+              if (import.meta.env.DEV) {
+                console.warn('SupportChat realtime subscription issue:', status);
+              }
+            }
+          });
       } catch (err) {
+        // Avoid noisy console errors when offline / blocked (e.g. Tempo canvas)
+        if (err instanceof TypeError && /failed to fetch/i.test(err.message)) {
+          return;
+        }
         console.error('Error fetching messages:', err);
       } finally {
         setLoading(false);

@@ -15,6 +15,7 @@ import { ScheduledTaskForm, ScheduledTask } from "@/components/tasks/ScheduledTa
 import { useTaskNotifications } from "@/hooks/useTaskNotifications";
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
 import { Tutorial } from "@/components/Tutorial";
+import { useTutorial } from "@/hooks/useTutorial";
 
 interface ScheduledTaskWithGoogle extends ScheduledTask {
   google_calendar_event_id?: string | null;
@@ -39,6 +40,7 @@ const TasksPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { canAdd: canAddTask } = useCanAdd('maxTasks', tasks.length);
+  const { showTutorial } = useTutorial('tasks');
 
   useTaskNotifications();
 
@@ -566,7 +568,19 @@ const TasksPage = () => {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            if (showTutorial) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            if (showTutorial) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{selectedTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </DialogHeader>
