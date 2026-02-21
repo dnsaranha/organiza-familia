@@ -447,6 +447,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               onClick={() => setIsDesktopTransactionOpen(true)}
               className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
               size="sm"
+              data-tutorial="add-transaction-button"
             >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Nova Transação</span>
@@ -472,7 +473,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         <div className="w-full">{children}</div>
         <Dialog open={isDesktopTransactionOpen} onOpenChange={setIsDesktopTransactionOpen}>
           <DialogContent 
-            className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+            className="sm:max-w-[425px] p-0 max-h-[90vh] overflow-y-auto bg-transparent border-none shadow-none"
             onInteractOutside={(e) => {
               if (isTutorialActive) {
                 e.preventDefault();
