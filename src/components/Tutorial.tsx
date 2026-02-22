@@ -714,20 +714,6 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
 
     const handleCategoryButtonClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const categoryButton = target.closest('[data-tutorial="transaction-category"]');
-      
-      // Check if click was on the category select trigger
-      if (categoryButton && target.closest('button')) {
-        // Update spotlight padding when list opens
-        setTimeout(() => {
-          const updatedSteps = [...steps];
-          updatedSteps[4] = {
-            ...updatedSteps[4],
-            spotlightPadding: 200,
-          };
-          setSteps(updatedSteps);
-        }, 100);
-      }
       
       // Check if click was on a SelectItem
       if (target.closest('[role="option"]')) {
@@ -739,7 +725,7 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
 
     document.addEventListener("click", handleCategoryButtonClick, true);
     return () => document.removeEventListener("click", handleCategoryButtonClick, true);
-  }, [stepIndex, steps]);
+  }, [stepIndex]);
 
   // Handle transaction submit - Step 8: Auto-advance to step 9 when form is submitted
   useEffect(() => {
