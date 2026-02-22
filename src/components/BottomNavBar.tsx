@@ -57,7 +57,7 @@ export const BottomNavBar = () => {
 
       <Dialog open={isTransactionModalOpen} onOpenChange={setIsTransactionModalOpen}>
         <DialogContent 
-          className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+          className="sm:max-w-[425px] p-0 max-h-[90vh] overflow-y-auto bg-transparent border-none shadow-none"
           onInteractOutside={(e) => {
             if (isTutorialActive) {
               e.preventDefault();

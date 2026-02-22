@@ -91,7 +91,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually and avoid race conditions
       disableScrolling: false,
     },
     {
@@ -139,7 +139,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: true,
       spotlightPadding: 150,
     },
@@ -188,7 +188,7 @@ function getMainSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: false,
       scrollToFirstStep: true,
     },
@@ -308,7 +308,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: true,
     },
     {
@@ -340,7 +340,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: true,
       spotlightPadding: 150,
     },
@@ -387,7 +387,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "bottom",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: true,
     },
     {
@@ -419,7 +419,7 @@ function getTasksSteps(): Step[] {
       ),
       placement: "top",
       disableBeacon: true,
-      spotlightClicks: true,
+      spotlightClicks: false, // Disabled to handle manually
       disableScrolling: false,
       scrollOffset: 100,
     },
@@ -607,36 +607,20 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
         // Wait for form to open, then advance
         setTimeout(() => {
           setStepIndex(2);
-        }, 300);
+        }, 500); // Increased delay to ensure modal is ready
       } else if (tasksNewBtn && tasksNewBtn.contains(target)) {
-        // Click the button to open the form
-        (tasksNewBtn as HTMLElement).click();
         // Wait for form to open, then advance
         setTimeout(() => {
           setStepIndex(2);
-        }, 300);
-      }
-    };
-
-    // Auto-click for tasks when step 2 is reached
-    if (type === "tasks") {
-      const tasksNewBtn = document.querySelector('[data-tutorial="tasks-new-button"]');
-      if (tasksNewBtn) {
-        setTimeout(() => {
-          (tasksNewBtn as HTMLElement).click();
-          setTimeout(() => {
-            setStepIndex(2);
-          }, 300);
         }, 500);
       }
-    }
+    };
 
     document.addEventListener("click", handleSpotlightClick, true);
     return () => document.removeEventListener("click", handleSpotlightClick, true);
   }, [stepIndex, type]);
 
   // Prevent dialog from closing during tutorial for Tasks
-  // Note: previous code referenced a non-existent `run` variable.
   useEffect(() => {
     if (type !== "tasks" || !showTutorial) return;
     if (stepIndex < 2 || stepIndex > 8) return; // Steps 3-9 (indexes 2-8) are inside the form
@@ -714,20 +698,6 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
 
     const handleCategoryButtonClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const categoryButton = target.closest('[data-tutorial="transaction-category"]');
-      
-      // Check if click was on the category select trigger
-      if (categoryButton && target.closest('button')) {
-        // Update spotlight padding when list opens
-        setTimeout(() => {
-          const updatedSteps = [...steps];
-          updatedSteps[4] = {
-            ...updatedSteps[4],
-            spotlightPadding: 200,
-          };
-          setSteps(updatedSteps);
-        }, 100);
-      }
       
       // Check if click was on a SelectItem
       if (target.closest('[role="option"]')) {
@@ -739,7 +709,7 @@ export function Tutorial({ type = "main", onComplete }: TutorialProps) {
 
     document.addEventListener("click", handleCategoryButtonClick, true);
     return () => document.removeEventListener("click", handleCategoryButtonClick, true);
-  }, [stepIndex, steps]);
+  }, [stepIndex]);
 
   // Handle transaction submit - Step 8: Auto-advance to step 9 when form is submitted
   useEffect(() => {
