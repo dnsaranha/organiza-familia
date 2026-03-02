@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Joyride, { CallBackProps, EVENTS, STATUS, Step } from "react-joyride";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 const TUTORIAL_STORAGE_KEY = "organiza-tutorial-completed";
 const TASKS_TUTORIAL_STORAGE_KEY = "organiza-tasks-tutorial-completed";
@@ -119,13 +119,26 @@ interface GuidedTutorialProps {
   onComplete?: () => void;
 }
 
+// Global flag so other components can check if tutorial is active
+let _tutorialRunning = false;
+export function isTutorialRunning() {
+  return _tutorialRunning;
+}
+
 export function GuidedTutorial({ type, forceRun, onComplete }: GuidedTutorialProps) {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
+  const skipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const location = useLocation();
 
   const storageKey = type === "transactions" ? TUTORIAL_STORAGE_KEY : TASKS_TUTORIAL_STORAGE_KEY;
   const steps = type === "transactions" ? transactionSteps : tasksSteps;
+
+  // Update global flag
+  useEffect(() => {
+    _tutorialRunning = run;
+    return () => { _tutorialRunning = false; };
+  }, [run]);
 
   useEffect(() => {
     if (forceRun) {
@@ -180,8 +193,15 @@ export function GuidedTutorial({ type, forceRun, onComplete }: GuidedTutorialPro
       }
 
       if (eventType === EVENTS.TARGET_NOT_FOUND) {
-        // Skip missing targets
-        setStepIndex((prev) => prev + 1);
+        // Skip missing targets with a delay to prevent infinite cascade
+        if (skipTimerRef.current) clearTimeout(skipTimerRef.current);
+        skipTimerRef.current = setTimeout(() => {
+          setStepIndex((prev) => {
+            const next = prev + 1;
+            // Don't skip past the end
+            return next < steps.length ? next : prev;
+          });
+        }, 500);
       }
 
       if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
