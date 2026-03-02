@@ -5,6 +5,7 @@ import { useBottomNavConfig } from "@/hooks/useBottomNavConfig";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TransactionForm } from "@/components/TransactionForm";
 import { Plus } from "lucide-react";
+import { isTutorialRunning } from "@/components/GuidedTutorial";
 
 export const BottomNavBar = () => {
   const { activeNavItems } = useBottomNavConfig();
@@ -53,8 +54,20 @@ export const BottomNavBar = () => {
         </div>
       </div>
 
-      <Dialog open={isTransactionModalOpen} onOpenChange={setIsTransactionModalOpen}>
-        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+      <Dialog open={isTransactionModalOpen} onOpenChange={(open) => {
+        // Prevent closing the dialog while tutorial is running
+        if (!open && isTutorialRunning()) return;
+        setIsTransactionModalOpen(open);
+      }}>
+        <DialogContent
+          className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+          onPointerDownOutside={(e) => {
+            if (isTutorialRunning()) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (isTutorialRunning()) e.preventDefault();
+          }}
+        >
           <DialogTitle className="sr-only">Nova Transação</DialogTitle>
            <TransactionForm
             onSave={handleTransactionSaved}
