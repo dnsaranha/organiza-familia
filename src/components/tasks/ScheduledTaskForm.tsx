@@ -293,7 +293,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
     <div className="pr-4">
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+        <div data-tutorial="task-title" className="space-y-2">
           <Label htmlFor="title">Título *</Label>
           <Input
             id="title"
@@ -303,7 +303,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
             required
           />
         </div>
-        <div className="space-y-2">
+        <div data-tutorial="task-type" className="space-y-2">
           <Label htmlFor="task_type">Tipo de Tarefa</Label>
           <Select value={formData.task_type} onValueChange={(value: any) => setFormData({ ...formData, task_type: value })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -317,7 +317,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
+          <div data-tutorial="task-value" className="space-y-2">
               <Label htmlFor="value">Valor (R$)</Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -347,7 +347,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
                 )}
               </div>
           </div>
-          <div className="space-y-2">
+          <div data-tutorial="task-category" className="space-y-2">
                 <Label htmlFor="category">Categoria *</Label>
                 <Combobox
                     options={categories}
@@ -390,7 +390,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div data-tutorial="task-date" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="schedule_date">Data *</Label>
           <Input
@@ -439,7 +439,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         </div>
       </div>
 
-      <div className="space-y-3 pt-4 border-t">
+      <div data-tutorial="task-recurring" className="space-y-3 pt-4 border-t">
         <div className="flex items-center justify-between">
           <Label htmlFor="is_recurring" className="text-sm font-medium">Tarefa Recorrente</Label>
           <Switch
@@ -500,7 +500,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button data-tutorial="task-submit" type="submit">
           {initialData?.id ? 'Salvar Alterações' : 'Agendar Tarefa'}
         </Button>
       </div>

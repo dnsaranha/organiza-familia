@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { GuidedTutorial } from "@/components/GuidedTutorial";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -379,6 +380,7 @@ const TasksPage = () => {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      <GuidedTutorial type="tasks" />
       <LimitAlert limitKey="maxTasks" currentCount={tasks.length} itemName="tarefas" className="mb-4" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3 sm:gap-4">
         <div>
@@ -398,6 +400,7 @@ const TasksPage = () => {
                 <span className="sm:inline">Ver Calendário</span>
             </Button>
             <Button
+                data-tutorial="add-task-btn"
                 size="sm"
                 className="flex-1 sm:flex-none"
                 disabled={!canAddTask}

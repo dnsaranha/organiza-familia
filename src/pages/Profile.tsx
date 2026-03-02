@@ -28,9 +28,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, Smartphone, Tags, AlertTriangle } from "lucide-react";
+import { Trash2, Loader2, Smartphone, Tags, AlertTriangle, GraduationCap } from "lucide-react";
 import { BottomNavConfig } from "@/components/BottomNavConfig";
 import { CategoryManager } from "@/components/CategoryManager";
+import { resetTutorial } from "@/components/GuidedTutorial";
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -372,6 +373,44 @@ export default function Profile() {
                   Personalize quais atalhos aparecem no menu inferior do aplicativo mobile.
                 </p>
                 <BottomNavConfig />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  <h3 className="text-lg font-medium">Tutoriais Guiados</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Refaça os tutoriais para aprender a usar o aplicativo.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetTutorial("transactions");
+                      toast({ title: "Tutorial reiniciado!", description: "O tutorial de transações será exibido ao acessar o Dashboard." });
+                      navigate("/dashboard");
+                    }}
+                  >
+                    Tutorial de Transações
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetTutorial("tasks");
+                      toast({ title: "Tutorial reiniciado!", description: "O tutorial de tarefas será exibido ao acessar a página de Tarefas." });
+                      navigate("/tasks");
+                    }}
+                  >
+                    Tutorial de Tarefas
+                  </Button>
+                </div>
               </div>
 
               <Separator />

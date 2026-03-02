@@ -173,7 +173,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         <CardContent className="space-y-6">
           {/* Type Selector */}
           {!isEditMode && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
+            <div data-tutorial="transaction-type" className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
               <Button
                 type="button"
                 variant={type === 'expense' ? 'default' : 'ghost'}
@@ -201,7 +201,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount">Valor *</Label>
-              <div className="relative">
+              <div data-tutorial="transaction-amount" className="relative">
                 <span className="absolute left-3 top-3 text-muted-foreground">R$</span>
                 <Input
                   id="amount"
@@ -218,7 +218,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             </div>
 
             {/* Category */}
-            <div className="space-y-2">
+            <div data-tutorial="transaction-category" className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
               <Select value={category} onValueChange={setCategory} required disabled={loading}>
                 <SelectTrigger>
@@ -255,7 +255,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             )}
 
             {/* Description */}
-            <div className="space-y-2">
+            <div data-tutorial="transaction-description" className="space-y-2">
               <Label htmlFor="description">Descrição</Label>
               <Textarea
                 id="description"
@@ -269,6 +269,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
 
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
+                data-tutorial="transaction-submit"
                 type="submit"
                 className="w-full bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
                 disabled={loading}
