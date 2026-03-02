@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { GuidedTutorial } from "@/components/GuidedTutorial";
 import { useNavigate } from "react-router-dom";
 import { FinancialSummaryCard } from "@/components/FinancialSummaryCard";
 import { TransactionList } from "@/components/TransactionList";
@@ -169,6 +170,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <GuidedTutorial type="transactions" />
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
         <div className="mb-4 sm:mb-6 md:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
