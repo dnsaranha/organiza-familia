@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
             customer_id: activeCustomerId, 
             updated_at: new Date().toISOString() 
           })
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
       }
     } else {
       console.log(`[stripe-sync-subscription] Creating new customer record`);
