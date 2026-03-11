@@ -119,6 +119,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [isOpen, setIsOpen] = useState(true);
 
   const fetchTransactions = useCallback(async () => {
+    // Guard: don't query if no authenticated session (prevents RLS errors)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
     setLoading(true);
     setError(null);
     try {
