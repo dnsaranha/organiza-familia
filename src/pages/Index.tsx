@@ -141,8 +141,16 @@ const Index = () => {
       });
 
     } catch (err) {
-      if (err instanceof Error && !err.message.includes("aborted")) {
-        console.error("Erro ao buscar dados financeiros:", err);
+      if (err instanceof Error) {
+        const msg = err.message;
+        // Suppress auth race condition errors silently
+        if (msg.includes('JWT') || msg.includes('auth') || msg.includes('unauthenticated')) {
+          console.warn("Auth transitória, ignorando erro:", msg);
+          return;
+        }
+        if (!msg.includes("aborted")) {
+          console.error("Erro ao buscar dados financeiros:", err);
+        }
       }
     } finally {
       setLoadingData(false);

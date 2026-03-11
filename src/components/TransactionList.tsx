@@ -119,6 +119,10 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [isOpen, setIsOpen] = useState(true);
 
   const fetchTransactions = useCallback(async () => {
+    // Guard: don't query if no authenticated session (prevents RLS errors)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -147,6 +151,12 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
       if (error) throw error;
       setTransactions(data || []);
     } catch (err: unknown) {
+      // Suppress auth-related errors (race condition during token refresh)
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('JWT') || errMsg.includes('auth') || errMsg.includes('unauthenticated')) {
+        console.warn("Auth transitória, ignorando erro:", errMsg);
+        return;
+      }
       console.error("Erro ao buscar transações:", err);
       setError("Não foi possível carregar as transações.");
     } finally {
