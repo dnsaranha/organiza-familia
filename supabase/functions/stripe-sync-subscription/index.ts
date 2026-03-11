@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     const { data: existingCustomer } = await supabaseAdmin
       .from('stripe_customers')
       .select('id, customer_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (existingCustomer) {
