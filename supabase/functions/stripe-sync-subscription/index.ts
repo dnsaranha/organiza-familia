@@ -49,23 +49,17 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Validate JWT using getClaims
+    // Validate user authentication
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (claimsError || !claimsData?.claims) {
-      // Fallback to getUser if getClaims fails
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error('[stripe-sync-subscription] Auth error:', claimsError || authError);
-        return corsResponse({ error: 'Unauthorized' }, 401);
-      }
-      var userId = user.id;
-      var userEmail = user.email;
-    } else {
-      var userId = claimsData.claims.sub as string;
-      var userEmail = claimsData.claims.email as string;
+    if (authError || !user) {
+      console.error('[stripe-sync-subscription] Auth error:', authError);
+      return corsResponse({ error: 'Unauthorized' }, 401);
     }
+
+    const userId = user.id;
+    const userEmail = user.email;
 
     if (!userEmail) {
       return corsResponse({ error: 'User email not found' }, 400);
