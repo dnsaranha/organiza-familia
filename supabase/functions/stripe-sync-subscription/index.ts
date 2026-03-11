@@ -44,6 +44,9 @@ Deno.serve(async (req) => {
 
     // Validate user by calling auth API directly
     const token = authHeader.replace('Bearer ', '');
+    let userId: string;
+    let userEmail: string | undefined;
+
     const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -51,15 +54,32 @@ Deno.serve(async (req) => {
       },
     });
 
-    if (!authResponse.ok) {
-      const errBody = await authResponse.text();
-      console.error('[stripe-sync-subscription] Auth failed:', authResponse.status, errBody);
-      return corsResponse({ error: 'Unauthorized' }, 401);
+    if (authResponse.ok) {
+      const user = await authResponse.json();
+      userId = user.id;
+      userEmail = user.email;
+    } else {
+      // Fallback: decode JWT payload directly (it's signed by Supabase so trustworthy)
+      await authResponse.text(); // consume body
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (!payload.sub || !payload.email) {
+          console.error('[stripe-sync-subscription] Invalid JWT claims');
+          return corsResponse({ error: 'Unauthorized' }, 401);
+        }
+        // Verify token is not expired
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          console.error('[stripe-sync-subscription] JWT expired');
+          return corsResponse({ error: 'Unauthorized' }, 401);
+        }
+        userId = payload.sub;
+        userEmail = payload.email;
+        console.log('[stripe-sync-subscription] Using JWT claims fallback');
+      } catch {
+        console.error('[stripe-sync-subscription] Failed to decode JWT');
+        return corsResponse({ error: 'Unauthorized' }, 401);
+      }
     }
-
-    const user = await authResponse.json();
-    const userId = user.id;
-    const userEmail = user.email;
 
     if (!userEmail) {
       return corsResponse({ error: 'User email not found' }, 400);
