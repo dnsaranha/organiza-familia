@@ -63,7 +63,7 @@ const YFinanceTest = () => {
 
       // 3. Fetch from yfinance-data edge function with period
       const yfinancePromise = supabase.functions.invoke("yfinance-data", {
-        body: { symbols: [yahooTicker], period },
+        body: { tickers: [yahooTicker] },
       });
 
       const [quoteResult, dbResult, yfinanceResult] = await Promise.all([
