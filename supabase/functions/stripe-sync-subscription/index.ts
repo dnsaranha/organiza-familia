@@ -42,22 +42,22 @@ Deno.serve(async (req) => {
       return corsResponse({ error: 'No authorization header' }, 401);
     }
 
-    // Create Supabase client with user's token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
+    // Validate user by calling auth API directly
+    const token = authHeader.replace('Bearer ', '');
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseAnonKey,
       },
     });
 
-    // Validate user authentication
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('[stripe-sync-subscription] Auth error:', authError);
+    if (!authResponse.ok) {
+      const errBody = await authResponse.text();
+      console.error('[stripe-sync-subscription] Auth failed:', authResponse.status, errBody);
       return corsResponse({ error: 'Unauthorized' }, 401);
     }
 
+    const user = await authResponse.json();
     const userId = user.id;
     const userEmail = user.email;
 
