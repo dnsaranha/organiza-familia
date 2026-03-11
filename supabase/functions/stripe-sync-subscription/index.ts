@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin
         .from('stripe_customers')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           customer_id: activeCustomerId,
         });
     }
