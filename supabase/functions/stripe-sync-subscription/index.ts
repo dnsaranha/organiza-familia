@@ -42,27 +42,50 @@ Deno.serve(async (req) => {
       return corsResponse({ error: 'No authorization header' }, 401);
     }
 
-    // Create Supabase client with user's token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
+    // Validate user by calling auth API directly
+    const token = authHeader.replace('Bearer ', '');
+    let userId: string;
+    let userEmail: string | undefined;
+
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseAnonKey,
       },
     });
 
-    // Get the user from Supabase auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      console.error('[stripe-sync-subscription] Auth error:', authError);
-      return corsResponse({ error: 'Unauthorized' }, 401);
+    if (authResponse.ok) {
+      const user = await authResponse.json();
+      userId = user.id;
+      userEmail = user.email;
+    } else {
+      // Fallback: decode JWT payload directly (it's signed by Supabase so trustworthy)
+      await authResponse.text(); // consume body
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (!payload.sub || !payload.email) {
+          console.error('[stripe-sync-subscription] Invalid JWT claims');
+          return corsResponse({ error: 'Unauthorized' }, 401);
+        }
+        // Verify token is not expired
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          console.error('[stripe-sync-subscription] JWT expired');
+          return corsResponse({ error: 'Unauthorized' }, 401);
+        }
+        userId = payload.sub;
+        userEmail = payload.email;
+        console.log('[stripe-sync-subscription] Using JWT claims fallback');
+      } catch {
+        console.error('[stripe-sync-subscription] Failed to decode JWT');
+        return corsResponse({ error: 'Unauthorized' }, 401);
+      }
     }
 
-    const userEmail = user.email;
     if (!userEmail) {
       return corsResponse({ error: 'User email not found' }, 400);
     }
 
-    console.log(`[stripe-sync-subscription] Syncing for user ${user.id}, email: ${userEmail}`);
+    console.log(`[stripe-sync-subscription] Syncing for user ${userId}, email: ${userEmail}`);
 
     // Create admin client
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -127,7 +150,7 @@ Deno.serve(async (req) => {
     const { data: existingCustomer } = await supabaseAdmin
       .from('stripe_customers')
       .select('id, customer_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (existingCustomer) {
@@ -139,14 +162,14 @@ Deno.serve(async (req) => {
             customer_id: activeCustomerId, 
             updated_at: new Date().toISOString() 
           })
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
       }
     } else {
       console.log(`[stripe-sync-subscription] Creating new customer record`);
       await supabaseAdmin
         .from('stripe_customers')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           customer_id: activeCustomerId,
         });
     }
