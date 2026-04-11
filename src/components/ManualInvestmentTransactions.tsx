@@ -158,18 +158,27 @@ export function ManualInvestmentTransactions({
           }
         }
 
+        const typeMap: Record<string, string> = {
+          compra: "buy", buy: "buy",
+          venda: "sell", sell: "sell",
+          split: "split", desdobramento: "split",
+          agrupamento: "grouping", grouping: "grouping",
+          bonificação: "bonus", bonificacao: "bonus", bonus: "bonus",
+        };
+        const mappedType = typeMap[transactionType] || "buy";
+
         return {
           user_id: user.id,
           ticker: ticker.toUpperCase(),
           asset_name: assetName,
           asset_type: assetType.toUpperCase(),
-          transaction_type: transactionType === "compra" || transactionType === "buy" ? "buy" : "sell",
+          transaction_type: mappedType,
           quantity,
           price,
           fees,
           transaction_date: transactionDate,
         };
-      }).filter(t => t.ticker && t.quantity > 0 && t.price > 0);
+      }).filter(t => t.ticker && t.quantity > 0 && t.price >= 0);
 
       if (transactionsToInsert.length === 0) {
         throw new Error("Nenhuma transação válida encontrada na planilha");
@@ -221,6 +230,26 @@ export function ManualInvestmentTransactions({
         transaction_type: "buy",
         quantity: 10,
         price: 165.00,
+        fees: 0,
+      },
+      {
+        ticker: "PETR4",
+        asset_name: "Petrobras PN",
+        asset_type: "STOCK",
+        transaction_date: "2024-03-01",
+        transaction_type: "split",
+        quantity: 100,
+        price: 0,
+        fees: 0,
+      },
+      {
+        ticker: "PETR4",
+        asset_name: "Petrobras PN",
+        asset_type: "STOCK",
+        transaction_date: "2024-04-01",
+        transaction_type: "bonus",
+        quantity: 10,
+        price: 0,
         fees: 0,
       },
     ];
@@ -594,6 +623,9 @@ export function ManualInvestmentTransactions({
                         <SelectContent>
                           <SelectItem value="buy">Compra</SelectItem>
                           <SelectItem value="sell">Venda</SelectItem>
+                          <SelectItem value="split">Split</SelectItem>
+                          <SelectItem value="grouping">Agrupamento</SelectItem>
+                          <SelectItem value="bonus">Bonificação</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -652,13 +684,13 @@ export function ManualInvestmentTransactions({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {transaction.transaction_type === "buy" ? (
+                          {transaction.transaction_type === "buy" || transaction.transaction_type === "bonus" ? (
                             <TrendingUp className="h-3 w-3 text-success" />
-                          ) : (
+                          ) : transaction.transaction_type === "sell" ? (
                             <TrendingDown className="h-3 w-3 text-destructive" />
-                          )}
+                          ) : null}
                           <span className="text-xs sm:text-sm">
-                            {transaction.transaction_type === "buy" ? "Compra" : "Venda"}
+                            {({ buy: "Compra", sell: "Venda", split: "Split", grouping: "Agrupamento", bonus: "Bonificação" } as Record<string, string>)[transaction.transaction_type] || transaction.transaction_type}
                           </span>
                         </div>
                       </TableCell>
