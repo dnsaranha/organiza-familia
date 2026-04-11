@@ -112,6 +112,31 @@ export function useManualInvestments() {
         } else {
           positionMap.delete(tx.ticker);
         }
+      } else if (tx.transaction_type === "split" && existing) {
+        existing.quantity += tx.quantity;
+        existing.averagePrice = existing.totalCost / existing.quantity;
+      } else if (tx.transaction_type === "grouping" && existing) {
+        existing.quantity = Math.max(existing.quantity - tx.quantity, 0);
+        if (existing.quantity === 0) {
+          positionMap.delete(tx.ticker);
+        } else {
+          existing.averagePrice = existing.totalCost / existing.quantity;
+        }
+      } else if (tx.transaction_type === "bonus") {
+        if (existing) {
+          existing.quantity += tx.quantity;
+          existing.averagePrice = existing.totalCost / existing.quantity;
+        } else {
+          positionMap.set(tx.ticker, {
+            ticker: tx.ticker,
+            name: tx.asset_name,
+            category: (tx as any).asset_type || "OTHER",
+            quantity: tx.quantity,
+            averagePrice: 0,
+            totalCost: 0,
+            totalFees: 0,
+          });
+        }
       }
     });
 

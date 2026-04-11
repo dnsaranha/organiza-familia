@@ -54,6 +54,18 @@ export const calculateManualPositions = (transactions: InvestmentTransaction[]):
             totalCostBasis -= costOfSold;
             quantity -= t.quantity;
          }
+      } else if (t.transaction_type === 'split') {
+        // Split: quantity increases, cost basis stays the same
+        quantity += t.quantity;
+      } else if (t.transaction_type === 'grouping') {
+        // Agrupamento (reverse split): quantity decreases, cost basis stays the same
+        if (quantity > 0) {
+          quantity = Math.max(quantity - t.quantity, 0);
+          if (quantity === 0) totalCostBasis = 0;
+        }
+      } else if (t.transaction_type === 'bonus') {
+        // Bonificação: new shares received at no cost
+        quantity += t.quantity;
       }
     }
 
