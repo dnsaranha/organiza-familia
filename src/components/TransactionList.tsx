@@ -424,7 +424,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
 
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
                 {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : filteredTransactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>{searchQuery.trim() ? 'Nenhuma transação encontrada para a busca.' : 'Nenhuma transação encontrada para os filtros selecionados.'}</p></div> : (
-                    transactions.map((transaction) => {
+                    filteredTransactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
