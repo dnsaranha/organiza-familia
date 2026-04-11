@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter, Search } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
