@@ -5,7 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Minus, Loader2, Users, AlertTriangle, Pencil } from "lucide-react";
+import { Plus, Minus, Loader2, Users, AlertTriangle, Pencil, CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +40,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,12 +70,15 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
       setCategory(transactionToEdit.category);
       setDescription(transactionToEdit.description || '');
       setGroupId(transactionToEdit.group_id);
+      if (transactionToEdit.date) {
+        setSelectedDate(parse(transactionToEdit.date, 'yyyy-MM-dd', new Date()));
+      }
     } else {
-      // Reseta o formulário se não estiver em modo de edição (ex: ao criar uma nova transação)
       setType('expense');
       setAmountValue(0);
       setCategory('');
       setDescription('');
+      setSelectedDate(new Date());
       setGroupId(null);
     }
   }, [isEditMode, transactionToEdit, setAmountValue]);
@@ -88,8 +97,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
 
     setLoading(true);
     try {
-      const d = new Date();
-      const localDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const localDateString = format(selectedDate, 'yyyy-MM-dd');
 
       const transactionData = {
         user_id: user.id,
@@ -98,7 +106,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         amount: amountValue,
         category,
         description: description || null,
-        date: isEditMode ? transactionToEdit.date : localDateString,
+        date: localDateString,
         updated_at: new Date().toISOString(),
       };
 
@@ -128,6 +136,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         setAmountValue(0);
         setCategory('');
         setDescription('');
+        setSelectedDate(new Date());
         setGroupId(null);
       }
 
@@ -232,6 +241,37 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Date */}
+            <div className="space-y-2">
+              <Label>Data *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                    disabled={loading}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    locale={ptBR}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Group Selector - Hidden in Edit Mode */}
