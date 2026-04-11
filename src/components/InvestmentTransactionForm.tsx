@@ -68,9 +68,10 @@ export function InvestmentTransactionForm({ onSuccess }: InvestmentTransactionFo
 
       if (error) throw error;
 
+      const typeLabels: Record<string, string> = { buy: "compra", sell: "venda", split: "split", grouping: "agrupamento", bonus: "bonificação" };
       toast({
         title: "Sucesso!",
-        description: `Transação de ${formData.transaction_type === 'buy' ? 'compra' : 'venda'} registrada.`,
+        description: `Transação de ${typeLabels[formData.transaction_type] || formData.transaction_type} registrada.`,
       });
 
       setFormData({
@@ -129,6 +130,9 @@ export function InvestmentTransactionForm({ onSuccess }: InvestmentTransactionFo
               <SelectContent>
                 <SelectItem value="buy">Compra</SelectItem>
                 <SelectItem value="sell">Venda</SelectItem>
+                <SelectItem value="split">Split</SelectItem>
+                <SelectItem value="grouping">Agrupamento</SelectItem>
+                <SelectItem value="bonus">Bonificação</SelectItem>
               </SelectContent>
             </Select>
           </div>
