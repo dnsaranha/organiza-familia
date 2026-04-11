@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Clock, AlertTriangle, ChevronUp, MoreHorizontal, Pencil, Trash2, Loader2, Upload, Download, FileDown, FileUp, Filter, Search } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,7 +118,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
-
+  const [searchQuery, setSearchQuery] = useState('');
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -321,6 +322,22 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const formatCurrency = (amount: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
   const formatDate = (dateString: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateString));
 
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const terms = searchQuery.toLowerCase().trim().split(/\s+/);
+    return transactions.filter((t) => {
+      const searchable = [
+        t.description || '',
+        t.category || '',
+        t.type === 'income' ? 'receita' : 'despesa',
+        formatCurrency(t.amount),
+        String(t.amount),
+        new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(t.date)),
+      ].join(' ').toLowerCase();
+      return terms.every((term) => searchable.includes(term));
+    });
+  }, [transactions, searchQuery]);
+
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
@@ -395,9 +412,19 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                 </div>
               </div>
 
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por descrição, categoria, valor, data..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
-                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : transactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>Nenhuma transação encontrada para os filtros selecionados.</p></div> : (
-                    transactions.map((transaction) => {
+                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : filteredTransactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>{searchQuery.trim() ? 'Nenhuma transação encontrada para a busca.' : 'Nenhuma transação encontrada para os filtros selecionados.'}</p></div> : (
+                    filteredTransactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
