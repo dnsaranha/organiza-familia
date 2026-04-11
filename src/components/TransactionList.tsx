@@ -322,6 +322,22 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const formatCurrency = (amount: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
   const formatDate = (dateString: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateString));
 
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const terms = searchQuery.toLowerCase().trim().split(/\s+/);
+    return transactions.filter((t) => {
+      const searchable = [
+        t.description || '',
+        t.category || '',
+        t.type === 'income' ? 'receita' : 'despesa',
+        formatCurrency(t.amount),
+        String(t.amount),
+        new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(t.date)),
+      ].join(' ').toLowerCase();
+      return terms.every((term) => searchable.includes(term));
+    });
+  }, [transactions, searchQuery]);
+
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
