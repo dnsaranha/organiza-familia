@@ -165,7 +165,7 @@ export class FinancialSecurity {
         userId,
         timestamp: new Date().toISOString(),
         hash: auditHash,
-        details: process.env.NODE_ENV === 'development' ? details : '[REDACTED]',
+        details: import.meta.env.DEV ? details : '[REDACTED]',
       });
     } catch (error) {
       console.error('Erro ao registrar evento de auditoria:', error);
