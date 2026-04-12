@@ -15,6 +15,7 @@ const Investments = () => {
     enhancedAssets,
     portfolioEvolution,
     dividendHistory,
+    dividendChartData,
     getEnhancedAssetsData,
     getPortfolioEvolutionData,
     getDividendHistoryData,
@@ -31,6 +32,17 @@ const Investments = () => {
 
     loadInitialData();
   }, [getEnhancedAssetsData, getPortfolioEvolutionData, getDividendHistoryData]);
+
+    const currentQuantities = useMemo(() => {
+    const qtys: Record<string, number> = {};
+    if (Array.isArray(enhancedAssets)) {
+      enhancedAssets.forEach(a => {
+        const symbol = a.symbol ? a.symbol.replace(".SA", "") : "";
+        if (symbol) qtys[symbol] = a.quantity;
+      });
+    }
+    return qtys;
+  }, [enhancedAssets]);
 
   const totalValue = useMemo(() => {
     if (!Array.isArray(enhancedAssets)) return 0;
@@ -106,11 +118,11 @@ const Investments = () => {
         </div>
 
         <div className="mb-6">
-          <DividendMonthlyTable assetsData={dividendHistory} loading={loading} />
+          <DividendMonthlyTable assetsData={dividendHistory} currentQuantities={currentQuantities} loading={loading} />
         </div>
 
         <div className="mb-6">
-          <DividendHistoryChart data={[]} loading={loading} />
+          <DividendHistoryChart data={dividendChartData} loading={loading} />
         </div>
       </div>
     </FeatureGate>
