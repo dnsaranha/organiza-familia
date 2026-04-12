@@ -41,8 +41,9 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
   // Tentar a API v8 chart primeiro (mais confiável)
   const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
   const now = Math.floor(Date.now() / 1000);
+  const period1 = 0; // Fetch all historical data
   
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${oneYearAgo}&period2=${now}&interval=1mo&events=div`;
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${now}&interval=1mo&events=div`;
   
   console.log(`Fetching chart data from: ${chartUrl}`);
   
@@ -93,7 +94,10 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
     if (divData && divData.amount) {
       const date = new Date(parseInt(timestamp) * 1000).toISOString().split('T')[0];
       historico_dividendos.push({ date, amount: divData.amount });
-      dividendos_12m += divData.amount;
+
+      if (parseInt(timestamp) >= oneYearAgo) {
+        dividendos_12m += divData.amount;
+      }
     }
   }
 
