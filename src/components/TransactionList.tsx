@@ -119,6 +119,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -338,6 +340,17 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     });
   }, [transactions, searchQuery]);
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, budgetFilter, categoryFilter, dateRange]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredTransactions.slice(start, start + itemsPerPage);
+  }, [filteredTransactions, currentPage, itemsPerPage]);
+
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
@@ -422,9 +435,9 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                 />
               </div>
 
-              <ScrollArea className="h-72"><div className="space-y-4 pr-4">
-                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : filteredTransactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>{searchQuery.trim() ? 'Nenhuma transação encontrada para a busca.' : 'Nenhuma transação encontrada para os filtros selecionados.'}</p></div> : (
-                    filteredTransactions.map((transaction) => {
+              <div className="space-y-4 pr-1">
+                {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : paginatedTransactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>{searchQuery.trim() ? 'Nenhuma transação encontrada para a busca.' : 'Nenhuma transação encontrada para os filtros selecionados.'}</p></div> : (
+                    paginatedTransactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
@@ -469,7 +482,73 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                       );
                     })
                 )}
-              </div></ScrollArea>
+              </div>
+
+              {/* Pagination Controls */}
+              {!loading && !error && filteredTransactions.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                    <span>Exibir</span>
+                    <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[70px] h-8 text-xs sm:text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span>por página</span>
+                    <span className="ml-2 hidden sm:inline">
+                      ({filteredTransactions.length} {filteredTransactions.length === 1 ? 'registro' : 'registros'})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <LucideIcons.ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <LucideIcons.ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs sm:text-sm text-muted-foreground px-2 whitespace-nowrap">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <LucideIcons.ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <LucideIcons.ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </CollapsibleContent>
         </Collapsible>
