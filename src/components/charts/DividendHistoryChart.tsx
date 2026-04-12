@@ -43,7 +43,12 @@ const DividendHistoryChart = ({
   const [period, setPeriod] = useState("12m");
   const [groupBy, setGroupBy] = useState("monthly");
 
-  const filteredData = data && data.length > 0 ? data.slice(-12) : []; // Default to last 12 months
+  let months = 12;
+  if (period === "6m") months = 6;
+  if (period === "24m") months = 24;
+  if (period === "all") months = 120; // up to 10 years
+
+  const filteredData = data && data.length > 0 ? data.slice(-months) : [];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {

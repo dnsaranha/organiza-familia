@@ -13,6 +13,7 @@ export const useB3Data = () => {
   const [portfolioEvolution, setPortfolioEvolution] = useState<any[]>([]);
   const [enhancedAssets, setEnhancedAssets] = useState<any[]>([]);
   const [dividendHistory, setDividendHistory] = useState<any[]>([]);
+  const [dividendChartData, setDividendChartData] = useState<any[]>([]);
   const [benchmarkData, setBenchmarkData] = useState<{
     value: number;
     change: number;
@@ -629,41 +630,148 @@ export const useB3Data = () => {
         return [];
       }
 
-      // 1. Buscar transações manuais do usuário para obter os tickers
+      // 1. Fetch Manual Transactions
       const { data: manualTransactions } = await supabase
         .from("investment_transactions")
-        .select("ticker")
+        .select("ticker, quantity, transaction_date, transaction_type")
         .eq("user_id", user.id);
 
-      if (!manualTransactions || manualTransactions.length === 0) {
+      // 2. Fetch Pluggy Items
+      let pluggyInvestments: any[] = [];
+      const { data: pluggyItems } = await supabase
+        .from("pluggy_items")
+        .select("item_id")
+        .eq("user_id", user.id);
+
+      if (pluggyItems && pluggyItems.length > 0) {
+        const investmentPromises = pluggyItems.map((item) =>
+          supabase.functions.invoke("pluggy-investments", {
+            body: { itemId: item.item_id },
+          })
+        );
+        const investmentResults = await Promise.all(investmentPromises);
+        pluggyInvestments = investmentResults.flatMap(
+          (result) => result.data?.investments || []
+        );
+      }
+
+      const pluggyTickers = pluggyInvestments
+        .map((inv) => {
+          const name = inv.name || inv.code || "";
+          const tickerMatch = name.match(/([A-Z]{4}\d{1,2})/g);
+          return tickerMatch && tickerMatch[0] ? `${tickerMatch[0]}.SA` : null;
+        })
+        .filter(Boolean) as string[];
+
+      const manualTickers = (manualTransactions || []).map(t => {
+        const ticker = t.ticker;
+        if (ticker.match(/^[A-Z]{4}\d{1,2}$/)) return `${ticker}.SA`;
+        return ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+      });
+
+      const uniqueTickers = [...new Set([...manualTickers, ...pluggyTickers])];
+
+      if (uniqueTickers.length === 0) {
         setDividendHistory([]);
         return [];
       }
 
-      // 2. Obter tickers únicos
-      const uniqueTickers = [...new Set(
-        manualTransactions.map(t => {
-          const ticker = t.ticker;
-          if (ticker.match(/^[A-Z]{4}\d{1,2}$/)) return `${ticker}.SA`;
-          return ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-        })
-      )];
-
       // 3. Buscar dados de dividendos do financial_assets
       const { data: assetsData, error } = await supabase
         .from("financial_assets")
-        .select("ticker, dividend_history")
+        .select("ticker, dividend_history, current_price")
         .in("ticker", uniqueTickers);
 
       if (error) throw error;
 
-      // 4. Formatar os dados para o componente
+      // Create historyData for DividendMonthlyTable
       const historyData = (assetsData || []).map(asset => ({
         ticker: asset.ticker,
         dividendHistory: (asset.dividend_history as any[]) || []
       }));
 
+      // Calculate monthly dividend history for the DividendHistoryChart (grouped by month)
+      const monthlyDataMap = new Map();
+
+      // We need to calculate quantity per ticker at specific dates.
+      // For simplicity, let's use the calculateManualPositions for manual investments
+      // to get the total quantity, but ideally it should be point-in-time.
+      // Since calculating point-in-time for every month is complex, we will estimate
+      // using current manual position quantity, similar to what PortfolioEvolution does.
+      let manualPositions = [];
+      if (manualTransactions && manualTransactions.length > 0) {
+         manualPositions = calculateManualPositions(manualTransactions as Transaction[]);
+      }
+
+      const now = new Date();
+      for (let i = 23; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
+        let totalDividends = 0;
+        let totalCost = 0;
+        let assetsInMonth = [];
+
+        (assetsData || []).forEach(asset => {
+           let posQuantity = 0;
+           let posCost = 0;
+
+           // Check manual
+           const manualPos = manualPositions.find(p => {
+               const ticker = p.ticker.match(/^[A-Z]{4}\d{1,2}$/) ? `${p.ticker}.SA` : (p.ticker.endsWith(".SA") ? p.ticker : `${p.ticker}.SA`);
+               return ticker === asset.ticker;
+           });
+
+           if (manualPos) {
+               posQuantity += manualPos.quantity;
+               posCost += manualPos.totalCost;
+           }
+
+           // Check pluggy
+           const pluggyPos = pluggyInvestments.find(inv => {
+               const name = inv.name || inv.code || "";
+               const tickerMatch = name.match(/([A-Z]{4}\d{1,2})/g);
+               const ticker = tickerMatch && tickerMatch[0] ? `${tickerMatch[0]}.SA` : null;
+               return ticker === asset.ticker;
+           });
+
+           if (pluggyPos) {
+               posQuantity += pluggyPos.quantity || 1;
+               posCost += pluggyPos.balance || (asset.current_price * (pluggyPos.quantity || 1));
+           }
+
+           if (posQuantity > 0) {
+               totalCost += posCost;
+               const monthDivs = (asset.dividend_history || []).filter(d => {
+                   const dDate = new Date(d.date);
+                   return dDate.getMonth() === date.getMonth() && dDate.getFullYear() === date.getFullYear();
+               }).reduce((sum, d) => sum + (d.amount * posQuantity), 0);
+
+               if (monthDivs > 0) {
+                   totalDividends += monthDivs;
+                   assetsInMonth.push({
+                       symbol: asset.ticker.replace('.SA', ''),
+                       amount: monthDivs
+                   });
+               }
+           }
+        });
+
+        // Calculate Yield on Cost for the month
+        // totalDividends is for the month, Yield on Cost usually annualized but here maybe we show monthly or 12m trailing. Let's just show monthly yield on cost * 100
+        const yieldOnCost = totalCost > 0 ? (totalDividends / totalCost) * 100 : 0;
+
+        monthlyDataMap.set(monthKey, {
+            month: monthKey,
+            yieldOnCost: yieldOnCost,
+            totalDividends: totalDividends,
+            assets: assetsInMonth
+        });
+      }
+
       setDividendHistory(historyData);
+      setDividendChartData(Array.from(monthlyDataMap.values()));
+
       return historyData;
     } catch (error) {
       console.error("Erro ao carregar histórico de dividendos:", error);
@@ -712,6 +820,7 @@ export const useB3Data = () => {
     portfolioEvolution,
     enhancedAssets,
     dividendHistory,
+    dividendChartData,
     benchmarkData,
     loading,
     connected,

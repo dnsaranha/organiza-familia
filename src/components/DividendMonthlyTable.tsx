@@ -48,6 +48,7 @@ interface TransactionData {
 
 interface DividendMonthlyTableProps {
   assetsData: AssetDividendData[];
+  currentQuantities?: Record<string, number>;
   loading?: boolean;
 }
 
@@ -56,7 +57,7 @@ const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 type PeriodFilter = "current_year" | "12_months" | "all";
 type DisplayMode = "value" | "yield";
 
-export function DividendMonthlyTable({ assetsData, loading = false }: DividendMonthlyTableProps) {
+export function DividendMonthlyTable({ assetsData, currentQuantities = {}, loading = false }: DividendMonthlyTableProps) {
   const [showFilter, setShowFilter] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
@@ -123,27 +124,41 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
     return Array.from(types);
   }, [transactions]);
 
-  // Calculate quantity held at a specific date for a ticker
+  // Calculate quantity to use for dividend multiplier
   const getQuantityAtDate = (ticker: string, date: Date): number => {
     const normalizedTicker = ticker.replace(".SA", "");
-    let quantity = 0;
 
-    const sortedTxs = transactions
-      .filter(tx => tx.ticker.replace(".SA", "") === normalizedTicker)
-      .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+    // Check if we have any manual transactions for this ticker
+    const tickerTxs = transactions.filter(tx => tx.ticker.replace(".SA", "") === normalizedTicker);
+    const hasTransactions = tickerTxs.length > 0;
 
-    for (const tx of sortedTxs) {
-      const txDate = new Date(tx.transaction_date);
-      if (txDate > date) break;
+    if (hasTransactions) {
+      // Point-in-time calculation for manual transactions
+      let quantity = 0;
+      const sortedTxs = [...tickerTxs].sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
 
-      if (tx.transaction_type === "buy") {
-        quantity += tx.quantity;
-      } else if (tx.transaction_type === "sell") {
-        quantity -= tx.quantity;
+      for (const tx of sortedTxs) {
+        const txDate = new Date(tx.transaction_date);
+        if (txDate > date) break;
+
+        if (tx.transaction_type === "buy") {
+          quantity += tx.quantity;
+        } else if (tx.transaction_type === "sell") {
+          quantity -= tx.quantity;
+        }
       }
+      return Math.max(0, quantity);
     }
 
-    return Math.max(0, quantity);
+    // If there are no manual transactions, this asset likely came from an automatic integration (Pluggy)
+    // where we only know the current balance, not the historical purchases.
+    // In this case, we use the current quantity to show the historical yield of their current position.
+    const currentQty = currentQuantities[normalizedTicker] || currentQuantities[`${normalizedTicker}.SA`] || 0;
+
+    if (currentQty > 0) return currentQty;
+
+    // Fallback if neither transactions nor current quantity exists
+    return 1;
   };
 
   // Filter assets by selected tickers and types
