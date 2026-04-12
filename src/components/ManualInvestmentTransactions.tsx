@@ -41,6 +41,7 @@ import * as XLSX from "xlsx";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Select,
   SelectContent,
@@ -68,6 +69,9 @@ export function ManualInvestmentTransactions({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -489,6 +493,44 @@ export function ManualInvestmentTransactions({
 
   const positionSummary = calculateManualPositions(transactions).filter(p => p.quantity > 0);
 
+  const paginatedTransactions = useMemo(() => {
+    let filtered = transactions;
+    if (searchQuery.trim()) {
+      const terms = searchQuery.toLowerCase().trim().split(/\s+/);
+      filtered = filtered.filter((t) => {
+        const searchable = [
+          t.ticker,
+          t.asset_name || '',
+          t.transaction_type,
+          format(new Date(t.transaction_date), "dd/MM/yy"),
+        ].join(' ').toLowerCase();
+        return terms.every((term) => searchable.includes(term));
+      });
+    }
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [transactions, searchQuery, currentPage, itemsPerPage]);
+
+  const totalFilteredCount = useMemo(() => {
+    let filtered = transactions;
+    if (searchQuery.trim()) {
+      const terms = searchQuery.toLowerCase().trim().split(/\s+/);
+      filtered = filtered.filter((t) => {
+        const searchable = [
+          t.ticker,
+          t.asset_name || '',
+          t.transaction_type,
+          format(new Date(t.transaction_date), "dd/MM/yy"),
+        ].join(' ').toLowerCase();
+        return terms.every((term) => searchable.includes(term));
+      });
+    }
+    return filtered.length;
+  }, [transactions, searchQuery]);
+
+  const totalPages = Math.ceil(totalFilteredCount / itemsPerPage);
+
+
   return (
     <div className="space-y-4">
       {positionSummary.length > 0 && (
@@ -529,17 +571,49 @@ export function ManualInvestmentTransactions({
                     </TableRow>
                   ))}
                 </TableBody>
+
               </Table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pb-2 px-2">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalFilteredCount)} de {totalFilteredCount}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={String(itemsPerPage)} onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[80px] h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                    <span className="text-sm">Página {currentPage} de {totalPages}</span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Próxima</Button>
+                  </div>
+                </div>
+              )}
             </div>
+
           </CardContent>
         </Card>
       )}
 
       <Card>
+
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <CardTitle className="text-base sm:text-lg">Histórico de Transações</CardTitle>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                placeholder="Buscar (ex: PETR4 Compra)..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full sm:w-64 h-9"
+              />
+
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
@@ -677,7 +751,7 @@ export function ManualInvestmentTransactions({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((transaction) => (
+                  {paginatedTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="text-xs sm:text-sm">
                         {format(new Date(transaction.transaction_date), "dd/MM/yy")}
@@ -737,8 +811,32 @@ export function ManualInvestmentTransactions({
                     </TableRow>
                   ))}
                 </TableBody>
+
               </Table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pb-2 px-2">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalFilteredCount)} de {totalFilteredCount}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={String(itemsPerPage)} onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[80px] h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                    <span className="text-sm">Página {currentPage} de {totalPages}</span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Próxima</Button>
+                  </div>
+                </div>
+              )}
             </div>
+
           )}
         </CardContent>
       </Card>
