@@ -119,6 +119,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
