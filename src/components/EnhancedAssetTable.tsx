@@ -83,7 +83,7 @@ const EnhancedAssetTable = ({
   };
 
   const filteredAndSortedAssets = useMemo(() => {
-    let filtered = assets.filter((asset) => {
+    let filtered = assets.filter(asset => asset.quantity > 0).filter((asset) => {
       const displayType = getAssetDisplayType(asset);
       const matchesFilter = assetFilter === "all" || assetFilter === "Todos" || displayType === assetFilter;
 

@@ -119,6 +119,8 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -338,6 +340,13 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     });
   }, [transactions, searchQuery]);
 
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredTransactions, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
@@ -400,7 +409,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                         {dateRange?.from ? (dateRange.to ? (`${format(dateRange.from, "d/MM/yy")} - ${format(dateRange.to, "d/MM/yy")}`) : format(dateRange.from, "d/MM/yy")) : (<span>Período</span>)}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent>
+                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={(range) => { setDateRange(range); setCurrentPage(1); }} numberOfMonths={2} /></PopoverContent>
                   </Popover>
                 </div>
 
@@ -417,14 +426,14 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                 <Input
                   placeholder="Buscar por descrição, categoria, valor, data..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   className="pl-9"
                 />
               </div>
 
               <ScrollArea className="h-72"><div className="space-y-4 pr-4">
                 {loading ? renderSkeleton() : error ? <div className="text-center py-8 text-destructive flex flex-col items-center gap-2"><AlertTriangle className="h-8 w-8" /><p>{error}</p></div> : filteredTransactions.length === 0 ? <div className="text-center py-8 text-muted-foreground"><p>{searchQuery.trim() ? 'Nenhuma transação encontrada para a busca.' : 'Nenhuma transação encontrada para os filtros selecionados.'}</p></div> : (
-                    filteredTransactions.map((transaction) => {
+                    paginatedTransactions.map((transaction) => {
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
@@ -470,6 +479,29 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                     })
                 )}
               </div></ScrollArea>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} de {filteredTransactions.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={String(itemsPerPage)} onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[80px] h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                    <span className="text-sm">Página {currentPage} de {totalPages}</span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Próxima</Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </CollapsibleContent>
         </Collapsible>

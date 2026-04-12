@@ -487,7 +487,7 @@ export function ManualInvestmentTransactions({
     );
   }
 
-  const positionSummary = calculateManualPositions(transactions);
+  const positionSummary = calculateManualPositions(transactions).filter(p => p.quantity > 0);
 
   return (
     <div className="space-y-4">
