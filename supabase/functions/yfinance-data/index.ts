@@ -39,10 +39,10 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
   };
 
   // Tentar a API v8 chart primeiro (mais confiável)
-  const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
+  const oneYearAgo = 0;
   const now = Math.floor(Date.now() / 1000);
   
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${oneYearAgo}&period2=${now}&interval=1mo&events=div`;
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=0&period2=${now}&interval=1mo&events=div`;
   
   console.log(`Fetching chart data from: ${chartUrl}`);
   

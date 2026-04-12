@@ -538,28 +538,50 @@ export const useB3Data = () => {
             };
           });
 
-          const enhancedManual = manualPositions.map((pos) => {
-             // Determine correct ticker for lookup
-             const lookupTicker = pos.ticker.match(/^[A-Z]{4}\d{1,2}$/) ? `${pos.ticker}.SA` : (pos.ticker.endsWith(".SA") ? pos.ticker : `${pos.ticker}.SA`);
+          const getQuantityAtDate = (ticker: string, dateStr: string, txs: any[]) => {
+             const date = new Date(dateStr);
+             let qty = 0;
+             for (const tx of txs) {
+                 const txDate = new Date(tx.transaction_date);
+                 if (txDate > date) break;
+                 if (tx.ticker === ticker || tx.ticker === ticker.replace('.SA', '')) {
+                     if (tx.transaction_type === 'buy') qty += tx.quantity;
+                     else if (tx.transaction_type === 'sell') qty -= tx.quantity;
+                 }
+             }
+             return Math.max(0, qty);
+          };
 
+          const sortedManualTxs = [...manualTransactions].sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+
+          const enhancedManual = manualPositions.map((pos) => {
+             const lookupTicker = pos.ticker.match(/^[A-Z]{4}\d{1,2}$/) ? `${pos.ticker}.SA` : (pos.ticker.endsWith(".SA") ? pos.ticker : `${pos.ticker}.SA`);
              const yfinanceAsset = yfinanceData.find((asset) => asset.ticker === lookupTicker);
 
-             const currentPrice = yfinanceAsset?.preco_atual || pos.averagePrice; // Fallback to avg price if no quote
+             const currentPrice = yfinanceAsset?.preco_atual || pos.averagePrice;
              const marketValue = currentPrice * pos.quantity;
              const cost = pos.totalCost;
              const profitLoss = marketValue - cost;
              const profitability = cost > 0 ? (profitLoss / cost) * 100 : 0;
 
-             // Calculate dividends and Yield on Cost
-             // `dividendos_12m` from yfinance is dividends per share over last 12 months.
-             const dividendPerShare = yfinanceAsset?.dividendos_12m || 0;
-             const totalDividendsReceived = dividendPerShare * pos.quantity;
-             const yieldOnCostCalc = pos.averagePrice > 0 ? (dividendPerShare / pos.averagePrice) * 100 : 0;
+             let totalDividendsReceived = 0;
+             if (yfinanceAsset?.historico_dividendos && Array.isArray(yfinanceAsset.historico_dividendos)) {
+                 yfinanceAsset.historico_dividendos.forEach((div: any) => {
+                     const qtyAtDiv = getQuantityAtDate(pos.ticker, div.date, sortedManualTxs);
+                     if (qtyAtDiv > 0 && div.amount) {
+                         totalDividendsReceived += (div.amount * qtyAtDiv);
+                     }
+                 });
+             } else if (yfinanceAsset?.dividendos_12m) {
+                 totalDividendsReceived = yfinanceAsset.dividendos_12m * pos.quantity;
+             }
+
+             const yieldOnCostCalc = pos.totalCost > 0 ? (totalDividendsReceived / pos.totalCost) * 100 : 0;
 
              return {
                symbol: pos.ticker,
                name: yfinanceAsset?.nome || pos.asset_name,
-               type: pos.asset_type, // Use the asset_type from the manual position
+               type: pos.asset_type,
                subtype: null,
                currentPrice,
                quantity: pos.quantity,
@@ -573,14 +595,10 @@ export const useB3Data = () => {
              };
           });
 
-          // Fix potential dividend calculation issues in Pluggy data
           const enhancedPluggyFixed = enhancedPluggy.map(p => {
-             // Ensure dividends are calculated as Total Dividends (per share * quantity)
-             // Pluggy data was initially assigned per-share dividends to `accumulatedDividends`.
              const divPerShare = p.accumulatedDividends;
              const totalDivs = divPerShare * p.quantity;
              const yoc = p.averagePrice > 0 ? (divPerShare / p.averagePrice) * 100 : 0;
-
              return {
                 ...p,
                 accumulatedDividends: totalDivs,
