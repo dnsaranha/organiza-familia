@@ -658,89 +658,11 @@ export function ManualInvestmentTransactions({
           </div>
         </CardHeader>
         <CardContent>
-          {transactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhuma transação registrada ainda.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs sm:text-sm min-w-[80px]">Data</TableHead>
-                    <TableHead className="text-xs sm:text-sm">Tipo</TableHead>
-                    <TableHead className="text-xs sm:text-sm min-w-[80px]">Ticker</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Qtd</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Preço</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Total</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Taxas</TableHead>
-                    <TableHead className="text-xs sm:text-sm w-[100px] text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="text-xs sm:text-sm">
-                        {format(new Date(transaction.transaction_date), "dd/MM/yy")}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {transaction.transaction_type === "buy" || transaction.transaction_type === "bonus" ? (
-                            <TrendingUp className="h-3 w-3 text-success" />
-                          ) : transaction.transaction_type === "sell" ? (
-                            <TrendingDown className="h-3 w-3 text-destructive" />
-                          ) : null}
-                          <span className="text-xs sm:text-sm">
-                            {({ buy: "Compra", sell: "Venda", split: "Split", grouping: "Agrupamento", bonus: "Bonificação" } as Record<string, string>)[transaction.transaction_type] || transaction.transaction_type}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium text-xs sm:text-sm">
-                        {transaction.ticker}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        {transaction.quantity}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        R$ {transaction.price.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        R$ {(transaction.quantity * transaction.price).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        R$ {transaction.fees.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setEditingTransaction(transaction)} className="h-8 w-8 p-0">
-                          <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Isso excluirá permanentemente a transação.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(transaction.id)}>Continuar</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <InvestmentTransactionHistory
+            transactions={transactions}
+            onEdit={setEditingTransaction}
+            onDelete={(id) => handleDelete(id)}
+          />
         </CardContent>
       </Card>
     </div>
