@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, Edit, TrendingUp, TrendingDown, PlusCircle, Upload, Download } from "lucide-react";
+import { PlusCircle, Upload, Download } from "lucide-react";
+import { InvestmentTransactionHistory } from "@/components/InvestmentTransactionHistory";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
