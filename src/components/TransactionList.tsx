@@ -340,6 +340,17 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
     });
   }, [transactions, searchQuery]);
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, budgetFilter, categoryFilter, dateRange]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredTransactions.slice(start, start + itemsPerPage);
+  }, [filteredTransactions, currentPage, itemsPerPage]);
+
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
