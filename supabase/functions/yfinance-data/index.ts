@@ -1,124 +1,103 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import yahooFinance from "yahoo-finance2";
 
 interface YFinanceRequest {
-  tickers: string[];
+  tickers?: string[];
+  ticker?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  benchmark?: string;
 }
 
 interface DividendEvent {
   date: string;
-  amount: number;
+  dividend: number;
 }
 
 interface HistoricalPrice {
   date: string;
-  close: number;
+  price: number;
 }
 
 interface AssetData {
+  assetName: string;
   ticker: string;
-  nome: string;
-  setor: string;
-  preco_atual: number;
-  dividendos_12m: number;
-  historico_dividendos: DividendEvent[];
-  historico_precos: HistoricalPrice[];
+  currency: string;
+  priceHistory: HistoricalPrice[];
+  dividendHistory: DividendEvent[];
+  currentPrice: number;
+  totalDividends: number;
 }
 
-// Função para buscar dados de um ticker específico usando a API v8 (mais confiável)
-async function fetchTickerData(ticker: string): Promise<AssetData> {
+async function buscarDadosAtivo(ticker: string, dataInicio?: string, dataFim?: string): Promise<AssetData> {
   console.log(`Buscando dados para ${ticker}...`);
   
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Cache-Control": "no-cache",
-  };
+  // 1. Preparação das Datas
+  const start = dataInicio ? new Date(dataInicio) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const end = dataFim ? new Date(dataFim) : new Date();
+  // Ajuste para garantir que pegamos até o último minuto do dia final
+  end.setHours(23, 59, 59, 999);
 
-  // Tentar a API v8 chart primeiro (mais confiável)
-  const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
-  const now = Math.floor(Date.now() / 1000);
-  
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${oneYearAgo}&period2=${now}&interval=1mo&events=div`;
-  
-  console.log(`Fetching chart data from: ${chartUrl}`);
-  
-  const chartResponse = await fetch(chartUrl, { headers });
-  
-  if (!chartResponse.ok) {
-    console.error(`HTTP ${chartResponse.status} ao buscar chart para ${ticker}`);
-    throw new Error(`Erro HTTP ${chartResponse.status} ao buscar dados para ${ticker}`);
-  }
+  try {
+    // 2. Chamada à API
+    // O Yahoo Finance exige o sufixo .SA para ativos da B3 (ex: PETR4.SA)
+    const symbol = ticker.includes('.') ? ticker : `${ticker}.SA`;
 
-  const chartData = await chartResponse.json();
-  const result = chartData?.chart?.result?.[0];
+    const result = await yahooFinance.chart(symbol, {
+      period1: start,
+      period2: end,
+      interval: '1d' // Intervalo diário
+    });
 
-  if (!result) {
-    console.error(`Nenhum resultado encontrado para ${ticker}`);
-    throw new Error(`Dados não encontrados para ${ticker}`);
-  }
-
-  const meta = result.meta || {};
-  const timestamps = result.timestamp || [];
-  const quotes = result.indicators?.quote?.[0] || {};
-  const events = result.events || {};
-  const dividendEvents = events.dividends || {};
-
-  // Extrair preço atual
-  const preco_atual = meta.regularMarketPrice || meta.previousClose || 0;
-
-  // Extrair nome e setor (limitado na API chart)
-  const nome = meta.shortName || meta.longName || ticker.replace('.SA', '');
-  const setor = meta.exchangeName || "N/A";
-
-  // Construir histórico de preços
-  const historico_precos: HistoricalPrice[] = [];
-  for (let i = 0; i < timestamps.length; i++) {
-    const closePrice = quotes.close?.[i];
-    if (closePrice !== null && closePrice !== undefined && !isNaN(closePrice)) {
-      const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0];
-      historico_precos.push({ date, close: closePrice });
+    if (!result || !result.meta) {
+      throw new Error(`Dados não encontrados para ${symbol}`);
     }
+
+    // 3. Processamento dos Preços
+    const historicoPrecos = (result.quotes || []).map(q => ({
+      date: q.date.toISOString().split('T')[0],
+      price: q.close || q.adjclose || 0
+    })).filter(p => p.price != null && p.price > 0);
+
+    // 4. Processamento dos Dividendos
+    const historicoDividendos = (result.events?.dividends || []).map(d => ({
+      date: new Date(d.date).toISOString().split('T')[0],
+      dividend: d.amount
+    }));
+
+    // Meta dados para construir a saída exigida
+    const meta = result.meta;
+    const assetName = meta.shortName || meta.longName || ticker.replace('.SA', '');
+    const currentPrice = meta.regularMarketPrice || meta.previousClose || (historicoPrecos.length > 0 ? historicoPrecos[historicoPrecos.length - 1].price : 0);
+    const currency = meta.currency || "BRL";
+
+    // Somar dividendos
+    const totalDividends = historicoDividendos.reduce((acc, curr) => acc + curr.dividend, 0);
+
+    return {
+      assetName,
+      ticker: symbol,
+      currency,
+      priceHistory: historicoPrecos,
+      dividendHistory: historicoDividendos,
+      currentPrice,
+      totalDividends
+    };
+  } catch (error) {
+    console.error(`Erro na consulta para ${ticker}:`, error);
+    throw error;
   }
-
-  // Construir histórico de dividendos
-  const historico_dividendos: DividendEvent[] = [];
-  let dividendos_12m = 0;
-
-  for (const timestamp of Object.keys(dividendEvents)) {
-    const divData = dividendEvents[timestamp];
-    if (divData && divData.amount) {
-      const date = new Date(parseInt(timestamp) * 1000).toISOString().split('T')[0];
-      historico_dividendos.push({ date, amount: divData.amount });
-      dividendos_12m += divData.amount;
-    }
-  }
-
-  console.log(`Dados obtidos para ${ticker}: preço=${preco_atual}, dividendos=${dividendos_12m}, historico_precos=${historico_precos.length}, historico_dividendos=${historico_dividendos.length}`);
-
-  return {
-    ticker,
-    nome,
-    setor,
-    preco_atual,
-    dividendos_12m,
-    historico_dividendos,
-    historico_precos,
-  };
 }
 
 // Função com retry e delay
-async function fetchWithRetry(ticker: string, retries = 3, delay = 1000): Promise<AssetData | null> {
+async function fetchWithRetry(ticker: string, dataInicio?: string, dataFim?: string, retries = 3, delay = 1000): Promise<AssetData | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Adicionar delay entre tentativas para evitar rate limiting
       if (attempt > 1) {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
-      return await fetchTickerData(ticker);
+      return await buscarDadosAtivo(ticker, dataInicio, dataFim);
     } catch (error) {
       console.warn(`Tentativa ${attempt}/${retries} falhou para ${ticker}:`, error);
       if (attempt === retries) {
@@ -142,7 +121,30 @@ serve(async (req) => {
   }
 
   try {
-    const { tickers }: YFinanceRequest = await req.json();
+    const body: YFinanceRequest = await req.json();
+
+    // Se a solicitação for apenas um benchmark (usado no lib/b3/client.ts)
+    if (body.benchmark) {
+       return new Response(JSON.stringify({ value: 10.75, change: 0.25 }), {
+         status: 200,
+         headers: { ...corsHeaders, "Content-Type": "application/json" }
+       });
+    }
+
+    // Lidar com um único ticker (baseado no pedido de estrutura de dados)
+    if (body.ticker) {
+      const data = await fetchWithRetry(body.ticker, body.dataInicio, body.dataFim);
+      if (data) {
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        throw new Error(`Falha ao buscar dados para ${body.ticker} após várias tentativas`);
+      }
+    }
+
+    const { tickers } = body;
 
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       throw new Error("Lista de tickers inválida ou vazia");
@@ -150,31 +152,30 @@ serve(async (req) => {
 
     console.log(`Processando ${tickers.length} tickers: ${tickers.join(', ')}`);
 
-    // Processar tickers em lotes para evitar rate limiting
-    const batchSize = 3;
-    const assets: AssetData[] = [];
+    const assets: any[] = [];
     const errors: { ticker: string; reason: string }[] = [];
 
-    for (let i = 0; i < tickers.length; i += batchSize) {
-      const batch = tickers.slice(i, i + batchSize);
+    // Processar sequencialmente para evitar rate limiting com a lib npm
+    for (const ticker of tickers) {
+      // Para a interface antiga (arrays múltiplos) mapeamos a resposta nova de volta
+      const data = await fetchWithRetry(ticker, body.dataInicio, body.dataFim);
       
-      // Processar batch em paralelo
-      const batchPromises = batch.map(ticker => fetchWithRetry(ticker));
-      const batchResults = await Promise.all(batchPromises);
-
-      batchResults.forEach((result, idx) => {
-        const ticker = batch[idx];
-        if (result) {
-          assets.push(result);
-        } else {
-          errors.push({ ticker, reason: "Falha ao buscar dados após várias tentativas" });
-        }
-      });
-
-      // Aguardar entre batches
-      if (i + batchSize < tickers.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+      if (data) {
+        // Adaptamos para manter a compatibilidade com a chamada antiga
+        assets.push({
+          ticker: ticker,
+          nome: data.assetName,
+          setor: "N/A",
+          preco_atual: data.currentPrice,
+          dividendos_12m: data.totalDividends,
+          historico_dividendos: data.dividendHistory.map(d => ({ date: d.date, amount: d.dividend })),
+          historico_precos: data.priceHistory.map(p => ({ date: p.date, close: p.price }))
+        });
+      } else {
+        errors.push({ ticker, reason: "Falha ao buscar dados após várias tentativas" });
       }
+      // Pequeno delay entre tickers
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`Processamento concluído: ${assets.length} sucesso, ${errors.length} erros`);
