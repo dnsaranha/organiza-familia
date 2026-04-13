@@ -56,7 +56,7 @@ const Investments = () => {
       <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Meus Investimentos</h1>
-          <Button onClick={handleRefresh} disabled={loading} size="sm">
+          <Button onClick={() => handleRefresh()} disabled={loading} size="sm">
             <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar Dados
           </Button>
