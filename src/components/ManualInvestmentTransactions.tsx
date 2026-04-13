@@ -197,7 +197,8 @@ export function ManualInvestmentTransactions({
       });
 
       loadTransactions();
-      if (onTransactionsUpdate) onTransactionsUpdate();
+      const importedTickers = [...new Set(transactionsToInsert.map((t: any) => t.ticker))];
+      if (onTransactionsUpdate) onTransactionsUpdate(importedTickers);
     } catch (error: any) {
       toast({
         title: "Erro na importação",
@@ -303,7 +304,7 @@ export function ManualInvestmentTransactions({
 
       loadTransactions();
       if (onTransactionsUpdate) {
-        onTransactionsUpdate();
+        onTransactionsUpdate(ticker ? [ticker] : undefined);
       }
     } catch (error: any) {
       toast({
@@ -464,7 +465,7 @@ export function ManualInvestmentTransactions({
       setEditingTransaction(null);
       loadTransactions();
       if (onTransactionsUpdate) {
-        onTransactionsUpdate();
+        onTransactionsUpdate([dataToSubmit.ticker]);
       }
     } catch (error: any) {
       toast({
