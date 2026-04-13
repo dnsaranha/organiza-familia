@@ -45,10 +45,10 @@ const Investments = () => {
   const totalProfitLoss = totalValue - totalCost;
   const totalProfitability = totalCost > 0 ? (totalProfitLoss / totalCost) * 100 : 0;
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (changedTickers?: string[]) => {
     await getEnhancedAssetsData(true);
     await getPortfolioEvolutionData("12m", true);
-    await getDividendHistoryData();
+    await getDividendHistoryData(changedTickers);
   };
 
   return (
