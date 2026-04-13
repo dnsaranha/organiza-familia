@@ -60,7 +60,7 @@ const assetTypes = [
 ];
 
 interface ManualInvestmentTransactionsProps {
-  onTransactionsUpdate?: () => void;
+  onTransactionsUpdate?: (changedTickers?: string[]) => void;
 }
 
 export function ManualInvestmentTransactions({
