@@ -3,6 +3,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 interface YFinanceRequest {
   tickers: string[];
+  fullHistory?: boolean; // When true, fetch all available dividend history
 }
 
 interface DividendEvent {
@@ -25,9 +26,9 @@ interface AssetData {
   historico_precos: HistoricalPrice[];
 }
 
-// Função para buscar dados de um ticker específico usando a API v8 (mais confiável)
-async function fetchTickerData(ticker: string): Promise<AssetData> {
-  console.log(`Buscando dados para ${ticker}...`);
+// Fetch ticker data with configurable history depth
+async function fetchTickerData(ticker: string, fullHistory: boolean = false): Promise<AssetData> {
+  console.log(`Buscando dados para ${ticker} (fullHistory=${fullHistory})...`);
   
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -38,12 +39,13 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
     "Cache-Control": "no-cache",
   };
 
-  // Tentar a API v8 chart primeiro (mais confiável)
-  const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
   const now = Math.floor(Date.now() / 1000);
-  const period1 = 0; // Fetch all historical data
+  // For full history, go back 10 years; otherwise 1 year
+  const periodStart = fullHistory
+    ? Math.floor(Date.now() / 1000) - 10 * 365 * 24 * 60 * 60
+    : Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
   
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${now}&interval=1mo&events=div`;
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${periodStart}&period2=${now}&interval=1mo&events=div`;
   
   console.log(`Fetching chart data from: ${chartUrl}`);
   
@@ -68,14 +70,11 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
   const events = result.events || {};
   const dividendEvents = events.dividends || {};
 
-  // Extrair preço atual
   const preco_atual = meta.regularMarketPrice || meta.previousClose || 0;
-
-  // Extrair nome e setor (limitado na API chart)
   const nome = meta.shortName || meta.longName || ticker.replace('.SA', '');
   const setor = meta.exchangeName || "N/A";
 
-  // Construir histórico de preços
+  // Build price history
   const historico_precos: HistoricalPrice[] = [];
   for (let i = 0; i < timestamps.length; i++) {
     const closePrice = quotes.close?.[i];
@@ -85,23 +84,29 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
     }
   }
 
-  // Construir histórico de dividendos
+  // Build dividend history
   const historico_dividendos: DividendEvent[] = [];
   let dividendos_12m = 0;
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
   for (const timestamp of Object.keys(dividendEvents)) {
     const divData = dividendEvents[timestamp];
     if (divData && divData.amount) {
-      const date = new Date(parseInt(timestamp) * 1000).toISOString().split('T')[0];
+      const divDate = new Date(parseInt(timestamp) * 1000);
+      const date = divDate.toISOString().split('T')[0];
       historico_dividendos.push({ date, amount: divData.amount });
-
-      if (parseInt(timestamp) >= oneYearAgo) {
+      // Only sum last 12 months for dividendos_12m
+      if (divDate >= oneYearAgo) {
         dividendos_12m += divData.amount;
       }
     }
   }
 
-  console.log(`Dados obtidos para ${ticker}: preço=${preco_atual}, dividendos=${dividendos_12m}, historico_precos=${historico_precos.length}, historico_dividendos=${historico_dividendos.length}`);
+  // Sort dividends by date ascending
+  historico_dividendos.sort((a, b) => a.date.localeCompare(b.date));
+
+  console.log(`Dados obtidos para ${ticker}: preço=${preco_atual}, div_12m=${dividendos_12m}, hist_precos=${historico_precos.length}, hist_divs=${historico_dividendos.length}`);
 
   return {
     ticker,
@@ -114,15 +119,13 @@ async function fetchTickerData(ticker: string): Promise<AssetData> {
   };
 }
 
-// Função com retry e delay
-async function fetchWithRetry(ticker: string, retries = 3, delay = 1000): Promise<AssetData | null> {
+async function fetchWithRetry(ticker: string, fullHistory: boolean, retries = 3, delay = 1000): Promise<AssetData | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Adicionar delay entre tentativas para evitar rate limiting
       if (attempt > 1) {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
-      return await fetchTickerData(ticker);
+      return await fetchTickerData(ticker, fullHistory);
     } catch (error) {
       console.warn(`Tentativa ${attempt}/${retries} falhou para ${ticker}:`, error);
       if (attempt === retries) {
@@ -146,15 +149,14 @@ serve(async (req) => {
   }
 
   try {
-    const { tickers }: YFinanceRequest = await req.json();
+    const { tickers, fullHistory = false }: YFinanceRequest = await req.json();
 
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       throw new Error("Lista de tickers inválida ou vazia");
     }
 
-    console.log(`Processando ${tickers.length} tickers: ${tickers.join(', ')}`);
+    console.log(`Processando ${tickers.length} tickers (fullHistory=${fullHistory}): ${tickers.join(', ')}`);
 
-    // Processar tickers em lotes para evitar rate limiting
     const batchSize = 3;
     const assets: AssetData[] = [];
     const errors: { ticker: string; reason: string }[] = [];
@@ -162,8 +164,7 @@ serve(async (req) => {
     for (let i = 0; i < tickers.length; i += batchSize) {
       const batch = tickers.slice(i, i + batchSize);
       
-      // Processar batch em paralelo
-      const batchPromises = batch.map(ticker => fetchWithRetry(ticker));
+      const batchPromises = batch.map(ticker => fetchWithRetry(ticker, fullHistory));
       const batchResults = await Promise.all(batchPromises);
 
       batchResults.forEach((result, idx) => {
@@ -175,7 +176,6 @@ serve(async (req) => {
         }
       });
 
-      // Aguardar entre batches
       if (i + batchSize < tickers.length) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
