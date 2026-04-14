@@ -15,6 +15,7 @@ const Investments = () => {
     enhancedAssets,
     portfolioEvolution,
     dividendHistory,
+    dividendChartData,
     getEnhancedAssetsData,
     getPortfolioEvolutionData,
     getDividendHistoryData,
@@ -110,7 +111,7 @@ const Investments = () => {
         </div>
 
         <div className="mb-6">
-          <DividendHistoryChart data={[]} loading={loading} />
+          <DividendHistoryChart data={dividendChartData} loading={loading} />
         </div>
       </div>
     </FeatureGate>
