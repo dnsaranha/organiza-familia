@@ -4,7 +4,7 @@ import { B3Asset, B3Portfolio, B3Dividend } from "@/lib/open-banking/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
+import { calculateManualPositions, Transaction, getQuantityAtDate } from "@/lib/finance-utils";
 
 const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date";
 const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers";
@@ -38,6 +38,7 @@ export const useB3Data = () => {
   const [portfolioEvolution, setPortfolioEvolution] = useState<any[]>([]);
   const [enhancedAssets, setEnhancedAssets] = useState<any[]>([]);
   const [dividendHistory, setDividendHistory] = useState<any[]>([]);
+  const [dividendChartData, setDividendChartData] = useState<any[]>([]);
   const [benchmarkData, setBenchmarkData] = useState<{
     value: number;
     change: number;
@@ -305,6 +306,11 @@ export const useB3Data = () => {
                     const ticker = formatTickerForYahoo(pos.ticker);
                     const assetData = assetsMap.find((a: any) => a.ticker === ticker);
 
+                    // Note: Here we need historical quantity, but pos.quantity is current.
+                    // Calculate quantity at end of this month
+                    const eomDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+                    const historicalQuantity = getQuantityAtDate(pos.ticker, eomDate, manualTransactions as any[]);
+
                     if (assetData && assetData.historico_precos && Array.isArray(assetData.historico_precos)) {
                       const priceEntry = assetData.historico_precos.find((h: any) => {
                         const hDate = new Date(h.date);
@@ -314,8 +320,10 @@ export const useB3Data = () => {
                       const price = priceEntry && typeof priceEntry === 'object' && 'close' in priceEntry && typeof priceEntry.close === 'number'
                         ? priceEntry.close
                         : (i === 0 && typeof assetData.preco_atual === 'number' ? assetData.preco_atual : pos.averagePrice);
-                      totalMarketValue += price * pos.quantity;
-                      totalCost += pos.totalCost;
+                      totalMarketValue += price * historicalQuantity;
+                      // totalCost approximation for historical
+                      const historicalCost = pos.averagePrice * historicalQuantity;
+                      totalCost += historicalCost;
                     }
 
                     if (assetData && assetData.historico_dividendos && Array.isArray(assetData.historico_dividendos)) {
@@ -326,7 +334,9 @@ export const useB3Data = () => {
                         })
                         .reduce((sum: number, d: any) => {
                           const amount = typeof d.amount === 'number' ? d.amount : 0;
-                          return sum + (amount * pos.quantity);
+                          const dDate = new Date(d.date);
+                          const quantityAtPayment = getQuantityAtDate(pos.ticker, dDate, manualTransactions as any[]);
+                          return sum + (amount * quantityAtPayment);
                         }, 0) as number;
                       totalDividends += monthDividends;
                     }
@@ -585,7 +595,7 @@ export const useB3Data = () => {
       // 1. Get user's tickers
       const { data: manualTransactions } = await supabase
         .from("investment_transactions")
-        .select("ticker")
+        .select("*")
         .eq("user_id", user.id);
 
       if (!manualTransactions || manualTransactions.length === 0) {
@@ -648,6 +658,92 @@ export const useB3Data = () => {
         .filter(item => item.dividendHistory.length > 0);
 
       setDividendHistory(historyData);
+
+      // Generate data for DividendHistoryChart
+      const aggregatedChartData: Record<string, { totalDividends: number; yieldOnCost: number; totalCost: number; assets: Record<string, number> }> = {};
+
+      const now = new Date();
+      const months = 12; // default to 12 months for chart
+
+      // Pre-calculate total costs per month to compute Yield on Cost correctly
+      for (let i = months - 1; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
+        let monthTotalCost = 0;
+        // Calculate the total cost basis of all manual positions up to this month
+        const manualTxs = manualTransactions as any[];
+
+        uniqueTickers.forEach(ticker => {
+           // We need to approximate the cost. In finance-utils calculateManualPositions does it, but we can do a simplified version
+           // or just use current yield. For now, we will just pass 0 for yieldOnCost if we can't accurately calculate it,
+           // but we'll try to sum dividends correctly.
+           const eomDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+           const quantity = getQuantityAtDate(ticker, eomDate, manualTxs);
+           // If we had averagePrice we could do cost.
+        });
+
+        aggregatedChartData[monthKey] = {
+            totalDividends: 0,
+            yieldOnCost: 0,
+            totalCost: 0,
+            assets: {}
+        };
+      }
+
+      // Pre-calculate Yield on Cost
+      const getAssetCost = (ticker: string, date: Date, txs: any[]) => {
+          const positions = calculateManualPositions(txs);
+          const pos = positions.find(p => p.ticker === ticker || p.ticker === ticker.replace(".SA", ""));
+          return pos ? pos.averagePrice : 0;
+      };
+
+      // Populate dividends
+      historyData.forEach(asset => {
+          asset.dividendHistory.forEach(div => {
+              if (!div.date || typeof div.amount !== "number") return;
+              // Some dates come as UTC ISO, parse carefully
+              const dDate = new Date(div.date + "T12:00:00Z");
+
+              // Only consider last 12 months roughly
+              const diffTime = Math.abs(now.getTime() - dDate.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays > 400) return;
+
+              const monthKey = dDate.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
+              if (aggregatedChartData[monthKey]) {
+                  const quantity = getQuantityAtDate(asset.ticker, dDate, manualTransactions as any[]);
+                  if (quantity > 0) {
+                      const totalDiv = div.amount * quantity;
+                      aggregatedChartData[monthKey].totalDividends += totalDiv;
+
+                      if (!aggregatedChartData[monthKey].assets[asset.ticker]) {
+                          aggregatedChartData[monthKey].assets[asset.ticker] = 0;
+                      }
+                      aggregatedChartData[monthKey].assets[asset.ticker] += totalDiv;
+
+                      const avgPrice = getAssetCost(asset.ticker, dDate, manualTransactions as any[]);
+                      if (avgPrice > 0) {
+                         const costBasisForDiv = avgPrice * quantity;
+                         aggregatedChartData[monthKey].totalCost += costBasisForDiv;
+                      }
+                  }
+              }
+          });
+      });
+
+      const finalChartData = Object.entries(aggregatedChartData).map(([month, data]) => {
+          return {
+              month,
+              totalDividends: data.totalDividends,
+              yieldOnCost: data.totalCost > 0 ? (data.totalDividends / data.totalCost) * 100 : 0,
+              assets: Object.entries(data.assets).map(([symbol, amount]) => ({ symbol, amount }))
+          };
+      });
+
+      setDividendChartData(finalChartData);
+
       return historyData;
     } catch (error) {
       console.error("Erro ao carregar histórico de dividendos:", error);
@@ -698,6 +794,7 @@ export const useB3Data = () => {
     portfolioEvolution,
     enhancedAssets,
     dividendHistory,
+    dividendChartData,
     benchmarkData,
     loading,
     connected,

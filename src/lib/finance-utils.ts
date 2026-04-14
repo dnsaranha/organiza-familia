@@ -123,3 +123,41 @@ export const autoCategorize = (
 
   return null;
 };
+/**
+ * Calculates the quantity of an asset held at a specific date based on transactions.
+ * @param ticker - The asset ticker.
+ * @param date - The specific date to calculate the quantity for.
+ * @param transactions - An array of investment transactions.
+ * @returns The quantity held at the given date.
+ */
+export const getQuantityAtDate = (
+  ticker: string,
+  date: Date,
+  transactions: { ticker: string; transaction_date: string; transaction_type: string; quantity: number }[]
+): number => {
+  const normalizedTicker = ticker.replace(".SA", "");
+  let quantity = 0;
+
+  const sortedTxs = transactions
+    .filter(tx => tx.ticker.replace(".SA", "") === normalizedTicker)
+    .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+
+  for (const tx of sortedTxs) {
+    const txDate = new Date(tx.transaction_date);
+    if (txDate > date) break;
+
+    if (tx.transaction_type === 'buy') {
+      quantity += tx.quantity;
+    } else if (tx.transaction_type === 'sell') {
+      quantity -= tx.quantity;
+    } else if (tx.transaction_type === 'split') {
+      quantity += tx.quantity;
+    } else if (tx.transaction_type === 'grouping') {
+      quantity = Math.max(quantity - tx.quantity, 0);
+    } else if (tx.transaction_type === 'bonus') {
+      quantity += tx.quantity;
+    }
+  }
+
+  return Math.max(0, quantity);
+};

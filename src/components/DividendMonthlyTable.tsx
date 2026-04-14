@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
+import { getQuantityAtDate } from "@/lib/finance-utils";
 
 interface DividendEntry {
   date: string;
@@ -123,29 +124,6 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
     return Array.from(types);
   }, [transactions]);
 
-  // Calculate quantity held at a specific date for a ticker
-  const getQuantityAtDate = (ticker: string, date: Date): number => {
-    const normalizedTicker = ticker.replace(".SA", "");
-    let quantity = 0;
-
-    const sortedTxs = transactions
-      .filter(tx => tx.ticker.replace(".SA", "") === normalizedTicker)
-      .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
-
-    for (const tx of sortedTxs) {
-      const txDate = new Date(tx.transaction_date);
-      if (txDate > date) break;
-
-      if (tx.transaction_type === "buy") {
-        quantity += tx.quantity;
-      } else if (tx.transaction_type === "sell") {
-        quantity -= tx.quantity;
-      }
-    }
-
-    return Math.max(0, quantity);
-  };
-
   // Filter assets by selected tickers and types
   const filteredAssetsData = useMemo(() => {
     let filtered = assetsData;
@@ -194,7 +172,7 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
         if (periodFilter === "12_months" && date < twelveMonthsAgo) return;
 
         // Get quantity at dividend date
-        const quantity = getQuantityAtDate(asset.ticker, date);
+        const quantity = getQuantityAtDate(asset.ticker, date, transactions);
         if (quantity === 0) return;
 
         // Calculate value based on display mode
