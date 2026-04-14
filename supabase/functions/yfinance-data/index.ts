@@ -4,6 +4,9 @@ import { corsHeaders } from "../_shared/cors.ts";
 interface YFinanceRequest {
   tickers: string[];
   fullHistory?: boolean; // When true, fetch all available dividend history
+  periodStart?: string | number;
+  periodEnd?: string | number;
+  interval?: string;
 }
 
 interface DividendEvent {
@@ -27,8 +30,8 @@ interface AssetData {
 }
 
 // Fetch ticker data with configurable history depth
-async function fetchTickerData(ticker: string, fullHistory: boolean = false): Promise<AssetData> {
-  console.log(`Buscando dados para ${ticker} (fullHistory=${fullHistory})...`);
+async function fetchTickerData(ticker: string, fullHistory: boolean = false, customPeriodStart?: string | number, customPeriodEnd?: string | number, interval: string = '1mo'): Promise<AssetData> {
+  console.log(`Buscando dados para ${ticker} (fullHistory=${fullHistory}, start=${customPeriodStart}, end=${customPeriodEnd}, interval=${interval})...`);
   
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -40,12 +43,18 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   };
 
   const now = Math.floor(Date.now() / 1000);
-  // For full history, go back 10 years; otherwise 1 year
-  const periodStart = fullHistory
-    ? Math.floor(Date.now() / 1000) - 10 * 365 * 24 * 60 * 60
-    : Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
   
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${periodStart}&period2=${now}&interval=1mo&events=div`;
+  let period1 = customPeriodStart;
+  let period2 = customPeriodEnd || now;
+
+  if (period1 === undefined) {
+    // For full history, default to maximum available or 10 years; otherwise 1 year
+    period1 = fullHistory
+      ? -2208988800 // roughly 1900-01-01
+      : Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
+  }
+
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=${interval}&events=div`;
   
   console.log(`Fetching chart data from: ${chartUrl}`);
   
@@ -119,13 +128,13 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   };
 }
 
-async function fetchWithRetry(ticker: string, fullHistory: boolean, retries = 3, delay = 1000): Promise<AssetData | null> {
+async function fetchWithRetry(ticker: string, fullHistory: boolean, periodStart?: string | number, periodEnd?: string | number, interval?: string, retries = 3, delay = 1000): Promise<AssetData | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       if (attempt > 1) {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
-      return await fetchTickerData(ticker, fullHistory);
+      return await fetchTickerData(ticker, fullHistory, periodStart, periodEnd, interval);
     } catch (error) {
       console.warn(`Tentativa ${attempt}/${retries} falhou para ${ticker}:`, error);
       if (attempt === retries) {
@@ -149,13 +158,13 @@ serve(async (req) => {
   }
 
   try {
-    const { tickers, fullHistory = false }: YFinanceRequest = await req.json();
+    const { tickers, fullHistory = false, periodStart, periodEnd, interval = '1mo' }: YFinanceRequest = await req.json();
 
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       throw new Error("Lista de tickers inválida ou vazia");
     }
 
-    console.log(`Processando ${tickers.length} tickers (fullHistory=${fullHistory}): ${tickers.join(', ')}`);
+    console.log(`Processando ${tickers.length} tickers (fullHistory=${fullHistory}, start=${periodStart}, end=${periodEnd}): ${tickers.join(', ')}`);
 
     const batchSize = 3;
     const assets: AssetData[] = [];
@@ -164,7 +173,7 @@ serve(async (req) => {
     for (let i = 0; i < tickers.length; i += batchSize) {
       const batch = tickers.slice(i, i + batchSize);
       
-      const batchPromises = batch.map(ticker => fetchWithRetry(ticker, fullHistory));
+      const batchPromises = batch.map(ticker => fetchWithRetry(ticker, fullHistory, periodStart, periodEnd, interval));
       const batchResults = await Promise.all(batchPromises);
 
       batchResults.forEach((result, idx) => {
