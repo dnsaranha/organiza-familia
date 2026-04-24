@@ -81,11 +81,14 @@ export const investmentMapping = [
 
 // 2. Função para mapear Pluggy → Português
 export function mapInvestmentType(type: string, subtype: string | null) {
-  const typeData = investmentMapping.find(t => t.type === type);
+  const normalizedType = type.toUpperCase();
+  const normalizedSubtype = subtype ? subtype.toUpperCase() : null;
+
+  const typeData = investmentMapping.find(t => t.type.toUpperCase() === normalizedType);
   if (!typeData) return { label_pt: type, descricao_pt: "" };
 
-  if (!subtype) return { label_pt: typeData.label_pt, descricao_pt: "" };
+  if (!normalizedSubtype) return { label_pt: typeData.label_pt, descricao_pt: "" };
 
-  const subtypeData = typeData.subtypes.find(s => s.subtype === subtype);
+  const subtypeData = typeData.subtypes.find(s => s.subtype.toUpperCase() === normalizedSubtype);
   return subtypeData ? { label_pt: subtypeData.label_pt, descricao_pt: subtypeData.descricao_pt } : { label_pt: typeData.label_pt, descricao_pt: "" };
 }
