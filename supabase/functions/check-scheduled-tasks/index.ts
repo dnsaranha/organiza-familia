@@ -136,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("Error in check-scheduled-tasks function:", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: "An error occurred processing your request",
         success: false 
       }),
       {
