@@ -149,10 +149,29 @@ serve(async (req) => {
   }
 
   try {
-    const { tickers, fullHistory = false }: YFinanceRequest = await req.json();
+    let parsed: YFinanceRequest;
+    try {
+      parsed = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { tickers, fullHistory = false } = parsed || ({} as YFinanceRequest);
 
-    if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
-      throw new Error("Lista de tickers inválida ou vazia");
+    if (!Array.isArray(tickers) || tickers.length === 0 || tickers.length > 50) {
+      return new Response(
+        JSON.stringify({ error: 'tickers must be a non-empty array (max 50)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    const tickerPattern = /^[A-Za-z0-9._-]{1,15}$/;
+    if (!tickers.every((t) => typeof t === 'string' && tickerPattern.test(t))) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid ticker format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     console.log(`Processando ${tickers.length} tickers (fullHistory=${fullHistory}): ${tickers.join(', ')}`);
@@ -189,7 +208,7 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("Erro na função yfinance-data:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'An error occurred processing your request' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

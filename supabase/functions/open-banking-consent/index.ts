@@ -10,6 +10,35 @@ interface ConsentRequest {
   permissions: string[];
   institutionId: string;
   redirectUri: string;
+  userCpf: string;
+}
+
+function isValidCpf(cpf: string): boolean {
+  return /^\d{11}$/.test(cpf);
+}
+
+function isValidCnpj(v: string): boolean {
+  return /^\d{14}$/.test(v);
+}
+
+function isAllowedRedirect(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const allowed = (Deno.env.get('ALLOWED_REDIRECT_DOMAINS') || '')
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (allowed.length === 0) {
+      // Safe default: only HTTPS to known Lovable / localhost dev
+      return (
+        u.protocol === 'https:' &&
+        (u.hostname.endsWith('.lovable.app') || u.hostname.endsWith('.lovable.dev'))
+      ) || (u.hostname === 'localhost');
+    }
+    return allowed.some((d) => url.startsWith(d));
+  } catch {
+    return false;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -22,7 +51,48 @@ Deno.serve(async (req) => {
       return new Response('Method not allowed', { status: 405, headers: corsHeaders });
     }
 
-    const { permissions, institutionId, redirectUri }: ConsentRequest = await req.json();
+    let body: ConsentRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { permissions, institutionId, redirectUri, userCpf } = body || ({} as ConsentRequest);
+
+    // Validate inputs
+    if (
+      !Array.isArray(permissions) ||
+      permissions.length === 0 ||
+      permissions.length > 50 ||
+      !permissions.every((p) => typeof p === 'string' && p.length > 0 && p.length <= 100)
+    ) {
+      return new Response(JSON.stringify({ error: 'Invalid permissions' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!institutionId || !isValidCnpj(institutionId)) {
+      return new Response(JSON.stringify({ error: 'Invalid institutionId (must be 14-digit CNPJ)' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!userCpf || !isValidCpf(userCpf)) {
+      return new Response(JSON.stringify({ error: 'Invalid userCpf (must be 11-digit CPF)' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!redirectUri || !isAllowedRedirect(redirectUri)) {
+      return new Response(JSON.stringify({ error: 'redirectUri not allowed' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Configurações do Open Banking
     const clientId = Deno.env.get('OPEN_BANKING_CLIENT_ID');
@@ -58,7 +128,7 @@ Deno.serve(async (req) => {
       data: {
         loggedUser: {
           document: {
-            identification: '11111111111', // CPF do usuário (deve vir do contexto)
+            identification: userCpf,
             rel: 'CPF'
           }
         },
@@ -87,7 +157,7 @@ Deno.serve(async (req) => {
 
     if (!consentResponse.ok) {
       const errorData = await consentResponse.text();
-      console.error('Erro ao criar consentimento:', errorData);
+      console.error('Erro ao criar consentimento (status):', consentResponse.status, errorData);
       throw new Error('Falha ao criar consentimento');
     }
 
@@ -116,7 +186,7 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('Erro na função open-banking-consent:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An error occurred processing your request' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

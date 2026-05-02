@@ -22,6 +22,26 @@ function corsResponse(body: string | object | null, status = 200) {
   });
 }
 
+function isAllowedRedirect(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const extra = (Deno.env.get('ALLOWED_REDIRECT_DOMAINS') || '')
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (extra.some((d) => url.startsWith(d))) return true;
+    // Safe defaults: HTTPS lovable preview/published domains, or localhost dev
+    if (
+      u.protocol === 'https:' &&
+      (u.hostname.endsWith('.lovable.app') || u.hostname.endsWith('.lovable.dev'))
+    ) return true;
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   // Log request start
   console.log('[stripe-checkout] Request received', { method: req.method, url: req.url });
@@ -79,6 +99,18 @@ Deno.serve(async (req) => {
     if (!['payment', 'subscription'].includes(mode)) {
       console.error('[stripe-checkout] Invalid mode:', mode);
       return corsResponse({ error: 'Invalid mode. Must be payment or subscription' }, 400);
+    }
+
+    // Validate price_id format (Stripe price ids start with price_)
+    if (typeof price_id !== 'string' || !/^price_[A-Za-z0-9]+$/.test(price_id) || price_id.length > 100) {
+      console.warn('[stripe-checkout] Invalid price_id format');
+      return corsResponse({ error: 'Invalid price_id' }, 400);
+    }
+
+    // Validate redirect URLs to prevent open-redirect abuse
+    if (!isAllowedRedirect(success_url) || !isAllowedRedirect(cancel_url)) {
+      console.warn('[stripe-checkout] Disallowed redirect URL', { success_url, cancel_url });
+      return corsResponse({ error: 'success_url/cancel_url not allowed' }, 400);
     }
 
     // Authenticate user

@@ -78,10 +78,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { symbols }: QuotesRequest = await req.json();
-
-    if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
-      throw new Error("Símbolos inválidos ou não fornecidos");
+    let parsed: QuotesRequest;
+    try {
+      parsed = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { symbols } = parsed || ({} as QuotesRequest);
+    if (!Array.isArray(symbols) || symbols.length === 0 || symbols.length > 50) {
+      return new Response(
+        JSON.stringify({ error: 'symbols must be a non-empty array (max 50)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    const symbolPattern = /^[A-Za-z0-9._-]{1,15}$/;
+    if (!symbols.every((s) => typeof s === 'string' && symbolPattern.test(s))) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid symbol format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // Mapear símbolos para formato Yahoo Finance
@@ -200,7 +217,7 @@ Deno.serve(async (req) => {
     });
   } catch (error: any) {
     console.error("Erro na função b3-quotes:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'An error occurred processing your request' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
