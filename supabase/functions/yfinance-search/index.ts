@@ -16,15 +16,23 @@ serve(async (req) => {
 
   try {
     // Extract search query from request body
-    const { query } = await req.json();
-    console.log(`Buscando tickers para: ${query}`);
-
-    if (!query) {
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ error: 'Missing "query" parameter' }),
+        JSON.stringify({ error: 'Invalid JSON body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const query = body?.query;
+    if (typeof query !== 'string' || query.trim().length === 0 || query.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid "query" parameter (1-100 chars)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    console.log(`Buscando tickers para: ${query}`);
 
     // Fetch search results from Yahoo Finance
     const searchUrl = `${YFINANCE_SEARCH_URL}?q=${encodeURIComponent(query)}&lang=pt-BR&quotesCount=20&newsCount=0`;
@@ -72,7 +80,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in yfinance-search:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An error occurred processing your request' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
