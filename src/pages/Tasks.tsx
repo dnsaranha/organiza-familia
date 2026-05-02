@@ -457,20 +457,85 @@ const TasksPage = () => {
           filteredTasks.map((task) => (
             <Card key={task.id} className={`border ${task.is_completed ? 'bg-muted/50 opacity-75' : 'bg-background'}`}>
               <CardContent className="p-3 sm:p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className={`font-medium ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>
+                <div className="flex flex-col gap-2 min-w-0">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                      <h4 className={`font-medium break-words ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>
                         {task.title}
                       </h4>
                       <Badge variant={task.is_completed ? 'secondary' : 'default'}>
                         {taskTypes.find(t => t.value === task.task_type)?.label}
                       </Badge>
                     </div>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!task.is_completed ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => markAsCompleted(task.id)}
+                          className="h-8 px-3"
+                          title="Marcar como concluída"
+                        >
+                          <CheckCircle className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => undoCompletion(task.id)}
+                          className="h-8 px-3 text-orange-600 hover:text-orange-700"
+                          title="Desfazer conclusão"
+                        >
+                          <Undo2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(task)}
+                        className="h-8 px-3"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteTask(task.id)}
+                        className="h-8 px-3 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      {hasGoogleConnection && (
+                        <>
+                          {task.google_calendar_event_id ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(`https://calendar.google.com/calendar/r/eventedit/${task.google_calendar_event_id}`, '_blank')}
+                              className="h-8 px-3 text-blue-600 hover:text-blue-700"
+                              title="Ver no Google Calendar"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAddToGoogleCalendar(task)}
+                              className="h-8 px-3"
+                              title="Adicionar ao Google Calendar"
+                            >
+                              <CalendarPlus className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {task.description && (
+                    <p className="text-sm text-muted-foreground break-words whitespace-pre-wrap">{task.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {new Date(task.schedule_date).toLocaleString('pt-BR', {
@@ -485,73 +550,6 @@ const TasksPage = () => {
                         {task.notification_email && <Mail className="h-3 w-3" />}
                         {task.notification_push && <Bell className="h-3 w-3" />}
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    {!task.is_completed ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => markAsCompleted(task.id)}
-                        className="h-8 px-3"
-                        title="Marcar como concluída"
-                      >
-                        <CheckCircle className="h-3 w-3" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => undoCompletion(task.id)}
-                        className="h-8 px-3 text-orange-600 hover:text-orange-700"
-                        title="Desfazer conclusão"
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEdit(task)}
-                      className="h-8 px-3"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => deleteTask(task.id)}
-                      className="h-8 px-3 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                    
-                    {/* Botão de Google Calendar */}
-                    {hasGoogleConnection && (
-                      <>
-                        {task.google_calendar_event_id ? (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => window.open(`https://calendar.google.com/calendar/r/eventedit/${task.google_calendar_event_id}`, '_blank')} 
-                            className="h-8 px-3 text-blue-600 hover:text-blue-700" 
-                            title="Ver no Google Calendar"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleAddToGoogleCalendar(task)} 
-                            className="h-8 px-3" 
-                            title="Adicionar ao Google Calendar"
-                          >
-                            <CalendarPlus className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </>
-                    )}
                   </div>
                 </div>
               </CardContent>
