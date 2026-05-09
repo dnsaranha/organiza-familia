@@ -6,8 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
 
-const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date";
-const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers";
+const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v2";
+const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v2";
 
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
@@ -202,12 +202,12 @@ export const useB3Data = () => {
     return ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
   };
 
-  // Fetch dividend data from yfinance edge function and store in financial_assets
+  // Fetch dividend data from yfinance edge function and persist in financial_assets
   const fetchAndStoreDividends = useCallback(async (tickers: string[]): Promise<any[]> => {
     if (tickers.length === 0) return [];
 
-    console.log(`Buscando dividendos completos para: ${tickers.join(", ")}`);
-    
+    console.log(`Buscando dividendos completos (10 anos) para: ${tickers.join(", ")}`);
+
     try {
       const { data, error } = await supabase.functions.invoke("yfinance-data", {
         body: { tickers, fullHistory: true },
@@ -220,7 +220,26 @@ export const useB3Data = () => {
 
       const fetchedAssets = data?.assets || [];
 
-      // Return formatted data for the component
+      // Persist into financial_assets so subsequent loads have full history
+      if (fetchedAssets.length > 0) {
+        const rows = fetchedAssets.map((asset: any) => ({
+          ticker: asset.ticker,
+          name: asset.nome,
+          sector: asset.setor,
+          current_price: asset.preco_atual,
+          dividends_12m: asset.dividendos_12m,
+          price_history: asset.historico_precos || [],
+          dividend_history: asset.historico_dividendos || [],
+          updated_at: new Date().toISOString(),
+        }));
+        const { error: upsertError } = await supabase
+          .from("financial_assets")
+          .upsert(rows, { onConflict: "ticker" });
+        if (upsertError) {
+          console.warn("Falha ao persistir financial_assets:", upsertError);
+        }
+      }
+
       return fetchedAssets.map((asset: any) => ({
         ticker: asset.ticker,
         dividendHistory: asset.historico_dividendos || [],
@@ -597,47 +616,55 @@ export const useB3Data = () => {
         manualTransactions.map(t => formatTickerForYahoo(t.ticker))
       )];
 
-      // Determine which tickers need fresh data
-      let tickersToFetch: string[] = [];
-
-      if (changedTickers && changedTickers.length > 0) {
-        // Only fetch the specific changed tickers
-        tickersToFetch = changedTickers.map(t => formatTickerForYahoo(t));
-      } else if (shouldFetchDividends()) {
-        // First visit of the day: fetch all
-        tickersToFetch = uniqueTickers;
-      } else {
-        // Check for new tickers not previously fetched
-        const previouslyFetched = getFetchedTickers();
-        tickersToFetch = uniqueTickers.filter(t => !previouslyFetched.includes(t));
-      }
-
-      // 2. Get existing data from DB
+      // 2. Get existing data from DB first
       const { data: dbData, error: dbError } = await supabase
         .from("financial_assets")
         .select("ticker, dividend_history")
         .in("ticker", uniqueTickers);
 
-      let dbHistoryMap = new Map<string, any[]>();
+      const dbHistoryMap = new Map<string, any[]>();
       if (!dbError && dbData) {
         dbData.forEach(asset => {
           dbHistoryMap.set(asset.ticker, (asset.dividend_history as any[]) || []);
         });
       }
 
-      // 3. Fetch fresh data for tickers that need it
-      if (tickersToFetch.length > 0) {
-        console.log(`Buscando dividendos atualizados para: ${tickersToFetch.join(", ")}`);
-        const freshData = await fetchAndStoreDividends(tickersToFetch);
+      // Determine which tickers need fresh data
+      let tickersToFetch: string[] = [];
 
-        // Merge fresh data into the map
+      if (changedTickers && changedTickers.length > 0) {
+        tickersToFetch = changedTickers.map(t => formatTickerForYahoo(t));
+      } else if (shouldFetchDividends()) {
+        // First visit of the day: refetch all to ensure full 10-year history
+        tickersToFetch = uniqueTickers;
+      } else {
+        const previouslyFetched = getFetchedTickers();
+        // Refetch tickers that are new OR have suspiciously short history (< 3 years)
+        tickersToFetch = uniqueTickers.filter(t => {
+          if (!previouslyFetched.includes(t)) return true;
+          const hist = dbHistoryMap.get(t) || [];
+          if (hist.length === 0) return true;
+          const oldest = hist.reduce((min: string, d: any) => (d.date < min ? d.date : min), hist[0].date);
+          const oldestYear = parseInt((oldest || "").slice(0, 4), 10);
+          const cutoffYear = new Date().getFullYear() - 3;
+          return !oldestYear || oldestYear > cutoffYear;
+        });
+      }
+
+      // 3. Fetch fresh data for tickers that need it
+      let fetchSucceeded = true;
+      if (tickersToFetch.length > 0) {
+        const freshData = await fetchAndStoreDividends(tickersToFetch);
+        if (freshData.length === 0) fetchSucceeded = false;
         freshData.forEach(item => {
           dbHistoryMap.set(item.ticker, item.dividendHistory);
         });
       }
 
-      // Mark as fetched today
-      markDividendsFetched(uniqueTickers);
+      // Only mark cache when we actually have data
+      if (fetchSucceeded) {
+        markDividendsFetched(uniqueTickers);
+      }
 
       // 4. Build final result for all user tickers
       const historyData = uniqueTickers
