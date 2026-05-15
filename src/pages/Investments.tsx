@@ -110,7 +110,7 @@ const Investments = () => {
         </div>
 
         <div className="mb-6">
-          <DividendHistoryChart data={[]} loading={loading} />
+          <DividendHistoryChart data={dividendHistory} loading={loading} />
         </div>
       </div>
     </FeatureGate>
