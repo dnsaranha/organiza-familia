@@ -489,54 +489,8 @@ export function ManualInvestmentTransactions({
     );
   }
 
-  const positionSummary = calculateManualPositions(transactions);
-
   return (
     <div className="space-y-4">
-      {positionSummary.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Posições Atuais</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs sm:text-sm">Ticker</TableHead>
-                    <TableHead className="text-xs sm:text-sm">Ativo</TableHead>
-                    <TableHead className="text-xs sm:text-sm">Tipo</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Quantidade</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Custo Total</TableHead>
-                    <TableHead className="text-xs sm:text-sm text-right">Preço Médio</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {positionSummary.map((position) => (
-                    <TableRow key={position.ticker}>
-                      <TableCell className="font-medium text-xs sm:text-sm">
-                        {position.ticker}
-                      </TableCell>
-                      <TableCell className="text-xs sm:text-sm">{position.asset_name}</TableCell>
-                      <TableCell className="text-xs sm:text-sm">{assetTypes.find(at => at.value === position.asset_type)?.label || position.asset_type}</TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        {position.quantity.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        R$ {position.totalCost.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm">
-                        R$ {(position.totalCost / position.quantity).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
