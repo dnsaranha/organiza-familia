@@ -174,9 +174,10 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
       // dividends paid this month (per unit) × qty held at dividend date
       const divs = dividendByTicker.get(ticker) || [];
       let proventos = 0;
+      let proventosAcumulados = 0;
       for (const d of divs) {
         const dd = new Date(d.date);
-        if (dd < monthStart || dd > monthEnd) continue;
+        if (dd > monthEnd) continue;
         // qty held at dd
         let q = 0;
         for (const t of txs) {
@@ -186,7 +187,9 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
           else if (t.transaction_type === "sell" || t.transaction_type === "grouping") q -= t.quantity;
         }
         q = Math.max(0, q);
-        proventos += (d.amount || 0) * q;
+        const val = (d.amount || 0) * q;
+        proventosAcumulados += val;
+        if (dd >= monthStart) proventos += val;
       }
 
       return {
@@ -194,13 +197,14 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
         marketValue: Number(marketValue.toFixed(2)),
         cost: Number(cost.toFixed(2)),
         proventos: Number(proventos.toFixed(2)),
+        proventosAcumulados: Number(proventosAcumulados.toFixed(2)),
         operations: Number(operations.toFixed(2)),
         _total: marketValue,
       };
     });
 
     return rows
-      .filter((r) => r.marketValue !== 0 || r.cost !== 0 || r.proventos !== 0 || r.operations !== 0)
+      .filter((r) => r.marketValue !== 0 || r.cost !== 0 || r.proventos !== 0 || r.proventosAcumulados !== 0 || r.operations !== 0)
       .sort((a, b) => b._total - a._total);
   }, [transactions, dividendByTicker, priceByTicker, monthStart, monthEnd, cursor]);
 
@@ -224,11 +228,13 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
             Nenhum dado para {label}.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={Math.max(320, chartData.length * 44)}>
+          <ResponsiveContainer width="100%" height={Math.max(360, chartData.length * 80)}>
             <BarChart
               data={chartData}
               layout="vertical"
               margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+              barCategoryGap="20%"
+              barGap={2}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
@@ -240,10 +246,11 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
               />
               <Tooltip formatter={(v: number) => formatCurrency(v)} />
               <Legend />
-              <Bar dataKey="marketValue" name="Valor de mercado" fill="#2563eb" />
-              <Bar dataKey="cost" name="Custo" fill="#f97316" />
-              <Bar dataKey="proventos" name="Proventos" fill="#60a5fa" />
-              <Bar dataKey="operations" name="Operações" fill="#10b981" />
+              <Bar dataKey="marketValue" stackId="patrimonio" name="Valor de mercado" fill="#2563eb" barSize={22} />
+              <Bar dataKey="proventosAcumulados" stackId="patrimonio" name="Proventos acumulados" fill="#1e3a8a" barSize={22} />
+              <Bar dataKey="cost" name="Custo" fill="#f97316" barSize={22} />
+              <Bar dataKey="proventos" name="Proventos (mês)" fill="#60a5fa" barSize={22} />
+              <Bar dataKey="operations" name="Operações" fill="#10b981" barSize={22} />
             </BarChart>
           </ResponsiveContainer>
         )}
