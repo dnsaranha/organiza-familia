@@ -141,36 +141,6 @@ const PortfolioEvolutionChart = ({
           </ResponsiveContainer>
         </CardContent>
       </Card>
-      {/* Operations Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Operações, Custos e Proventos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <ComposedChart data={filteredData.length > 0 ? filteredData : []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis tickFormatter={formatCurrency} />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
-              <Legend />
-              <Bar
-                dataKey="operations"
-                stackId="a"
-                fill="#10b981"
-                name="Operações"
-              />
-              <Bar dataKey="costs" stackId="a" fill="#f59e0b" name="Custos" />
-              <Bar
-                dataKey="dividends"
-                stackId="a"
-                fill="#3b82f6"
-                name="Proventos"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
     </div>
   );
 };
