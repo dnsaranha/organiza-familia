@@ -4,6 +4,7 @@ import EnhancedAssetTable from "@/components/EnhancedAssetTable";
 import PortfolioEvolutionChart from "@/components/charts/PortfolioEvolutionChart";
 import DividendHistoryChart from "@/components/charts/DividendHistoryChart";
 import MonthlyAssetBreakdownChart from "@/components/charts/MonthlyAssetBreakdownChart";
+import AssetAllocationChart from "@/components/charts/AssetAllocationChart";
 import { DividendMonthlyTable } from "@/components/DividendMonthlyTable";
 import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
@@ -96,6 +97,10 @@ const Investments = () => {
 
         <div className="mb-6">
           <PortfolioEvolutionChart data={portfolioEvolution} loading={loading} />
+        </div>
+
+        <div className="mb-6">
+          <AssetAllocationChart data={enhancedAssets as any} isLoading={loading} />
         </div>
 
         <div className="mb-6">
