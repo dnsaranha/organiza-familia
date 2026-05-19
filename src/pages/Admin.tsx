@@ -188,7 +188,7 @@ export default function AdminPage() {
 
       const conversationsList: UserWithMessages[] = userIds.map(userId => ({
         user_id: userId,
-        email: profileMap[userId] || 'Usuário',
+        email: profileMap[userId] || userId.slice(0, 8),
         messages: grouped[userId],
         unread_count: grouped[userId].filter(m => !m.is_read && !m.is_from_admin).length,
         last_message_at: grouped[userId][grouped[userId].length - 1]?.created_at || '',
