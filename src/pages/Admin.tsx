@@ -92,6 +92,7 @@ export default function AdminPage() {
       if (data) {
         fetchConversations();
         fetchStats();
+        fetchUsers();
       }
     } catch (err) {
       console.error('Error checking admin status:', err);
