@@ -249,6 +249,7 @@ export default function AdminPage() {
 
   const filteredUsers = users.filter(u =>
     (u.full_name || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
     u.id.toLowerCase().includes(userSearchTerm.toLowerCase())
   );
 
