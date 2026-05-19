@@ -668,10 +668,10 @@ const ReportsPage = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="min-w-[70px] text-xs">Data</TableHead>
-                          <TableHead className="min-w-[90px] text-xs">Categoria</TableHead>
-                          {scope !== "personal" && <TableHead className="min-w-[90px] text-xs">Membro</TableHead>}
-                          <TableHead className="text-right min-w-[90px] text-xs">Valor</TableHead>
+                          <TableHead className="px-1 sm:px-4 text-xs whitespace-nowrap">Data</TableHead>
+                          <TableHead className="px-1 sm:px-4 text-xs">Categoria</TableHead>
+                          {scope !== "personal" && <TableHead className="px-1 sm:px-4 text-xs">Membro</TableHead>}
+                          <TableHead className="px-1 sm:px-4 text-right text-xs whitespace-nowrap">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                     <TableBody>
@@ -683,18 +683,18 @@ const ReportsPage = () => {
 
                         return (
                           <TableRow key={t.id}>
-                            <TableCell className="text-xs sm:text-sm">
+                            <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap">
                               {isValidDate
-                                ? date.toLocaleDateString("pt-BR")
+                                ? date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
                                 : "Data inválida"}
                             </TableCell>
-                            <TableCell className="text-xs sm:text-sm">{t.category || "N/A"}</TableCell>
+                            <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm break-words">{t.category || "N/A"}</TableCell>
                             {scope !== "personal" && (
-                              <TableCell className="text-xs sm:text-sm">{t.memberName || "N/A"}</TableCell>
+                              <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm truncate max-w-[90px] sm:max-w-none">{t.memberName || "N/A"}</TableCell>
                             )}
                             <TableCell
                               className={cn(
-                                "text-right font-medium text-xs sm:text-sm",
+                                "px-1 sm:px-4 py-2 text-right font-medium text-xs sm:text-sm whitespace-nowrap",
                                 t.type === "income"
                                   ? "text-green-500"
                                   : "text-red-500",
