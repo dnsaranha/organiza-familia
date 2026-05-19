@@ -538,6 +538,7 @@ export default function AdminPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Nome</TableHead>
+                          <TableHead>Email</TableHead>
                           <TableHead>Plano</TableHead>
                           <TableHead>Última Atividade</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
@@ -546,7 +547,7 @@ export default function AdminPage() {
                       <TableBody>
                         {filteredUsers.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                               Nenhum usuário encontrado
                             </TableCell>
                           </TableRow>
@@ -556,13 +557,21 @@ export default function AdminPage() {
                               <TableCell className="font-medium">
                                 {u.full_name || 'Sem nome'}
                               </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {u.email || '-'}
+                              </TableCell>
                               <TableCell>
-                                <Badge variant={u.subscription_plan === 'free' || !u.subscription_plan ? 'secondary' : 'default'}>
-                                  {u.subscription_plan || 'free'}
+                                <Badge variant={u.plan === 'Gratuito' ? 'secondary' : 'default'}>
+                                  {u.plan}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm">
-                                {u.updated_at ? new Date(u.updated_at).toLocaleDateString('pt-BR') : '-'}
+                                {u.last_activity_at
+                                  ? new Date(u.last_activity_at).toLocaleString('pt-BR', {
+                                      day: '2-digit', month: '2-digit', year: '2-digit',
+                                      hour: '2-digit', minute: '2-digit',
+                                    })
+                                  : '-'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button
