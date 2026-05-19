@@ -657,21 +657,27 @@ const ReportsPage = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-base sm:text-lg">Histórico de Transações</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 sm:px-6">
+            <CardContent className="px-3 sm:px-6">
               {loading ? (
                 <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground">
                   <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
                 </div>
               ) : (
                 <ScrollArea className="h-[250px] sm:h-[300px]">
-                  <div className="overflow-x-auto -mx-2 sm:mx-0">
-                    <Table>
+                  <div className="w-full overflow-hidden">
+                    <Table className="table-fixed">
+                      <colgroup>
+                        <col className="w-[58px] sm:w-[110px]" />
+                        <col className="w-[86px] sm:w-auto" />
+                        {scope !== "personal" && <col className="w-auto" />}
+                        <col className="w-[104px] sm:w-[150px]" />
+                      </colgroup>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="px-1 sm:px-4 text-xs whitespace-nowrap">Data</TableHead>
-                          <TableHead className="px-1 sm:px-4 text-xs">Categoria</TableHead>
-                          {scope !== "personal" && <TableHead className="px-1 sm:px-4 text-xs">Membro</TableHead>}
-                          <TableHead className="px-1 sm:px-4 text-right text-xs whitespace-nowrap">Valor</TableHead>
+                          <TableHead className="px-0.5 sm:px-4 text-[11px] sm:text-xs whitespace-nowrap">Data</TableHead>
+                          <TableHead className="px-0.5 sm:px-4 text-[11px] sm:text-xs truncate">Categoria</TableHead>
+                          {scope !== "personal" && <TableHead className="px-0.5 sm:px-4 text-[11px] sm:text-xs truncate">Membro</TableHead>}
+                          <TableHead className="px-0.5 sm:px-4 text-right text-[11px] sm:text-xs whitespace-nowrap">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                     <TableBody>
@@ -683,18 +689,18 @@ const ReportsPage = () => {
 
                         return (
                           <TableRow key={t.id}>
-                            <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap">
+                            <TableCell className="px-0.5 sm:px-4 py-2 text-[11px] sm:text-sm whitespace-nowrap">
                               {isValidDate
                                 ? date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
                                 : "Data inválida"}
                             </TableCell>
-                            <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm break-words">{t.category || "N/A"}</TableCell>
+                            <TableCell className="px-0.5 sm:px-4 py-2 text-[11px] sm:text-sm truncate">{t.category || "N/A"}</TableCell>
                             {scope !== "personal" && (
-                              <TableCell className="px-1 sm:px-4 py-2 text-xs sm:text-sm truncate max-w-[90px] sm:max-w-none">{t.memberName || "N/A"}</TableCell>
+                              <TableCell className="px-0.5 sm:px-4 py-2 text-[11px] sm:text-sm truncate">{t.memberName || "N/A"}</TableCell>
                             )}
                             <TableCell
                               className={cn(
-                                "px-1 sm:px-4 py-2 text-right font-medium text-xs sm:text-sm whitespace-nowrap",
+                                "px-0.5 sm:px-4 py-2 text-right font-medium text-[11px] sm:text-sm whitespace-nowrap",
                                 t.type === "income"
                                   ? "text-green-500"
                                   : "text-red-500",
