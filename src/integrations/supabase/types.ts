@@ -1085,6 +1085,13 @@ export type Database = {
         }
       }
       get_user_id_by_email: { Args: { email: string }; Returns: string }
+      get_users_last_activity: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          last_activity_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

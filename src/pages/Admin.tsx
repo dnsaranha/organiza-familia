@@ -46,10 +46,11 @@ interface UserStats {
 
 interface UserInfo {
   id: string;
+  email: string | null;
   full_name: string | null;
-  subscription_plan: string | null;
-  updated_at: string | null;
-  transaction_count?: number;
+  plan: string;
+  last_activity_at: string | null;
+  created_at: string | null;
 }
 
 export default function AdminPage() {
@@ -92,6 +93,7 @@ export default function AdminPage() {
       if (data) {
         fetchConversations();
         fetchStats();
+        fetchUsers();
       }
     } catch (err) {
       console.error('Error checking admin status:', err);
@@ -129,18 +131,10 @@ export default function AdminPage() {
         .from('scheduled_tasks')
         .select('*', { count: 'exact', head: true });
 
-      // Users registered today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count: usersToday } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('updated_at', today.toISOString());
-
       setUserStats({
         total_users: totalUsers || 0,
         users_with_active_subscription: activeSubscriptions || 0,
-        users_today: usersToday || 0,
+        users_today: 0,
         total_transactions: totalTransactions || 0,
         total_goals: totalGoals || 0,
         total_tasks: totalTasks || 0,
@@ -153,14 +147,12 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, subscription_plan, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(100);
-
+      const { data, error } = await supabase.functions.invoke('admin-list-users');
       if (error) throw error;
-      setUsers(profiles || []);
+      setUsers((data?.users || []) as UserInfo[]);
+      if (typeof data?.users_today === 'number') {
+        setUserStats((prev) => prev ? { ...prev, users_today: data.users_today } : prev);
+      }
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -196,7 +188,7 @@ export default function AdminPage() {
 
       const conversationsList: UserWithMessages[] = userIds.map(userId => ({
         user_id: userId,
-        email: profileMap[userId] || 'Usuário',
+        email: profileMap[userId] || userId.slice(0, 8),
         messages: grouped[userId],
         unread_count: grouped[userId].filter(m => !m.is_read && !m.is_from_admin).length,
         last_message_at: grouped[userId][grouped[userId].length - 1]?.created_at || '',
@@ -257,6 +249,7 @@ export default function AdminPage() {
 
   const filteredUsers = users.filter(u =>
     (u.full_name || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
     u.id.toLowerCase().includes(userSearchTerm.toLowerCase())
   );
 
@@ -545,6 +538,7 @@ export default function AdminPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Nome</TableHead>
+                          <TableHead>Email</TableHead>
                           <TableHead>Plano</TableHead>
                           <TableHead>Última Atividade</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
@@ -553,7 +547,7 @@ export default function AdminPage() {
                       <TableBody>
                         {filteredUsers.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                               Nenhum usuário encontrado
                             </TableCell>
                           </TableRow>
@@ -563,13 +557,21 @@ export default function AdminPage() {
                               <TableCell className="font-medium">
                                 {u.full_name || 'Sem nome'}
                               </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {u.email || '-'}
+                              </TableCell>
                               <TableCell>
-                                <Badge variant={u.subscription_plan === 'free' || !u.subscription_plan ? 'secondary' : 'default'}>
-                                  {u.subscription_plan || 'free'}
+                                <Badge variant={u.plan === 'Gratuito' ? 'secondary' : 'default'}>
+                                  {u.plan}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm">
-                                {u.updated_at ? new Date(u.updated_at).toLocaleDateString('pt-BR') : '-'}
+                                {u.last_activity_at
+                                  ? new Date(u.last_activity_at).toLocaleString('pt-BR', {
+                                      day: '2-digit', month: '2-digit', year: '2-digit',
+                                      hour: '2-digit', minute: '2-digit',
+                                    })
+                                  : '-'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button
