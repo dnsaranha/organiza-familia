@@ -46,10 +46,11 @@ interface UserStats {
 
 interface UserInfo {
   id: string;
+  email: string | null;
   full_name: string | null;
-  subscription_plan: string | null;
-  updated_at: string | null;
-  transaction_count?: number;
+  plan: string;
+  last_activity_at: string | null;
+  created_at: string | null;
 }
 
 export default function AdminPage() {
@@ -130,18 +131,10 @@ export default function AdminPage() {
         .from('scheduled_tasks')
         .select('*', { count: 'exact', head: true });
 
-      // Users registered today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count: usersToday } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('updated_at', today.toISOString());
-
       setUserStats({
         total_users: totalUsers || 0,
         users_with_active_subscription: activeSubscriptions || 0,
-        users_today: usersToday || 0,
+        users_today: 0,
         total_transactions: totalTransactions || 0,
         total_goals: totalGoals || 0,
         total_tasks: totalTasks || 0,
@@ -154,14 +147,12 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, subscription_plan, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(100);
-
+      const { data, error } = await supabase.functions.invoke('admin-list-users');
       if (error) throw error;
-      setUsers(profiles || []);
+      setUsers((data?.users || []) as UserInfo[]);
+      if (typeof data?.users_today === 'number') {
+        setUserStats((prev) => prev ? { ...prev, users_today: data.users_today } : prev);
+      }
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
