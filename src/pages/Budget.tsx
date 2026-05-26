@@ -224,11 +224,26 @@ const BudgetPage = () => {
           transactionCategories: c.transactionCategories,
         })),
       };
-      const { data, error } = await (supabase as any)
-        .from("budget_settings")
-        .upsert(payload, { onConflict: scope === "personal" ? "user_id" : "group_id" })
-        .select()
-        .maybeSingle();
+      let data: any = null;
+      let error: any = null;
+      if (settingsId) {
+        const res = await (supabase as any)
+          .from("budget_settings")
+          .update(payload)
+          .eq("id", settingsId)
+          .select()
+          .maybeSingle();
+        data = res.data;
+        error = res.error;
+      } else {
+        const res = await (supabase as any)
+          .from("budget_settings")
+          .insert(payload)
+          .select()
+          .maybeSingle();
+        data = res.data;
+        error = res.error;
+      }
       if (error) throw error;
       if (data?.id) setSettingsId(data.id);
       toast({
