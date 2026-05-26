@@ -469,11 +469,6 @@ export const useOpenBanking = () => {
   // Função para recarregar todos os dados  
   const refreshAllData = useCallback(async () => {
     if (!user) {
-      toast({
-        title: "Usuário não autenticado",
-        description: "Você precisa estar logado para atualizar os dados.",
-        variant: "destructive",
-      });
       return;
     }
 
