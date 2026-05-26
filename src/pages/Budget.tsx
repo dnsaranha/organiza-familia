@@ -42,6 +42,8 @@ const BudgetPage = () => {
     defaultBudgetCategories.map((c) => ({ ...c, value: c.defaultPercentage }))
   );
   const [monthlyIncome, setMonthlyIncome] = useState<number>(0);
+  const [incomeManuallySet, setIncomeManuallySet] = useState(false);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
   const [currentMonthIncome, setCurrentMonthIncome] = useState<number>(0);
   const [currentMonthExpenses, setCurrentMonthExpenses] = useState<number>(0);
   const [expensesByBudgetCategory, setExpensesByBudgetCategory] = useState<Record<string, number>>({});
@@ -59,12 +61,37 @@ const BudgetPage = () => {
       try {
         setLoading(true);
 
-        // Load saved budget preferences
-        const { data: prefData } = await supabase
-          .from("user_preferences")
+        // Load saved budget settings for this scope
+        let settingsQuery = (supabase as any)
+          .from("budget_settings")
           .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .eq("user_id", user.id);
+        if (scope === "personal") {
+          settingsQuery = settingsQuery.is("group_id", null);
+        } else {
+          settingsQuery = settingsQuery.eq("group_id", scope);
+        }
+        const { data: settingsData } = await settingsQuery.maybeSingle();
+
+        let savedIncome: number | null = null;
+        if (settingsData) {
+          setSettingsId(settingsData.id);
+          savedIncome = Number(settingsData.monthly_income) || 0;
+          const saved = Array.isArray(settingsData.categories) ? settingsData.categories : [];
+          if (saved.length > 0) {
+            const merged = defaultBudgetCategories.map((dc) => {
+              const match = saved.find((s: any) => s.id === dc.id);
+              return {
+                ...dc,
+                value: match?.value ?? dc.defaultPercentage,
+                transactionCategories: match?.transactionCategories ?? dc.transactionCategories,
+              };
+            });
+            setCategories(merged);
+          }
+        } else {
+          setSettingsId(null);
+        }
 
         // Get current month transactions
         const currentDate = new Date();
@@ -114,8 +141,10 @@ const BudgetPage = () => {
           const byBudgetCategory = groupExpensesByBudgetCategory(expensesList);
           setExpensesByBudgetCategory(byBudgetCategory);
 
-          // Use current month income or last 3 months average
-          if (income > 0) {
+          // Prefer saved income; fallback to current month / last 3 months average
+          if (savedIncome && savedIncome > 0) {
+            setMonthlyIncome(savedIncome);
+          } else if (income > 0) {
             setMonthlyIncome(income);
           } else {
             // Get last 3 months average
@@ -182,13 +211,40 @@ const BudgetPage = () => {
   }, [monthlyIncome, currentMonthExpenses]);
 
   const handleSave = async () => {
+    if (!user) return;
     setSaving(true);
-    // Here you could save budget preferences to user_preferences table
-    toast({
-      title: "Orçamento salvo!",
-      description: "Suas configurações de orçamento foram salvas.",
-    });
-    setSaving(false);
+    try {
+      const payload = {
+        user_id: user.id,
+        group_id: scope === "personal" ? null : scope,
+        monthly_income: monthlyIncome,
+        categories: categories.map((c) => ({
+          id: c.id,
+          value: c.value,
+          transactionCategories: c.transactionCategories,
+        })),
+      };
+      const { data, error } = await (supabase as any)
+        .from("budget_settings")
+        .upsert(payload, { onConflict: scope === "personal" ? "user_id" : "group_id" })
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      if (data?.id) setSettingsId(data.id);
+      toast({
+        title: "Orçamento salvo!",
+        description: "Suas configurações de orçamento foram salvas.",
+      });
+    } catch (err: any) {
+      console.error("Error saving budget:", err);
+      toast({
+        title: "Erro ao salvar",
+        description: err.message || "Não foi possível salvar o orçamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {
