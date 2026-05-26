@@ -42,7 +42,6 @@ const BudgetPage = () => {
     defaultBudgetCategories.map((c) => ({ ...c, value: c.defaultPercentage }))
   );
   const [monthlyIncome, setMonthlyIncome] = useState<number>(0);
-  const [incomeManuallySet, setIncomeManuallySet] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [currentMonthIncome, setCurrentMonthIncome] = useState<number>(0);
   const [currentMonthExpenses, setCurrentMonthExpenses] = useState<number>(0);
