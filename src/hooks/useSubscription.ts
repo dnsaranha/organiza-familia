@@ -229,6 +229,17 @@ export function useSubscription(): SubscriptionState {
         return;
       }
 
+      // Admins get full access for free
+      const { data: isAdminData } = await supabase.rpc('is_admin');
+      if (isAdminData === true) {
+        setPlan('advanced');
+        setSubscriptionStatus('admin');
+        setLimits(PLAN_LIMITS.advanced);
+        await fetchPermissions('premium');
+        setIsLoading(false);
+        return;
+      }
+
       // Fetch subscription from stripe_user_subscriptions view
       const { data: subscription, error: subError } = await supabase
         .from('stripe_user_subscriptions')
