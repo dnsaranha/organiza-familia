@@ -6,6 +6,7 @@ import DividendHistoryChart from "@/components/charts/DividendHistoryChart";
 import MonthlyAssetBreakdownChart from "@/components/charts/MonthlyAssetBreakdownChart";
 import AssetAllocationChart from "@/components/charts/AssetAllocationChart";
 import { DividendMonthlyTable } from "@/components/DividendMonthlyTable";
+import { DividendScheduleCard } from "@/components/DividendScheduleCard";
 import { FinancialCard } from "@/components/FinancialCard";
 import { ManualInvestmentTransactions } from "@/components/ManualInvestmentTransactions";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,10 @@ const Investments = () => {
 
         <div className="mb-6">
           <MonthlyAssetBreakdownChart data={dividendHistory} loading={loading} />
+        </div>
+
+        <div className="mb-6">
+          <DividendScheduleCard data={dividendHistory} loading={loading} />
         </div>
 
         <div className="mb-6">
