@@ -210,7 +210,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount">Valor *</Label>
-              <div className="relative">
+              <div className="relative" data-tutorial="tx-amount">
                 <span className="absolute left-3 top-3 text-muted-foreground">R$</span>
                 <Input
                   id="amount"
@@ -227,7 +227,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             </div>
 
             {/* Category */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-tutorial="tx-category">
               <Label htmlFor="category">Categoria *</Label>
               <Select value={category} onValueChange={setCategory} required disabled={loading}>
                 <SelectTrigger>
@@ -244,7 +244,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             </div>
 
             {/* Date */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-tutorial="tx-date">
               <Label>Data *</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -295,7 +295,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             )}
 
             {/* Description */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-tutorial="tx-description">
               <Label htmlFor="description">Descrição</Label>
               <Textarea
                 id="description"
@@ -310,6 +310,7 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 type="submit"
+                data-tutorial="tx-submit"
                 className="w-full bg-gradient-primary text-primary-foreground shadow-button hover:scale-105 transition-smooth"
                 disabled={loading}
               >
