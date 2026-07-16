@@ -416,6 +416,10 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <MessageCircle className="h-4 w-4" />
                     Chat de Suporte
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsTutorialsOpen(true)} className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Tutoriais
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
