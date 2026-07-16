@@ -228,29 +228,29 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
             Nenhum dado para {label}.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={Math.max(360, chartData.length * 80)}>
+          <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 34 + 60)}>
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
-              barCategoryGap="20%"
-              barGap={2}
+              margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+              barCategoryGap={4}
+              barGap={1}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
+              <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10 }} />
               <YAxis
                 type="category"
                 dataKey="ticker"
-                width={80}
-                tick={{ fontSize: 12 }}
+                width={56}
+                tick={{ fontSize: 10 }}
               />
               <Tooltip formatter={(v: number) => formatCurrency(v)} />
-              <Legend />
-              <Bar dataKey="marketValue" stackId="patrimonio" name="Valor de mercado" fill="#2563eb" barSize={22} />
-              <Bar dataKey="proventosAcumulados" stackId="patrimonio" name="Proventos acumulados" fill="#1e3a8a" barSize={22} />
-              <Bar dataKey="cost" name="Custo" fill="#f97316" barSize={22} />
-              <Bar dataKey="proventos" name="Proventos (mês)" fill="#60a5fa" barSize={22} />
-              <Bar dataKey="operations" name="Operações" fill="#10b981" barSize={22} />
+              <Legend wrapperStyle={{ fontSize: 11 }} iconSize={8} />
+              <Bar dataKey="marketValue" stackId="patrimonio" name="Valor de mercado" fill="#2563eb" barSize={7} />
+              <Bar dataKey="proventosAcumulados" stackId="patrimonio" name="Proventos acumulados" fill="#1e3a8a" barSize={7} />
+              <Bar dataKey="cost" name="Custo" fill="#f97316" barSize={7} />
+              <Bar dataKey="proventos" name="Proventos (mês)" fill="#60a5fa" barSize={7} />
+              <Bar dataKey="operations" name="Operações" fill="#10b981" barSize={7} />
             </BarChart>
           </ResponsiveContainer>
         )}
