@@ -496,6 +496,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <SidebarProvider defaultOpen>
       {isMobile ? mobileView : desktopView}
+      <TutorialsDialog open={isTutorialsOpen} onOpenChange={setIsTutorialsOpen} />
     </SidebarProvider>
   );
 };
