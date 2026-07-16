@@ -28,7 +28,6 @@ export const tutorials: TutorialDefinition[] = [
         title: "Nova transação",
         content:
           "Clique neste botão para abrir o formulário e registrar uma nova transação.",
-        spotlightClicks: true,
         placement: "auto",
       },
       {
