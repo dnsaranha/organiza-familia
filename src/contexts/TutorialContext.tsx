@@ -151,7 +151,7 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
             // tooltip itself. Disable pointer events on the overlay/spotlight
             // so only the tooltip captures clicks.
             overlay: { pointerEvents: "none" },
-            spotlight: { pointerEvents: "none" },
+            spotlight: { style: { pointerEvents: "none", cursor: "default" } },
           }}
           locale={{
             back: "Voltar",
