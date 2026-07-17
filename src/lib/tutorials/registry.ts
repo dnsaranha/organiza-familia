@@ -6,6 +6,9 @@ export interface TutorialDefinition {
   description: string;
   /** If set, when the user visits this route for the first time we prompt to start. */
   autoPromptOnRoute?: string | string[];
+  /** Route where the tutorial makes sense. If provided, starting from the menu will
+   *  navigate here first when the user is elsewhere. */
+  startRoute?: string;
   steps: Step[];
 }
 
@@ -21,7 +24,8 @@ export const tutorials: TutorialDefinition[] = [
     title: "Adicionar uma transação",
     description:
       "Aprenda passo a passo como registrar uma nova receita ou despesa.",
-    autoPromptOnRoute: ["/dashboard", "/"],
+    autoPromptOnRoute: ["/dashboard"],
+    startRoute: "/dashboard",
     steps: [
       {
         target: '[data-tutorial="tx-open"]',
@@ -29,12 +33,14 @@ export const tutorials: TutorialDefinition[] = [
         content:
           "Clique neste botão para abrir o formulário e registrar uma nova transação.",
         placement: "auto",
+        skipBeacon: true,
       },
       {
         target: '[data-tutorial="tx-amount"]',
         title: "Valor",
         content: "Informe o valor da transação. Use o teclado numérico.",
         placement: "bottom",
+        skipBeacon: true,
       },
       {
         target: '[data-tutorial="tx-category"]',
@@ -42,18 +48,21 @@ export const tutorials: TutorialDefinition[] = [
         content:
           "Escolha a categoria correspondente. Isso ajuda nos relatórios e no orçamento.",
         placement: "bottom",
+        skipBeacon: true,
       },
       {
         target: '[data-tutorial="tx-date"]',
         title: "Data",
         content: "Selecione a data em que a transação aconteceu.",
         placement: "bottom",
+        skipBeacon: true,
       },
       {
         target: '[data-tutorial="tx-description"]',
         title: "Descrição (opcional)",
         content: "Adicione uma descrição para lembrar o motivo da transação.",
         placement: "top",
+        skipBeacon: true,
       },
       {
         target: '[data-tutorial="tx-submit"]',
@@ -61,6 +70,7 @@ export const tutorials: TutorialDefinition[] = [
         content:
           "Confirme para adicionar a transação. Pronto — ela aparecerá na sua lista e no resumo financeiro!",
         placement: "top",
+        skipBeacon: true,
       },
     ],
   },

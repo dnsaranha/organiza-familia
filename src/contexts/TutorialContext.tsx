@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Joyride, EVENTS, STATUS, type EventData } from "react-joyride";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import {
   resetTutorial,
   shouldPromptTutorial,
 } from "@/lib/tutorials/storage";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TutorialContextValue {
   tutorials: TutorialDefinition[];
@@ -29,18 +30,26 @@ export const useTutorial = () => {
 
 export const TutorialProvider = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [run, setRun] = React.useState(false);
   const promptedRef = React.useRef<Set<string>>(new Set());
+  const activeToastRef = React.useRef<string | number | null>(null);
 
   const active = activeId ? getTutorial(activeId) : null;
 
   const startTutorial = React.useCallback((id: string) => {
     const t = getTutorial(id);
     if (!t) return;
+    // If the tutorial has a start route and we're elsewhere, navigate there first.
+    if (t.startRoute && location.pathname !== t.startRoute) {
+      navigate(t.startRoute);
+    }
     setActiveId(id);
-    setRun(true);
-  }, []);
+    // Delay slightly so target elements exist in the DOM (especially after route change).
+    window.setTimeout(() => setRun(true), 300);
+  }, [location.pathname, navigate]);
 
   const stopTutorial = React.useCallback(() => {
     setRun(false);
@@ -58,7 +67,15 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   // First-visit prompt: any tutorial with autoPromptOnRoute matching current path.
   React.useEffect(() => {
     if (activeId) return;
+    if (authLoading || !user) return; // only prompt authenticated users
     const path = location.pathname;
+
+    // Dismiss stale prompt if user navigated away from a matching route.
+    if (activeToastRef.current !== null) {
+      toast.dismiss(activeToastRef.current);
+      activeToastRef.current = null;
+    }
+
     for (const t of tutorials) {
       if (!t.autoPromptOnRoute) continue;
       const routes = Array.isArray(t.autoPromptOnRoute)
@@ -84,9 +101,10 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
           },
         },
       });
+      activeToastRef.current = toastId;
       break; // one prompt at a time
     }
-  }, [location.pathname, activeId, startTutorial]);
+  }, [location.pathname, activeId, startTutorial, user, authLoading]);
 
   const handleEvent = React.useCallback((data: EventData) => {
     const { type, status } = data;
@@ -119,11 +137,14 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
           continuous
           onEvent={handleEvent}
           options={{
-            skipBeacon: true,
             showProgress: true,
             primaryColor: "hsl(var(--primary))",
             zIndex: 10000,
             buttons: ["back", "skip", "primary"],
+            overlayClickAction: false,
+            hideOverlay: true,
+            dismissKeyAction: "close",
+            targetWaitTimeout: 4000,
           }}
           locale={{
             back: "Voltar",
@@ -131,6 +152,8 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
             last: "Concluir",
             next: "Próximo",
             skip: "Pular",
+            nextWithProgress: "Próximo ({current} de {total})",
+            open: "Abrir tutorial",
           }}
         />
       )}
