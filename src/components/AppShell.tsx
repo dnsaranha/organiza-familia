@@ -19,6 +19,7 @@ import {
   Plus,
   MessageCircle,
   Shield,
+  GraduationCap,
 } from "lucide-react";
 
 import {
@@ -51,6 +52,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TransactionForm } from "@/components/TransactionForm";
 import { toggleSupportChat } from "@/components/SupportChat";
+import { TutorialsDialog } from "@/components/TutorialsDialog";
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const isMobile = useIsMobile();
@@ -59,6 +61,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [isDesktopTransactionOpen, setIsDesktopTransactionOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [isTutorialsOpen, setIsTutorialsOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!loading && !user && location.pathname !== "/yfinance-test") {
@@ -207,6 +210,10 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuItem onClick={toggleSupportChat} className="flex items-center gap-2">
                       <MessageCircle className="h-4 w-4" />
                       Chat de Suporte
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsTutorialsOpen(true)} className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4" />
+                      Tutoriais
                     </DropdownMenuItem>
                     {isAdmin && (
                       <>
@@ -409,6 +416,10 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     <MessageCircle className="h-4 w-4" />
                     Chat de Suporte
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsTutorialsOpen(true)} className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Tutoriais
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -443,6 +454,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-end gap-2 sm:gap-4">
             <Button
               onClick={() => setIsDesktopTransactionOpen(true)}
+              data-tutorial="tx-open"
               className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
               size="sm"
             >
@@ -484,6 +496,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <SidebarProvider defaultOpen>
       {isMobile ? mobileView : desktopView}
+      <TutorialsDialog open={isTutorialsOpen} onOpenChange={setIsTutorialsOpen} />
     </SidebarProvider>
   );
 };
