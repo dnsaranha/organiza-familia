@@ -142,16 +142,9 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
             zIndex: 10000,
             buttons: ["back", "skip", "primary"],
             overlayClickAction: false,
+            hideOverlay: true,
             dismissKeyAction: "close",
             targetWaitTimeout: 4000,
-          }}
-          styles={{
-            // The overlay in this version intercepts pointer events even when
-            // overlayClickAction is false, which blocks clicks on the Joyride
-            // tooltip itself. Disable pointer events on the overlay/spotlight
-            // so only the tooltip captures clicks.
-            overlay: { pointerEvents: "none" },
-            spotlight: { style: { pointerEvents: "none", cursor: "default" } },
           }}
           locale={{
             back: "Voltar",
