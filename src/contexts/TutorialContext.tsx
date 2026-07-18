@@ -107,7 +107,21 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   }, [location.pathname, activeId, startTutorial, user, authLoading]);
 
   const handleEvent = React.useCallback((data: EventData) => {
-    const { type, status } = data;
+    const { type, status, index, action } = data;
+
+    // Side-effects for the add-transaction tour: open/close the
+    // transaction modal so the form-field steps have valid targets.
+    if (activeId === "add-transaction") {
+      // After the user advances past step 0 (the "+" button), open the modal.
+      if (type === EVENTS.STEP_AFTER && index === 0 && action === "next") {
+        window.dispatchEvent(new CustomEvent("tutorial:open-tx-modal"));
+      }
+      // When going back to step 0 from step 1, close the modal.
+      if (type === EVENTS.STEP_AFTER && index === 1 && action === "prev") {
+        window.dispatchEvent(new CustomEvent("tutorial:close-tx-modal"));
+      }
+    }
+
     if (type === EVENTS.TOUR_END) {
       if (activeId && (status === STATUS.FINISHED)) {
         markTutorialCompleted(activeId);
@@ -115,6 +129,9 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       if (activeId && status === STATUS.SKIPPED) {
         // If the user skipped explicitly, treat as dismissed so we don't nag.
         markTutorialDismissed(activeId);
+      }
+      if (activeId === "add-transaction") {
+        window.dispatchEvent(new CustomEvent("tutorial:close-tx-modal"));
       }
       setRun(false);
       setActiveId(null);
