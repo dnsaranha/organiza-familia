@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useBottomNavConfig } from "@/hooks/useBottomNavConfig";
@@ -15,6 +15,19 @@ export const BottomNavBar = () => {
     setIsTransactionModalOpen(false);
     window.dispatchEvent(new CustomEvent("transaction-updated"));
   };
+
+  // Allow the tutorial system to open/close the transaction modal so guided
+  // steps that target fields inside the dialog have valid DOM targets.
+  useEffect(() => {
+    const open = () => setIsTransactionModalOpen(true);
+    const close = () => setIsTransactionModalOpen(false);
+    window.addEventListener("tutorial:open-tx-modal", open);
+    window.addEventListener("tutorial:close-tx-modal", close);
+    return () => {
+      window.removeEventListener("tutorial:open-tx-modal", open);
+      window.removeEventListener("tutorial:close-tx-modal", close);
+    };
+  }, []);
 
   return (
     <>

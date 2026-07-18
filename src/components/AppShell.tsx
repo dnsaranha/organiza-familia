@@ -92,6 +92,19 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     checkAdmin();
   }, [user]);
 
+  // Bridge tutorial events to the desktop transaction modal.
+  React.useEffect(() => {
+    if (isMobile) return;
+    const open = () => setIsDesktopTransactionOpen(true);
+    const close = () => setIsDesktopTransactionOpen(false);
+    window.addEventListener("tutorial:open-tx-modal", open);
+    window.addEventListener("tutorial:close-tx-modal", close);
+    return () => {
+      window.removeEventListener("tutorial:open-tx-modal", open);
+      window.removeEventListener("tutorial:close-tx-modal", close);
+    };
+  }, [isMobile]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
