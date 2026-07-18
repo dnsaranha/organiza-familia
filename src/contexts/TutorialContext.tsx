@@ -120,6 +120,13 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       if (type === EVENTS.STEP_AFTER && index === 1 && action === "prev") {
         window.dispatchEvent(new CustomEvent("tutorial:close-tx-modal"));
       }
+      // Notify the form so it can autofill defaults / show hints when
+      // the user advances without providing information.
+      if (type === EVENTS.STEP_AFTER && action === "next") {
+        window.dispatchEvent(
+          new CustomEvent("tutorial:tx-step-after", { detail: { index } }),
+        );
+      }
     }
 
     if (type === EVENTS.TOUR_END) {
@@ -137,6 +144,18 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       setActiveId(null);
     }
   }, [activeId]);
+
+  // Expose a body-level flag while a tour is running so modal dialogs can
+  // ignore outside-click / escape events that would otherwise close them
+  // when the user interacts with the Joyride tooltip (portal outside).
+  React.useEffect(() => {
+    if (run && activeId) {
+      document.body.setAttribute("data-tutorial-active", activeId);
+    } else {
+      document.body.removeAttribute("data-tutorial-active");
+    }
+    return () => document.body.removeAttribute("data-tutorial-active");
+  }, [run, activeId]);
 
   const value = React.useMemo<TutorialContextValue>(
     () => ({ tutorials, startTutorial, stopTutorial, restartTutorial, activeTutorialId: activeId }),

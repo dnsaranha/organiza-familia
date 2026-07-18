@@ -48,6 +48,51 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
   const { user } = useAuth();
   const { getAllIncomeCategories, getAllExpenseCategories } = useUserCategories();
 
+  // Tutorial helpers: when the guided tour advances past a form step
+  // without the user filling it in, autofill sensible defaults (amount)
+  // or surface a hint toast so the user knows what to do next.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { index } = (e as CustomEvent<{ index: number }>).detail || { index: -1 };
+      // Steps in the add-transaction tour:
+      // 0: open button, 1: amount, 2: category, 3: date, 4: description, 5: submit
+      if (index === 1) {
+        if (amountValue <= 0) {
+          setAmountValue(1);
+          toast({
+            title: "Valor preenchido automaticamente",
+            description: "Definimos R$ 1,00 como exemplo. Ajuste se quiser.",
+          });
+        }
+      } else if (index === 2) {
+        if (!category) {
+          const list = type === "income" ? getAllIncomeCategories() : getAllExpenseCategories();
+          if (list.length > 0) {
+            setCategory(list[0]);
+            toast({
+              title: "Categoria selecionada",
+              description: `Escolhemos "${list[0]}" como exemplo. Você pode trocar depois.`,
+            });
+          } else {
+            toast({
+              title: "Selecione uma categoria",
+              description: "Escolha uma categoria para continuar salvando a transação.",
+            });
+          }
+        }
+      } else if (index === 4) {
+        if (!description) {
+          toast({
+            title: "Descrição opcional",
+            description: "Você pode deixar em branco ou descrever a transação.",
+          });
+        }
+      }
+    };
+    window.addEventListener("tutorial:tx-step-after", handler as EventListener);
+    return () => window.removeEventListener("tutorial:tx-step-after", handler as EventListener);
+  }, [amountValue, category, description, type, setAmountValue, getAllIncomeCategories, getAllExpenseCategories, toast]);
+
   // Efeito para buscar os grupos do usuário
   useEffect(() => {
     const fetchGroups = async () => {

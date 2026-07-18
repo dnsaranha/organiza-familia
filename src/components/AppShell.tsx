@@ -494,7 +494,18 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         </header>
         <div className="w-full">{children}</div>
         <Dialog open={isDesktopTransactionOpen} onOpenChange={setIsDesktopTransactionOpen}>
-          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogContent
+            className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+            onPointerDownOutside={(e) => {
+              if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+            }}
+            onInteractOutside={(e) => {
+              if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+            }}
+            onEscapeKeyDown={(e) => {
+              if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+            }}
+          >
             <DialogTitle className="sr-only">Nova Transação</DialogTitle>
              <TransactionForm
               onSave={handleDesktopTransactionSaved}

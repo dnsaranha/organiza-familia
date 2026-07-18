@@ -67,7 +67,18 @@ export const BottomNavBar = () => {
       </div>
 
       <Dialog open={isTransactionModalOpen} onOpenChange={setIsTransactionModalOpen}>
-        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+        <DialogContent
+          className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none"
+          onPointerDownOutside={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+        >
           <DialogTitle className="sr-only">Nova Transação</DialogTitle>
            <TransactionForm
             onSave={handleTransactionSaved}
