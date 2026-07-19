@@ -452,9 +452,14 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                       const iconName = getCategoryIcon(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const iconColor = getCategoryColor(transaction.category, userCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color })));
                       const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.CircleDot;
-                      
+                      const isFirst = transaction.id === filteredTransactions[0].id;
+
                       return (
-                    <div key={transaction.id} className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50">
+                    <div
+                      key={transaction.id}
+                      data-tutorial={isFirst ? "tx-history-item" : undefined}
+                      className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50"
+                    >
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <div 
                           className="rounded-lg p-1.5 sm:p-2 flex-shrink-0 flex items-center justify-center"
@@ -476,16 +481,51 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                             {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
                           </p>
                         </div>
-                        <DropdownMenu>
+                        <DropdownMenu
+                          {...(isFirst
+                            ? {
+                                open: tutorialMenuOpen || undefined,
+                                onOpenChange: (o: boolean) => {
+                                  if (document.body.hasAttribute("data-tutorial-active") && !o) return;
+                                  setTutorialMenuOpen(o);
+                                },
+                              }
+                            : {})}
+                        >
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                            <Button
+                              variant="ghost"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              data-tutorial={isFirst ? "tx-history-menu" : undefined}
+                            >
                               <span className="sr-only">Menu</span>
                               <MoreHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditingTransaction(transaction)}><Pencil className="mr-2 h-4 w-4" /><span>Editar</span></DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onSelect={() => setTransactionToDelete(transaction)}><Trash2 className="mr-2 h-4 w-4" /><span>Excluir</span></DropdownMenuItem>
+                          <DropdownMenuContent
+                            align="end"
+                            onInteractOutside={(e) => {
+                              if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+                            }}
+                            onEscapeKeyDown={(e) => {
+                              if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+                            }}
+                          >
+                            <DropdownMenuItem
+                              data-tutorial={isFirst ? "tx-history-edit" : undefined}
+                              onSelect={(e) => {
+                                if (document.body.hasAttribute("data-tutorial-active")) { e.preventDefault(); return; }
+                                setEditingTransaction(transaction);
+                              }}
+                            ><Pencil className="mr-2 h-4 w-4" /><span>Editar</span></DropdownMenuItem>
+                            <DropdownMenuItem
+                              data-tutorial={isFirst ? "tx-history-delete" : undefined}
+                              className="text-destructive"
+                              onSelect={(e) => {
+                                if (document.body.hasAttribute("data-tutorial-active")) { e.preventDefault(); return; }
+                                setTransactionToDelete(transaction);
+                              }}
+                            ><Trash2 className="mr-2 h-4 w-4" /><span>Excluir</span></DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -499,8 +539,21 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
         </Collapsible>
       </Card>
 
-      <Dialog open={!!editingTransaction} onOpenChange={(open) => !open && setEditingTransaction(null)}>
-        <DialogContent>
+      <Dialog open={!!editingTransaction} onOpenChange={(open) => {
+        if (document.body.hasAttribute("data-tutorial-active") && !open) return;
+        if (!open) setEditingTransaction(null);
+      }}>
+        <DialogContent
+          onPointerDownOutside={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (document.body.hasAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+        >
           <DialogHeader><DialogTitle>Editar Transação</DialogTitle></DialogHeader>
           <TransactionForm
             transactionToEdit={editingTransaction}
