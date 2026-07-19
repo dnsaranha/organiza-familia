@@ -384,32 +384,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         </div>
       </div>
 
-      <div className="space-y-3">
-        <Label className="text-sm font-medium">Notificações</Label>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Email</span>
-            </div>
-            <Switch
-              checked={formData.notification_email}
-              onCheckedChange={(checked) => setFormData({ ...formData, notification_email: checked })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Notificação Push</span>
-            </div>
-            <Switch
-              checked={formData.notification_push}
-              onCheckedChange={(checked) => setFormData({ ...formData, notification_push: checked })}
-            />
-          </div>
-        </div>
-      </div>
-
       <div className="space-y-3 pt-4 border-t">
         <div className="flex items-center justify-between">
           <Label htmlFor="is_recurring" className="text-sm font-medium">Tarefa Recorrente</Label>
