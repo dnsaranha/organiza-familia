@@ -484,7 +484,7 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
                         <DropdownMenu
                           {...(isFirst
                             ? {
-                                open: tutorialMenuOpen || undefined,
+                                open: tutorialMenuOpen,
                                 onOpenChange: (o: boolean) => {
                                   if (document.body.hasAttribute("data-tutorial-active") && !o) return;
                                   setTutorialMenuOpen(o);
