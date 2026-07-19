@@ -74,6 +74,55 @@ export const tutorials: TutorialDefinition[] = [
       },
     ],
   },
+  {
+    id: "edit-transaction",
+    title: "Editar ou excluir uma transação",
+    description:
+      "Aprenda como alterar ou remover uma transação já registrada pelo histórico.",
+    startRoute: "/dashboard",
+    steps: [
+      {
+        target: '[data-tutorial="tx-history-item"]',
+        title: "Histórico de Transações",
+        content:
+          "Cada linha do histórico representa uma transação registrada. Vamos abrir o menu de ações da primeira.",
+        placement: "auto",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="tx-history-menu"]',
+        title: "Menu de ações",
+        content:
+          "Toque neste ícone (⋯) para abrir as opções da transação. Vamos abrir para você.",
+        placement: "left",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="tx-history-edit"]',
+        title: "Editar",
+        content:
+          "Selecione Editar para alterar valor, categoria, data ou descrição da transação.",
+        placement: "left",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="tx-history-delete"]',
+        title: "Excluir",
+        content:
+          "A opção Excluir remove a transação permanentemente. Um alerta pedirá confirmação antes de apagar.",
+        placement: "left",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="tx-submit"]',
+        title: "Salvar alterações",
+        content:
+          "Após ajustar os campos, clique em Salvar para confirmar a edição. Pronto!",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
 ];
 
 export const getTutorial = (id: string) =>

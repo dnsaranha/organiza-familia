@@ -129,6 +129,25 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       }
     }
 
+    // Side-effects for the edit-transaction tour: force-open the row's
+    // dropdown menu on step 1, then open the edit dialog on step 3.
+    if (activeId === "edit-transaction") {
+      if (type === EVENTS.STEP_AFTER && index === 1 && action === "next") {
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-open-menu"));
+      }
+      if (type === EVENTS.STEP_AFTER && index === 2 && action === "prev") {
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-menu"));
+      }
+      if (type === EVENTS.STEP_AFTER && index === 3 && action === "next") {
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-menu"));
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-open-edit"));
+      }
+      if (type === EVENTS.STEP_AFTER && index === 4 && action === "prev") {
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-edit"));
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-open-menu"));
+      }
+    }
+
     if (type === EVENTS.TOUR_END) {
       if (activeId && (status === STATUS.FINISHED)) {
         markTutorialCompleted(activeId);
@@ -139,6 +158,10 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       }
       if (activeId === "add-transaction") {
         window.dispatchEvent(new CustomEvent("tutorial:close-tx-modal"));
+      }
+      if (activeId === "edit-transaction") {
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-menu"));
+        window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-edit"));
       }
       setRun(false);
       setActiveId(null);
