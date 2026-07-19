@@ -119,6 +119,30 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [tutorialMenuOpen, setTutorialMenuOpen] = useState(false);
+
+  // Tutorial event bridge: open/close the first row's dropdown menu and the
+  // edit dialog on demand so guided steps have valid targets.
+  useEffect(() => {
+    const openMenu = () => setTutorialMenuOpen(true);
+    const closeMenu = () => setTutorialMenuOpen(false);
+    const openEdit = () => {
+      const first = transactions[0];
+      if (first) setEditingTransaction(first);
+    };
+    const closeEdit = () => setEditingTransaction(null);
+    window.addEventListener("tutorial:tx-history-open-menu", openMenu);
+    window.addEventListener("tutorial:tx-history-close-menu", closeMenu);
+    window.addEventListener("tutorial:tx-history-open-edit", openEdit);
+    window.addEventListener("tutorial:tx-history-close-edit", closeEdit);
+    return () => {
+      window.removeEventListener("tutorial:tx-history-open-menu", openMenu);
+      window.removeEventListener("tutorial:tx-history-close-menu", closeMenu);
+      window.removeEventListener("tutorial:tx-history-open-edit", openEdit);
+      window.removeEventListener("tutorial:tx-history-close-edit", closeEdit);
+    };
+  }, [transactions]);
+
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
