@@ -5,9 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Mail, Smartphone, PlusIcon, Minus } from "lucide-react";
+import { PlusIcon, Minus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useNotifications } from "@/hooks/useNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Combobox } from "@/components/ui/combobox";
@@ -60,7 +59,6 @@ interface ScheduledTaskFormProps {
 
 export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: ScheduledTaskFormProps) {
   const { toast } = useToast();
-  const { permission, requestPermission, scheduleNotification } = useNotifications();
   const { user } = useAuth();
 
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
@@ -75,8 +73,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
     task_type: 'custom' as 'payment_reminder' | 'budget_alert' | 'income_reminder' | 'custom',
     schedule_date: '',
     schedule_time: '',
-    notification_email: true,
-    notification_push: true,
     group_id: 'personal',
     category: '',
     is_recurring: false,
@@ -103,8 +99,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         task_type: initialData.task_type || 'custom',
         schedule_date: initialData.schedule_date ? new Date(initialData.schedule_date).toISOString().split('T')[0] : '',
         schedule_time: initialData.schedule_date ? new Date(initialData.schedule_date).toTimeString().slice(0, 5) : '',
-        notification_email: initialData.notification_email ?? true,
-        notification_push: initialData.notification_push ?? true,
         group_id: initialData.group_id || 'personal',
         category: initialData.category || '',
         is_recurring: initialData.is_recurring || false,
@@ -120,8 +114,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         task_type: 'custom' as 'payment_reminder' | 'budget_alert' | 'income_reminder' | 'custom',
         schedule_date: '',
         schedule_time: '',
-        notification_email: true,
-        notification_push: true,
         group_id: 'personal',
         category: '',
         is_recurring: false,
@@ -178,18 +170,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
       return;
     }
 
-    if (formData.notification_push && permission !== 'granted') {
-      const result = await requestPermission();
-      if (result !== 'granted') {
-        toast({
-          title: "Permissão negada",
-          description: "Para receber notificações push, é necessário permitir as notificações no navegador.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     try {
       const localDateTimeString = `${formData.schedule_date}T${formData.schedule_time}:00`;
       const localDate = new Date(localDateTimeString);
@@ -204,8 +184,8 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           description: formData.description,
           task_type: formData.task_type,
           schedule_date: scheduleDateTime,
-          notification_email: formData.notification_email,
-          notification_push: formData.notification_push,
+          notification_email: false,
+          notification_push: false,
           user_id: user?.id,
           group_id: (!formData.group_id || formData.group_id === 'personal' || formData.group_id === '') ? null : formData.group_id,
           value: valueWithSign,
@@ -262,15 +242,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
           console.error('Failed to update Google Calendar event:', gcError);
           // Don't fail the whole operation if Google sync fails
         }
-      }
-
-      if (formData.notification_push) {
-        const scheduleTime = new Date(scheduleDateTime);
-        scheduleNotification(formData.title, {
-          body: formData.description,
-          scheduleTime,
-          icon: '/favicon.ico',
-        });
       }
 
       toast({
@@ -410,32 +381,6 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
             onChange={(e) => setFormData({ ...formData, schedule_time: e.target.value })}
             required
           />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <Label className="text-sm font-medium">Notificações</Label>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Email</span>
-            </div>
-            <Switch
-              checked={formData.notification_email}
-              onCheckedChange={(checked) => setFormData({ ...formData, notification_email: checked })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Notificação Push</span>
-            </div>
-            <Switch
-              checked={formData.notification_push}
-              onCheckedChange={(checked) => setFormData({ ...formData, notification_push: checked })}
-            />
-          </div>
         </div>
       </div>
 
