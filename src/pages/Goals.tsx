@@ -330,7 +330,7 @@ export default function GoalsPage() {
           <p className="text-muted-foreground text-sm">Defina e acompanhe suas metas financeiras</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { setEditingGoal(null); resetForm(); } }}>
-          <DialogTrigger asChild><Button disabled={!canAddGoal && !editingGoal}><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
+          <DialogTrigger asChild><Button disabled={!canAddGoal && !editingGoal} data-tutorial="goal-new"><Plus className="h-4 w-4 mr-2" />Nova Meta</Button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingGoal ? "Editar Meta" : "Nova Meta"}</DialogTitle></DialogHeader>
             <div className="space-y-4">
@@ -377,7 +377,7 @@ export default function GoalsPage() {
             const isExpanded = expandedGoalId === goal.id;
 
             return (
-              <Card key={goal.id} className="overflow-hidden flex flex-col">
+              <Card key={goal.id} className="overflow-hidden flex flex-col" data-tutorial="goal-card">
                 <div className="h-2" style={{ backgroundColor: goal.color }} />
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -385,7 +385,7 @@ export default function GoalsPage() {
                       <div className="p-2 rounded-lg" style={{ backgroundColor: `${goal.color}20` }}><Icon className="h-5 w-5" style={{ color: goal.color }} /></div>
                       <div><CardTitle className="text-base">{goal.title}</CardTitle><p className="text-xs text-muted-foreground">{goal.category}</p></div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1" data-tutorial="goal-actions">
                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedGoalId(isExpanded ? null : goal.id)}>{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(goal)}><Edit className="h-4 w-4" /></Button>
                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(goal.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -394,7 +394,7 @@ export default function GoalsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 flex-1 flex flex-col">
                   {goal.description && (<p className="text-sm text-muted-foreground">{goal.description}</p>)}
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="goal-progress">
                     <div className="flex justify-between text-sm"><span>{formatCurrency(goal.current_amount)}</span><span className="text-muted-foreground">{formatCurrency(goal.target_amount)}</span></div>
                     <Progress value={progress} className="h-2" />
                     <div className="flex justify-between text-xs text-muted-foreground"><span>{progress.toFixed(1)}% completo</span><span>Faltam {formatCurrency(remaining > 0 ? remaining : 0)}</span></div>
@@ -416,7 +416,7 @@ export default function GoalsPage() {
                         <Button size="sm" variant="outline" onClick={() => { setIsAddingValue(null); setAddValue(""); }}>✕</Button>
                       </div>
                     ) : (
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => setIsAddingValue(goal.id)}><Plus className="h-4 w-4 mr-2" />Adicionar Valor</Button>
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => setIsAddingValue(goal.id)} data-tutorial="goal-add-value"><Plus className="h-4 w-4 mr-2" />Adicionar Valor</Button>
                     )}
                   </div>
                 </CardContent>
