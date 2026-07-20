@@ -272,6 +272,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="Ex: Pagar conta de luz"
             required
+            data-tutorial="task-form-title"
           />
         </div>
         <div className="space-y-2">
@@ -287,7 +288,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="task-form-category">
           <div className="space-y-2">
               <Label htmlFor="value">Valor (R$)</Label>
               <div className="flex items-center gap-2">
@@ -361,7 +362,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="task-form-date">
         <div className="space-y-2">
           <Label htmlFor="schedule_date">Data *</Label>
           <Input
@@ -445,7 +446,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button type="submit" data-tutorial="task-form-submit">
           {initialData?.id ? 'Salvar Alterações' : 'Agendar Tarefa'}
         </Button>
       </div>

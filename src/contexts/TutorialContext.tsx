@@ -148,6 +148,35 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
       }
     }
 
+    // Side-effects for the add-task tour: open/close the task form modal
+    // and switch between the list (/tasks) and calendar (/tasks/calendar) views.
+    if (activeId === "add-task") {
+      // After clicking "next" on the "New task" button, open the form.
+      if (type === EVENTS.STEP_AFTER && index === 0 && action === "next") {
+        window.dispatchEvent(new CustomEvent("tutorial:open-task-modal"));
+      }
+      // Going back to step 0 closes the form.
+      if (type === EVENTS.STEP_AFTER && index === 1 && action === "prev") {
+        window.dispatchEvent(new CustomEvent("tutorial:close-task-modal"));
+      }
+      // After the "Save" step, close the form so the list is visible.
+      if (type === EVENTS.STEP_AFTER && index === 4 && action === "next") {
+        window.dispatchEvent(new CustomEvent("tutorial:close-task-modal"));
+      }
+      // Going back into the form from the list step reopens it.
+      if (type === EVENTS.STEP_AFTER && index === 5 && action === "prev") {
+        window.dispatchEvent(new CustomEvent("tutorial:open-task-modal"));
+      }
+      // After the calendar-link step, navigate to the calendar view.
+      if (type === EVENTS.STEP_AFTER && index === 6 && action === "next") {
+        navigate("/tasks/calendar");
+      }
+      // Going back to the calendar-link step returns to the list view.
+      if (type === EVENTS.STEP_AFTER && index === 7 && action === "prev") {
+        navigate("/tasks");
+      }
+    }
+
     if (type === EVENTS.TOUR_END) {
       if (activeId && (status === STATUS.FINISHED)) {
         markTutorialCompleted(activeId);
@@ -163,10 +192,13 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
         window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-menu"));
         window.dispatchEvent(new CustomEvent("tutorial:tx-history-close-edit"));
       }
+      if (activeId === "add-task") {
+        window.dispatchEvent(new CustomEvent("tutorial:close-task-modal"));
+      }
       setRun(false);
       setActiveId(null);
     }
-  }, [activeId]);
+  }, [activeId, navigate]);
 
   // Expose a body-level flag while a tour is running so modal dialogs can
   // ignore outside-click / escape events that would otherwise close them
