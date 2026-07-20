@@ -123,6 +123,87 @@ export const tutorials: TutorialDefinition[] = [
       },
     ],
   },
+  {
+    id: "add-task",
+    title: "Adicionar e gerenciar tarefas",
+    description:
+      "Aprenda a agendar tarefas, ver a lista e o calendário, e usar as ações de concluir, editar, excluir e integrar com o Google Calendar.",
+    startRoute: "/tasks",
+    steps: [
+      {
+        target: '[data-tutorial="task-new"]',
+        title: "Nova tarefa",
+        content:
+          "Clique aqui para abrir o formulário e agendar uma nova tarefa. Vamos abrir para você.",
+        placement: "auto",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-form-title"]',
+        title: "Título",
+        content:
+          "Dê um nome curto e claro à tarefa. Ex.: \"Pagar conta de luz\".",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-form-date"]',
+        title: "Data e horário",
+        content:
+          "Escolha quando a tarefa deve acontecer. O horário é usado para lembretes e para a integração com o Google Calendar.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-form-category"]',
+        title: "Valor e categoria",
+        content:
+          "Se a tarefa envolver dinheiro (uma conta a pagar ou receber), informe o valor e a categoria para aparecer no orçamento.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-form-submit"]',
+        title: "Salvar",
+        content:
+          "Confirme para agendar a tarefa. Vamos fechar o formulário agora e mostrar como gerenciá-la.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-list"]',
+        title: "Ações de cada tarefa",
+        content:
+          "Cada cartão da lista traz, à direita: concluir (ou reativar, se já concluída), editar, excluir e — se sua conta Google estiver conectada — enviar/abrir a tarefa no Google Calendar.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-calendar-link"]',
+        title: "Visão de calendário",
+        content:
+          "Aqui você alterna para o calendário mensal. Vamos abrir a visão de calendário.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-calendar-grid"]',
+        title: "Calendário",
+        content:
+          "Os dias com tarefas ficam marcados com um ponto. Toque em um dia para ver as tarefas daquela data ao lado.",
+        placement: "auto",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="task-list-link"]',
+        title: "Voltar para a lista",
+        content:
+          "Use este botão para voltar à lista de tarefas quando quiser. Pronto — você já sabe agendar e gerenciar tarefas!",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+    ],
+  },
 ];
 
 export const getTutorial = (id: string) =>
