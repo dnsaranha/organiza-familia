@@ -266,7 +266,7 @@ export default function Profile() {
                     disabled
                   />
                 </div>
-                <div>
+                <div data-tutorial="profile-fullname">
                   <Label htmlFor="fullName">Nome Completo</Label>
                   <Input
                     id="fullName"
@@ -275,7 +275,7 @@ export default function Profile() {
                     onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2" data-tutorial="profile-avatar">
                   <Label>Avatar</Label>
                   <div className="flex items-center gap-4">
                     <Avatar className="h-20 w-20">
@@ -304,7 +304,7 @@ export default function Profile() {
                 <h3 className="text-lg font-medium">
                   Preferências Financeiras
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-2" data-tutorial="profile-month-start">
                   <Label htmlFor="monthStartDay">Dia de Início do Mês</Label>
                   <Input
                     id="monthStartDay"
@@ -319,7 +319,7 @@ export default function Profile() {
                     dia primeiro).
                   </p>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm" data-tutorial="profile-carryover">
                   <div className="space-y-0.5">
                     <Label>Transportar Saldo Anterior</Label>
                     <p className="text-sm text-muted-foreground">
@@ -331,7 +331,7 @@ export default function Profile() {
                     onCheckedChange={setCarryOverBalance}
                   />
                 </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm" data-tutorial="profile-darkmode">
                   <div className="space-y-0.5">
                     <Label>Modo escuro</Label>
                     <p className="text-sm text-muted-foreground">
@@ -350,7 +350,7 @@ export default function Profile() {
 
               <Separator />
 
-              <div className="space-y-4">
+              <div className="space-y-4" data-tutorial="profile-categories">
                 <div className="flex items-center gap-2">
                   <Tags className="h-5 w-5" />
                   <h3 className="text-lg font-medium">Gerenciar Categorias</h3>
@@ -363,7 +363,7 @@ export default function Profile() {
 
               <Separator />
 
-              <div className="space-y-4">
+              <div className="space-y-4" data-tutorial="profile-bottomnav">
                 <div className="flex items-center gap-2">
                   <Smartphone className="h-5 w-5" />
                   <h3 className="text-lg font-medium">Menu Inferior (Mobile)</h3>
@@ -384,14 +384,14 @@ export default function Profile() {
                 >
                   Voltar
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading} data-tutorial="profile-save">
                   {loading ? "Salvando..." : "Salvar Alterações"}
                 </Button>
               </div>
 
               <Separator />
 
-              <div className="space-y-4">
+              <div className="space-y-4" data-tutorial="profile-danger">
                 <h3 className="text-lg font-medium text-destructive">
                   Zona de Perigo
                 </h3>

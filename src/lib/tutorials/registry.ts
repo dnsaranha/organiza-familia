@@ -204,6 +204,273 @@ export const tutorials: TutorialDefinition[] = [
       },
     ],
   },
+  {
+    id: "profile",
+    title: "Perfil e preferências",
+    description:
+      "Configure seus dados, avatar, dia de início do mês, tema, categorias e o menu inferior do mobile.",
+    startRoute: "/profile",
+    steps: [
+      {
+        target: '[data-tutorial="profile-fullname"]',
+        title: "Nome completo",
+        content:
+          "Atualize o nome exibido no app e em grupos compartilhados.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-avatar"]',
+        title: "Avatar",
+        content:
+          "Envie uma foto de perfil para identificar sua conta.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-month-start"]',
+        title: "Dia de início do mês",
+        content:
+          "Escolha o dia em que seu mês financeiro começa (ex.: 1, 5, 10). Todos os relatórios e o orçamento seguem este ciclo.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-carryover"]',
+        title: "Transportar saldo",
+        content:
+          "Ative para começar cada mês com o saldo final do mês anterior.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-darkmode"]',
+        title: "Modo escuro",
+        content: "Alterne entre o tema claro e escuro conforme sua preferência.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-categories"]',
+        title: "Categorias personalizadas",
+        content:
+          "Crie, edite e escolha ícones/cores para categorias de transações e tarefas.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-bottomnav"]',
+        title: "Menu inferior (mobile)",
+        content:
+          "Escolha quais atalhos aparecem no menu inferior do app no celular.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-save"]',
+        title: "Salvar alterações",
+        content: "Confirme para gravar todas as mudanças do perfil.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="profile-danger"]',
+        title: "Zona de perigo",
+        content:
+          "Aqui você pode limpar todos os dados ou solicitar a exclusão permanente da conta. Use com cautela — a ação não pode ser desfeita.",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
+  {
+    id: "reports",
+    title: "Relatórios avançados",
+    description:
+      "Filtre por período, categoria e membro, exporte em PDF/Excel e navegue entre transações manuais e bancárias.",
+    startRoute: "/reports",
+    steps: [
+      {
+        target: '[data-tutorial="reports-filters"]',
+        title: "Filtros",
+        content:
+          "Ajuste o período, a categoria e (em grupos) o membro. Todos os gráficos e listas abaixo são recalculados.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="reports-pdf"]',
+        title: "Exportar PDF",
+        content:
+          "Gera um relatório em PDF com os gráficos e o histórico do período filtrado.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="reports-excel"]',
+        title: "Exportar Excel",
+        content:
+          "Baixa a mesma base em planilha para análises externas.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="reports-tabs"]',
+        title: "Manuais x Bancárias",
+        content:
+          "Alterne entre transações manuais e as importadas do Open Finance (quando conectado).",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="reports-history"]',
+        title: "Histórico de transações",
+        content:
+          "Lista detalhada respeitando os filtros. Pronto — os relatórios estão sob seu controle!",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
+  {
+    id: "goals",
+    title: "Metas de reserva",
+    description:
+      "Aprenda a criar metas, acompanhar o progresso, adicionar valores e editar/excluir metas existentes.",
+    startRoute: "/goals",
+    steps: [
+      {
+        target: '[data-tutorial="goal-new"]',
+        title: "Nova meta",
+        content:
+          "Clique aqui para criar uma meta. Defina título, valor-alvo, prazo, contribuição mensal, ícone e cor.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="goal-card"]',
+        title: "Cartão da meta",
+        content:
+          "Cada meta aparece em um cartão colorido com todas as informações principais.",
+        placement: "auto",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="goal-progress"]',
+        title: "Progresso",
+        content:
+          "A barra mostra quanto já foi acumulado e quanto ainda falta para atingir o alvo.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="goal-actions"]',
+        title: "Expandir, editar e excluir",
+        content:
+          "Use estes ícones para ver o histórico de contribuições, editar os dados ou remover a meta.",
+        placement: "left",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="goal-add-value"]',
+        title: "Adicionar valor",
+        content:
+          "Registre aportes manuais na meta. Cada valor é somado ao acumulado atual.",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
+  {
+    id: "budget",
+    title: "Orçamento mensal",
+    description:
+      "Entenda os cartões de resumo, distribua o orçamento por categoria e salve suas configurações.",
+    startRoute: "/budget",
+    steps: [
+      {
+        target: '[data-tutorial="budget-summary"]',
+        title: "Resumo do mês",
+        content:
+          "Receita, gastos, saldo restante e o percentual usado do orçamento — tudo do mês atual.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="budget-income"]',
+        title: "Renda mensal base",
+        content:
+          "Informe a renda-base usada para calcular quanto cada categoria representa em reais.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="budget-chart"]',
+        title: "Distribuição",
+        content:
+          "O gráfico de pizza mostra a divisão atual. A soma precisa ser 100%.",
+        placement: "right",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="budget-sliders"]',
+        title: "Ajuste por categoria",
+        content:
+          "Arraste os sliders para definir a porcentagem de cada categoria. O botão de engrenagem permite mapear categorias de transação a cada grupo.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="budget-save"]',
+        title: "Salvar",
+        content:
+          "Confirme para gravar sua distribuição. O botão fica ativo quando o total é 100%.",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
+  {
+    id: "forecast",
+    title: "Previsão financeira",
+    description:
+      "Projete receitas e despesas para os próximos meses combinando tarefas agendadas e médias históricas.",
+    startRoute: "/forecast",
+    steps: [
+      {
+        target: '[data-tutorial="forecast-period"]',
+        title: "Período da projeção",
+        content:
+          "Escolha quantos meses à frente deseja projetar (3, 6 ou 12).",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="forecast-totals"]',
+        title: "Totais previstos",
+        content:
+          "Somatório de receitas, despesas e o saldo final projetado para o período.",
+        placement: "bottom",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="forecast-chart"]',
+        title: "Projeção mensal",
+        content:
+          "Compare visualmente receitas e despesas previstas mês a mês.",
+        placement: "top",
+        skipBeacon: true,
+      },
+      {
+        target: '[data-tutorial="forecast-details"]',
+        title: "Detalhes por mês",
+        content:
+          "Cada cartão mostra receitas, despesas, saldo do mês e o acumulado, além dos agendamentos que compõem a previsão.",
+        placement: "top",
+        skipBeacon: true,
+      },
+    ],
+  },
 ];
 
 export const getTutorial = (id: string) =>

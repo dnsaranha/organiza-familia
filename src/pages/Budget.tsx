@@ -283,7 +283,7 @@ const BudgetPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4" data-tutorial="budget-summary">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -350,7 +350,7 @@ const BudgetPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left Column - Chart */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2" data-tutorial="budget-chart">
           <CardHeader>
             <CardTitle>Distribuição do Orçamento</CardTitle>
             <CardDescription>
@@ -388,13 +388,13 @@ const BudgetPage = () => {
         </Card>
 
         {/* Right Column - Controls */}
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3" data-tutorial="budget-controls">
           <CardHeader>
             <CardTitle>Controle de Orçamento</CardTitle>
             <CardDescription>Ajuste a porcentagem para cada categoria</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-2" data-tutorial="budget-income">
               <Label htmlFor="monthlyIncome">Renda Mensal Base</Label>
               <div className="flex gap-2">
                 <span className="flex items-center text-muted-foreground">R$</span>
@@ -411,7 +411,7 @@ const BudgetPage = () => {
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4" data-tutorial="budget-sliders">
               {budgetAmounts.map((category, index) => {
                 const spent = expensesByBudgetCategory[category.name] || 0;
                 const percentSpent = category.budgetAmount > 0 ? (spent / category.budgetAmount) * 100 : 0;
@@ -479,7 +479,7 @@ const BudgetPage = () => {
               <Button variant="outline" onClick={handleReset}>
                 Resetar Valores
               </Button>
-              <Button onClick={handleSave} disabled={saving || total !== 100}>
+              <Button onClick={handleSave} disabled={saving || total !== 100} data-tutorial="budget-save">
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? "Salvando..." : "Salvar"}
               </Button>
