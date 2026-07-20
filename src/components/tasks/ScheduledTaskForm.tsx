@@ -446,7 +446,7 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button type="submit" data-tutorial="task-form-submit">
           {initialData?.id ? 'Salvar Alterações' : 'Agendar Tarefa'}
         </Button>
       </div>
