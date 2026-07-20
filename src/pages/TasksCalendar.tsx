@@ -259,7 +259,7 @@ const TasksCalendar = () => {
               )}
             </>
           )}
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => navigate('/tasks')}>
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => navigate('/tasks')} data-tutorial="task-list-link">
             <List className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Ver Lista</span>
           </Button>
@@ -271,7 +271,7 @@ const TasksCalendar = () => {
       </div>
       
       <div className="flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-auto md:block">
+        <div className="w-full md:w-auto md:block" data-tutorial="task-calendar-grid">
           <div className="border-y border-x-0 md:border md:rounded-md p-0 md:p-4 bg-background shadow-none md:shadow-sm -mx-2 sm:-mx-4 md:mx-0 w-[calc(100%+1rem)] sm:w-[calc(100%+2rem)] md:w-auto">
             <Calendar
               mode="single"
