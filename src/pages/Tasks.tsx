@@ -41,6 +41,21 @@ const TasksPage = () => {
 
   useTaskNotifications();
 
+  // Tutorial hooks: open/close the task form modal on demand.
+  useEffect(() => {
+    const open = () => {
+      setSelectedTask(null);
+      setIsFormOpen(true);
+    };
+    const close = () => setIsFormOpen(false);
+    window.addEventListener("tutorial:open-task-modal", open);
+    window.addEventListener("tutorial:close-task-modal", close);
+    return () => {
+      window.removeEventListener("tutorial:open-task-modal", open);
+      window.removeEventListener("tutorial:close-task-modal", close);
+    };
+  }, []);
+
   // Verifica se o Google está na lista de provedores conectados
   const hasGoogleConnection = useMemo(() => user?.app_metadata?.providers?.includes('google'), [user]);
 
