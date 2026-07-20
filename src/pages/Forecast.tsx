@@ -162,23 +162,23 @@ export default function ForecastPage() {
             <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarDays className="h-6 w-6 text-primary" />Previsão Financeira</h1>
             <p className="text-muted-foreground text-sm">Projeção de receitas e despesas para os próximos meses</p>
           </div>
-          <Select value={monthsAhead} onValueChange={setMonthsAhead}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Período" /></SelectTrigger><SelectContent><SelectItem value="3">Próximos 3 meses</SelectItem><SelectItem value="6">Próximos 6 meses</SelectItem><SelectItem value="12">Próximos 12 meses</SelectItem></SelectContent></Select>
+          <Select value={monthsAhead} onValueChange={setMonthsAhead}><SelectTrigger className="w-[180px]" data-tutorial="forecast-period"><SelectValue placeholder="Período" /></SelectTrigger><SelectContent><SelectItem value="3">Próximos 3 meses</SelectItem><SelectItem value="6">Próximos 6 meses</SelectItem><SelectItem value="12">Próximos 12 meses</SelectItem></SelectContent></Select>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3" data-tutorial="forecast-totals">
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-green-500" />Receita Prevista</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{formatCurrency(totals.income)}</div><p className="text-xs text-muted-foreground">Total para {monthsAhead} meses</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><TrendingDown className="h-4 w-4 text-red-500" />Despesa Prevista</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{formatCurrency(totals.expense)}</div><p className="text-xs text-muted-foreground">Total para {monthsAhead} meses</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ArrowRight className="h-4 w-4" />Saldo Final Projetado</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${totals.balance >= 0 ? "text-green-600" : "text-red-600"}`}>{formatCurrency(totals.balance)}</div><p className="text-xs text-muted-foreground">Balanço acumulado ao final do período</p></CardContent></Card>
         </div>
 
-        <Card>
+        <Card data-tutorial="forecast-chart">
           <CardHeader><CardTitle className="text-lg">Projeção Mensal</CardTitle></CardHeader>
           <CardContent className="h-[300px]">
             {pageLoading ? <div className="h-full flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div> : <IncomeExpenseBarChart data={chartData} />}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-4" data-tutorial="forecast-details">
           <h2 className="text-lg font-semibold">Detalhes por Mês</h2>
           {pageLoading ? (
             <div className="grid gap-4 md:grid-cols-2">{[1,2,3,4].map(i=><Card key={i} className="animate-pulse"><CardHeader className="h-16 bg-muted rounded-t-lg"/><CardContent className="space-y-3 pt-4"><div className="h-4 bg-muted rounded w-3/4"/><div className="h-4 bg-muted rounded w-1/2"/></CardContent></Card>)}</div>
