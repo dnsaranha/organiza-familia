@@ -484,11 +484,11 @@ const ReportsPage = () => {
               <span className="sm:inline">Atualizar</span>
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handlePdfExport} className="flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" onClick={handlePdfExport} className="flex-1 sm:flex-none" data-tutorial="reports-pdf">
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="sm:inline">PDF</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExcelExport} className="flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" onClick={handleExcelExport} className="flex-1 sm:flex-none" data-tutorial="reports-excel">
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="sm:inline">Excel</span>
           </Button>
@@ -496,7 +496,7 @@ const ReportsPage = () => {
       </div>
 
       {/* Filter Bar */}
-      <Card className="mb-4 sm:mb-8">
+      <Card className="mb-4 sm:mb-8" data-tutorial="reports-filters">
         <CardContent className="p-3 sm:p-4 space-y-3 lg:space-y-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div className="flex-1">
@@ -615,7 +615,7 @@ const ReportsPage = () => {
 
       {/* Reports Tabs */}
       <Tabs defaultValue="manual" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 h-auto">
+        <TabsList className="grid w-full grid-cols-2 h-auto" data-tutorial="reports-tabs">
           <TabsTrigger value="manual" className="text-xs sm:text-sm py-2">Transações Manuais</TabsTrigger>
           <TabsTrigger value="banking" disabled={!bankConnected} className="text-xs sm:text-sm py-2">
             Dados Bancários {!bankConnected && "(Off)"}
