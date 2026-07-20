@@ -653,7 +653,7 @@ const ReportsPage = () => {
             </Card>
           </div>
 
-          <Card>
+          <Card data-tutorial="reports-history">
             <CardHeader className="pb-3">
               <CardTitle className="text-base sm:text-lg">Histórico de Transações</CardTitle>
             </CardHeader>
