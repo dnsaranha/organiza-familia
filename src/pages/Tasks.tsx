@@ -41,6 +41,21 @@ const TasksPage = () => {
 
   useTaskNotifications();
 
+  // Tutorial hooks: open/close the task form modal on demand.
+  useEffect(() => {
+    const open = () => {
+      setSelectedTask(null);
+      setIsFormOpen(true);
+    };
+    const close = () => setIsFormOpen(false);
+    window.addEventListener("tutorial:open-task-modal", open);
+    window.addEventListener("tutorial:close-task-modal", close);
+    return () => {
+      window.removeEventListener("tutorial:open-task-modal", open);
+      window.removeEventListener("tutorial:close-task-modal", close);
+    };
+  }, []);
+
   // Verifica se o Google está na lista de provedores conectados
   const hasGoogleConnection = useMemo(() => user?.app_metadata?.providers?.includes('google'), [user]);
 
@@ -393,6 +408,7 @@ const TasksPage = () => {
                 size="sm"
                 className="flex-1 sm:flex-none"
                 onClick={() => navigate('/tasks/calendar')}
+                data-tutorial="task-calendar-link"
             >
                 <CalendarIcon className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Ver Calendário</span>
@@ -405,6 +421,7 @@ const TasksPage = () => {
                     setSelectedTask(null);
                     setIsFormOpen(true);
                 }}
+                data-tutorial="task-new"
             >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="sm:inline">Nova Tarefa</span>
@@ -446,7 +463,7 @@ const TasksPage = () => {
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-tutorial="task-list">
         {filteredTasks.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -559,7 +576,18 @@ const TasksPage = () => {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => {
+            if (document.body.getAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (document.body.getAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (document.body.getAttribute("data-tutorial-active")) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{selectedTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </DialogHeader>

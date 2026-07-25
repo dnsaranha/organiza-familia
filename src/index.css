@@ -238,3 +238,10 @@ html, body {
     }
   }
 }
+/* Keep react-joyride tooltip interactive even when a Radix Dialog (modal) sets
+   pointer-events: none on the body. Without this, the tutorial's Next/Skip
+   buttons become unclickable inside modal dialogs. */
+#react-joyride-portal,
+#react-joyride-portal * {
+  pointer-events: auto !important;
+}

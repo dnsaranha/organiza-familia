@@ -32,6 +32,7 @@ import AdminPage from "./pages/Admin";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import DeleteAccount from "./pages/DeleteAccount";
+import { TutorialProvider } from "./contexts/TutorialContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,7 @@ const App = () => {
               <Sonner />
               <SupportChat />
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+              <TutorialProvider>
               <Routes>
                 {/* Public Routes - No login required */}
                 <Route path="/" element={<Auth />} />
@@ -231,6 +233,7 @@ const App = () => {
                 {/* Not Found Route */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </TutorialProvider>
             </BrowserRouter>
             </SubscriptionProvider>
           </BudgetScopeProvider>
