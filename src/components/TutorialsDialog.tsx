@@ -30,7 +30,7 @@ export const TutorialsDialog = ({ open, onOpenChange }: TutorialsDialogProps) =>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] w-[calc(100%-2rem)] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GraduationCap className="h-5 w-5 text-primary" />
@@ -41,7 +41,7 @@ export const TutorialsDialog = ({ open, onOpenChange }: TutorialsDialogProps) =>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
           {tutorials.map((t) => {
             const completed = isTutorialCompleted(t.id);
             return (
