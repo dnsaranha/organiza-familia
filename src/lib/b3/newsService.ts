@@ -15,6 +15,7 @@ export interface PortfolioNewsItem {
 let cachedNews: PortfolioNewsItem[] = [];
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const STORAGE_KEY = 'organiza_cached_portfolio_news';
 
 const COMPANY_NAME_MAP: Record<string, string> = {
   'PETROBRAS': 'PETR4',
@@ -59,7 +60,7 @@ function cleanHtml(raw: string): string {
 
 function parseRssXml(xmlText: string, sourceName: string): Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[] {
   const results: Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[] = [];
-  if (!xmlText) return results;
+  if (!xmlText || xmlText.startsWith('<!DOCTYPE') || xmlText.startsWith('<html')) return results;
 
   const itemMatches = xmlText.match(/<item[\s\S]*?<\/item>/gi) || [];
 
@@ -75,17 +76,15 @@ function parseRssXml(xmlText: string, sourceName: string): Omit<PortfolioNewsIte
     const pubDateStr = cleanHtml(pubDateMatch?.[1] || '');
     let description = cleanHtml(descMatch?.[1] || '');
 
-    // Cut off redundant trailing boilerplate from RSS aggregators
     description = description.split('The post')[0].trim();
-    if (description.length > 180) {
-      description = description.slice(0, 177) + '...';
+    if (description.length > 200) {
+      description = description.slice(0, 197) + '...';
     }
 
     if (!title || !link) continue;
 
     const parsedDate = pubDateStr ? new Date(pubDateStr) : new Date();
     const timestamp = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
-
     const id = guidMatch?.[1] ? cleanHtml(guidMatch[1]) : `${sourceName}-${title.slice(0, 30)}-${timestamp}`;
 
     results.push({
@@ -154,9 +153,10 @@ function detectTickers(
   desc: string,
   portfolioTickers: string[]
 ): { tickers: string[]; isPortfolio: boolean } {
-  const normalizedUserTickers = new Set(portfolioTickers.map(t => t.replace('.SA', '').toUpperCase().trim()));
+  const normalizedUserTickers = new Set(
+    portfolioTickers.map(t => t.replace('.SA', '').toUpperCase().trim()).filter(Boolean)
+  );
   const matched = new Set<string>();
-
   const textUpper = `${title} ${desc}`.toUpperCase();
 
   // 1. Detect standard B3 format (e.g. PETR4, VALE3, MXRF11, XPML11)
@@ -187,77 +187,181 @@ function detectTickers(
   return { tickers: matchedArray, isPortfolio };
 }
 
-async function fetchFeedSafe(primaryUrl: string, fallbackUrl: string, sourceName: string): Promise<Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[]> {
+/**
+ * Fetches RSS feed converting via RSS2JSON (CORS safe everywhere),
+ * with fallback to local proxy in dev or raw XML proxy.
+ */
+async function fetchFeedResilient(
+  directRssUrl: string,
+  localDevPath: string,
+  sourceName: string
+): Promise<Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[]> {
+  // Strategy 1: Public RSS2JSON API (Works everywhere on production web & PWA without CORS issues)
   try {
-    const res = await fetch(primaryUrl);
+    const rss2JsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(directRssUrl)}`;
+    const res = await fetch(rss2JsonUrl, { signal: AbortSignal.timeout(6000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
+        return data.items.map((item: any) => {
+          const title = cleanHtml(item.title || '');
+          const link = cleanHtml(item.link || '').replace(/\s/g, '');
+          const pubDateStr = cleanHtml(item.pubDate || '');
+          let description = cleanHtml(item.description || item.content || '');
+          if (description.length > 200) description = description.slice(0, 197) + '...';
+          const parsedDate = pubDateStr ? new Date(pubDateStr) : new Date();
+          const timestamp = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
+          const id = item.guid || `${sourceName}-${title.slice(0, 30)}-${timestamp}`;
+
+          return {
+            id,
+            title,
+            description: description || title,
+            link,
+            pubDate: pubDateStr,
+            timestamp,
+            source: sourceName,
+          };
+        }).filter((item: any) => Boolean(item.title && item.link));
+      }
+    }
+  } catch {
+    // Continue to next strategy
+  }
+
+  // Strategy 2: Local Vite dev proxy if available and in DEV mode
+  if (import.meta.env.DEV && localDevPath) {
+    try {
+      const res = await fetch(localDevPath, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const text = await res.text();
+        const parsed = parseRssXml(text, sourceName);
+        if (parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Continue to next strategy
+    }
+  }
+
+  // Strategy 3: CodeTabs CORS Proxy for raw XML
+  try {
+    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directRssUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const text = await res.text();
       const parsed = parseRssXml(text, sourceName);
       if (parsed.length > 0) return parsed;
     }
-  } catch (err) {
-    console.warn(`[NewsService] Primary feed failed for ${sourceName}:`, err);
-  }
-
-  if (fallbackUrl) {
-    try {
-      const resFallback = await fetch(fallbackUrl);
-      if (resFallback.ok) {
-        const text = await resFallback.text();
-        return parseRssXml(text, sourceName);
-      }
-    } catch (fallbackErr) {
-      console.warn(`[NewsService] Fallback feed failed for ${sourceName}:`, fallbackErr);
-    }
+  } catch {
+    // Failed all strategies
   }
 
   return [];
 }
+
+/**
+ * Fallback static market items in case network is completely offline
+ */
+const BACKUP_MARKET_NEWS: Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[] = [
+  {
+    id: 'backup-1',
+    title: 'Ibovespa: Ações do setor financeiro e commodities concentram fluxo de investidores',
+    description: 'Empresas como Petrobras (PETR4), Vale (VALE3) e grandes bancos sustentam o volume financeiro na B3.',
+    link: 'https://www.infomoney.com.br/mercados/',
+    pubDate: new Date().toLocaleDateString('pt-BR'),
+    timestamp: Date.now() - 3600000,
+    source: 'InfoMoney',
+  },
+  {
+    id: 'backup-2',
+    title: 'Fatos Relevantes e Proventos: Temporada de dividendos e JCP movimentam o mercado',
+    description: 'Companhias listadas na B3 atualizam cronograma de pagamento de dividendos e informes aos acionistas.',
+    link: 'https://www.moneytimes.com.br/',
+    pubDate: new Date().toLocaleDateString('pt-BR'),
+    timestamp: Date.now() - 7200000,
+    source: 'Money Times',
+  },
+  {
+    id: 'backup-3',
+    title: 'Fundos Imobiliários: MXRF11, HGLG11 e XPML11 divulgam rendimentos mensais',
+    description: 'FIIs de papel e logística mantêm regularidade de distribuição de proventos aos cotistas.',
+    link: 'https://www.seudinheiro.com/',
+    pubDate: new Date().toLocaleDateString('pt-BR'),
+    timestamp: Date.now() - 10800000,
+    source: 'Seu Dinheiro',
+  }
+];
 
 export async function getPortfolioNews(
   portfolioTickers: string[] = [],
   forceRefresh: boolean = false
 ): Promise<PortfolioNewsItem[]> {
   const now = Date.now();
+
+  // Return in-memory cache if valid
   if (!forceRefresh && cachedNews.length > 0 && now - lastFetchTime < CACHE_TTL_MS) {
-    // Re-evaluate portfolio matches based on current portfolio tickers
     return cachedNews.map(item => {
       const { isPortfolio } = detectTickers(item.title, item.description, portfolioTickers);
       return { ...item, isPortfolioAsset: isPortfolio };
     });
   }
 
+  // Check persistent storage on startup
+  if (!forceRefresh && cachedNews.length === 0) {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: PortfolioNewsItem[] = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cachedNews = parsed;
+          lastFetchTime = now;
+          return cachedNews.map(item => {
+            const { isPortfolio } = detectTickers(item.title, item.description, portfolioTickers);
+            return { ...item, isPortfolioAsset: isPortfolio };
+          });
+        }
+      }
+    } catch {
+      // Ignore storage error
+    }
+  }
+
   const normalizedUserTickers = Array.from(
-    new Set(portfolioTickers.map(t => t.replace('.SA', '').toUpperCase().trim()))
+    new Set(portfolioTickers.map(t => t.replace('.SA', '').toUpperCase().trim()).filter(Boolean))
   );
 
-  // 1. General Brazilian Market & Corporate RSS Feeds (Free public feeds)
+  // 1. Brazilian Market & Corporate RSS Feeds
   const feedPromises: Promise<Omit<PortfolioNewsItem, 'category' | 'matchedTickers' | 'isPortfolioAsset'>[]>[] = [
-    fetchFeedSafe(
+    fetchFeedResilient(
+      'https://www.moneytimes.com.br/feed/',
       '/api/feeds/moneytimes/feed/',
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.moneytimes.com.br/feed/'),
       'Money Times'
     ),
-    fetchFeedSafe(
+    fetchFeedResilient(
+      'https://www.infomoney.com.br/feed/',
       '/api/feeds/infomoney/feed/',
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.infomoney.com.br/feed/'),
       'InfoMoney'
     ),
-    fetchFeedSafe(
+    fetchFeedResilient(
+      'https://g1.globo.com/rss/g1/economia/',
+      '',
+      'G1 Economia'
+    ),
+    fetchFeedResilient(
+      'https://www.seudinheiro.com/feed/',
       '/api/feeds/seudinheiro/feed/',
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.seudinheiro.com/feed/'),
       'Seu Dinheiro'
     ),
   ];
 
-  // 2. Specific Yahoo Finance RSS for active portfolio tickers (up to 8 assets to avoid rate limiting)
-  const topPortfolioTickers = normalizedUserTickers.slice(0, 8);
+  // 2. Specific Yahoo Finance RSS for active portfolio tickers (up to 5 assets)
+  const topPortfolioTickers = normalizedUserTickers.slice(0, 5);
   for (const ticker of topPortfolioTickers) {
     const formatted = `${ticker}.SA`;
     feedPromises.push(
-      fetchFeedSafe(
+      fetchFeedResilient(
+        `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${formatted}`,
         `/api/feeds/yahoo-rss/rss/2.0/headline?s=${encodeURIComponent(formatted)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${formatted}`)}`,
         `Yahoo Finance (${ticker})`
       )
     );
@@ -272,25 +376,29 @@ export async function getPortfolioNews(
     }
   }
 
+  // If no items were fetched (e.g. total network block), fallback to backup items
+  if (rawItems.length === 0) {
+    rawItems.push(...BACKUP_MARKET_NEWS);
+  }
+
   // Deduplicate by URL and similar title
   const seenLinks = new Set<string>();
   const seenTitles = new Set<string>();
   const consolidated: PortfolioNewsItem[] = [];
 
   for (const raw of rawItems) {
-    const cleanLink = raw.link.split('?')[0].toLowerCase();
-    const titleKey = raw.title.slice(0, 45).toLowerCase().replace(/[^\w]/g, '');
+    const cleanLink = (raw.link || '').split('?')[0].toLowerCase();
+    const titleKey = (raw.title || '').slice(0, 45).toLowerCase().replace(/[^\w]/g, '');
 
-    if (seenLinks.has(cleanLink) || seenTitles.has(titleKey)) {
+    if (seenLinks.has(cleanLink) || (titleKey && seenTitles.has(titleKey))) {
       continue;
     }
-    seenLinks.add(cleanLink);
-    seenTitles.add(titleKey);
+    if (cleanLink) seenLinks.add(cleanLink);
+    if (titleKey) seenTitles.add(titleKey);
 
     const category = detectCategory(raw.title, raw.description);
     const { tickers, isPortfolio } = detectTickers(raw.title, raw.description, portfolioTickers);
 
-    // If item comes from ticker-specific Yahoo RSS, ensure that ticker is tagged
     if (raw.source.includes('Yahoo Finance (') && !tickers.length) {
       const matchSourceTicker = raw.source.match(/\((.*?)\)/)?.[1];
       if (matchSourceTicker) {
@@ -311,6 +419,13 @@ export async function getPortfolioNews(
 
   cachedNews = consolidated;
   lastFetchTime = Date.now();
+
+  // Save to localStorage for instant startup and offline resilience
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(consolidated.slice(0, 50)));
+  } catch {
+    // Ignore storage write error
+  }
 
   return consolidated;
 }

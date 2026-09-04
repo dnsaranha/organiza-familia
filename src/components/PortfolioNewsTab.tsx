@@ -24,9 +24,11 @@ import {
 
 interface PortfolioNewsTabProps {
   assets: Array<{
-    ticker: string;
+    ticker?: string;
+    symbol?: string;
     name?: string;
     shares?: number;
+    quantity?: number;
     currentPrice?: number;
   }>;
 }
@@ -47,7 +49,7 @@ export const PortfolioNewsTab = ({ assets }: PortfolioNewsTabProps) => {
     return Array.from(
       new Set(
         assets
-          .map((a) => a.ticker?.replace(".SA", "").toUpperCase().trim())
+          .map((a: any) => (a.ticker || a.symbol || "")?.replace(".SA", "").toUpperCase().trim())
           .filter(Boolean)
       )
     );
