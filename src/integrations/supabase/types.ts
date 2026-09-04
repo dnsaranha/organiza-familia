@@ -419,7 +419,10 @@ export type Database = {
           group_id: string | null
           icon: string
           id: string
+          linked_asset_ticker: string | null
+          linked_asset_type: string | null
           monthly_contribution: number | null
+          reserved_percentage: number | null
           target_amount: number
           title: string
           updated_at: string
@@ -435,7 +438,10 @@ export type Database = {
           group_id?: string | null
           icon?: string
           id?: string
+          linked_asset_ticker?: string | null
+          linked_asset_type?: string | null
           monthly_contribution?: number | null
+          reserved_percentage?: number | null
           target_amount?: number
           title: string
           updated_at?: string
@@ -451,7 +457,10 @@ export type Database = {
           group_id?: string | null
           icon?: string
           id?: string
+          linked_asset_ticker?: string | null
+          linked_asset_type?: string | null
           monthly_contribution?: number | null
+          reserved_percentage?: number | null
           target_amount?: number
           title?: string
           updated_at?: string

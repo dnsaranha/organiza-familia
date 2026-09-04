@@ -1,0 +1,6 @@
+{
+  "name": "Organiza - Gestão Financeira Familiar",
+  "description": "App completo para gestão financeira pessoal e familiar. Controle seus gastos, organize seu orçamento e alcance suas metas financeiras.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

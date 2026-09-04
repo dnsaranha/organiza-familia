@@ -17,12 +17,17 @@ import { Trash2, Edit, TrendingUp, TrendingDown, Search, ChevronLeft, ChevronRig
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Transaction } from "@/lib/finance-utils";
+import { calculateFixedIncomeYield } from "@/lib/fixed-income-calculator";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 
 const typeLabels: Record<string, string> = {
   buy: "Compra", sell: "Venda", split: "Split",
   grouping: "Agrupamento", bonus: "Bonificação",
+};
+
+const fixedIncomeTypeLabels: Record<string, string> = {
+  buy: "Aplicação", sell: "Resgate",
 };
 
 interface Props {
@@ -59,12 +64,16 @@ export function InvestmentTransactionHistory({ transactions, onEdit, onDelete }:
       const terms = searchQuery.toLowerCase().trim().split(/\s+/);
       result = result.filter((t) => {
         const dateStr = format(new Date(t.transaction_date), "dd/MM/yyyy");
-        const typeLabel = typeLabels[t.transaction_type] || t.transaction_type;
+        const isFixedIncome = t.asset_type === "FIXED_INCOME";
+        const typeLabel = isFixedIncome
+          ? (fixedIncomeTypeLabels[t.transaction_type] || t.transaction_type)
+          : (typeLabels[t.transaction_type] || t.transaction_type);
         const total = (t.quantity * t.price).toFixed(2);
         const searchable = [
           t.ticker, t.asset_name, typeLabel, t.transaction_type,
           dateStr, t.quantity.toString(), t.price.toFixed(2),
           total, t.fees.toFixed(2), t.asset_type || "",
+          isFixedIncome ? "renda fixa cdb tesouro lci lca" : "",
         ].join(" ").toLowerCase();
 
         return terms.every((term) => searchable.includes(term));
@@ -87,7 +96,7 @@ export function InvestmentTransactionHistory({ transactions, onEdit, onDelete }:
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Busca inteligente... (ex: PETR4 compra)"
+            placeholder="Busca inteligente... (ex: CDB Inter, PETR4, Tesouro)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -103,9 +112,9 @@ export function InvestmentTransactionHistory({ transactions, onEdit, onDelete }:
             <TableRow>
               <TableHead className="text-xs sm:text-sm min-w-[80px]">Data</TableHead>
               <TableHead className="text-xs sm:text-sm">Tipo</TableHead>
-              <TableHead className="text-xs sm:text-sm min-w-[80px]">Ticker</TableHead>
+              <TableHead className="text-xs sm:text-sm min-w-[120px]">Ativo / Título</TableHead>
               <TableHead className="text-xs sm:text-sm text-right">Qtd</TableHead>
-              <TableHead className="text-xs sm:text-sm text-right">Preço</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right">Preço Unit.</TableHead>
               <TableHead className="text-xs sm:text-sm text-right">Total</TableHead>
               <TableHead className="text-xs sm:text-sm text-right">Taxas</TableHead>
               <TableHead className="text-xs sm:text-sm w-[100px] text-right">Ações</TableHead>
@@ -121,55 +130,120 @@ export function InvestmentTransactionHistory({ transactions, onEdit, onDelete }:
                 </TableCell>
               </TableRow>
             ) : (
-              paginated.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="text-xs sm:text-sm">
-                    {format(new Date(transaction.transaction_date), "dd/MM/yy")}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {(transaction.transaction_type === "buy" || transaction.transaction_type === "bonus") && (
-                        <TrendingUp className="h-3 w-3 text-success" />
+              paginated.map((transaction) => {
+                const isFixedIncome = transaction.asset_type === "FIXED_INCOME";
+                const displayType = isFixedIncome
+                  ? (fixedIncomeTypeLabels[transaction.transaction_type] || transaction.transaction_type)
+                  : (typeLabels[transaction.transaction_type] || transaction.transaction_type);
+
+                let fiCalc = null;
+                let fiRate: string | null = null;
+                if (isFixedIncome && transaction.transaction_type === "buy") {
+                  if (transaction.notes) {
+                    const parts = transaction.notes.split(" | ");
+                    parts.forEach(p => {
+                      if (p.startsWith("Taxa: ")) fiRate = p.replace("Taxa: ", "").trim();
+                    });
+                  }
+                  fiCalc = calculateFixedIncomeYield({
+                    initialAmount: (transaction.quantity * transaction.price) + (transaction.fees || 0),
+                    startDate: transaction.transaction_date,
+                    rawRate: fiRate,
+                    assetName: transaction.asset_name,
+                  });
+                }
+
+                return (
+                  <TableRow key={transaction.id}>
+                    <TableCell className="text-xs sm:text-sm whitespace-nowrap">
+                      {format(new Date(transaction.transaction_date), "dd/MM/yy")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {(transaction.transaction_type === "buy" || transaction.transaction_type === "bonus") && (
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        )}
+                        {transaction.transaction_type === "sell" && (
+                          <TrendingDown className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                        )}
+                        <span className="text-xs sm:text-sm font-medium">
+                          {displayType}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs sm:text-sm">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-foreground">{transaction.ticker}</span>
+                        {isFixedIncome && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
+                            {fiCalc?.parsedRate?.label || "Renda Fixa"}
+                          </span>
+                        )}
+                        {transaction.asset_type === "FII" && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                            FII
+                          </span>
+                        )}
+                        {transaction.asset_type === "STOCK" && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                            Ação
+                          </span>
+                        )}
+                      </div>
+                      {transaction.asset_name && transaction.asset_name !== transaction.ticker && (
+                        <div className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-[240px]">
+                          {transaction.asset_name}
+                        </div>
                       )}
-                      {transaction.transaction_type === "sell" && (
-                        <TrendingDown className="h-3 w-3 text-destructive" />
-                      )}
-                      <span className="text-xs sm:text-sm">
-                        {typeLabels[transaction.transaction_type] || transaction.transaction_type}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium text-xs sm:text-sm">{transaction.ticker}</TableCell>
-                  <TableCell className="text-right text-xs sm:text-sm">{transaction.quantity}</TableCell>
-                  <TableCell className="text-right text-xs sm:text-sm">R$ {transaction.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-right text-xs sm:text-sm">R$ {(transaction.quantity * transaction.price).toFixed(2)}</TableCell>
-                  <TableCell className="text-right text-xs sm:text-sm">R$ {transaction.fees.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => onEdit(transaction)} className="h-8 w-8 p-0">
-                      <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. Isso excluirá permanentemente a transação.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => onDelete(transaction.id)}>Continuar</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm">
+                      {isFixedIncome && transaction.quantity === 1 ? "-" : transaction.quantity}
+                    </TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm whitespace-nowrap">
+                      R$ {transaction.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm font-medium whitespace-nowrap">
+                      <div>
+                        <span>
+                          R$ {(transaction.quantity * transaction.price).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {fiCalc && fiCalc.accruedInterest > 0 && (
+                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
+                            +{fiCalc.profitabilityPercent.toFixed(2)}% (+R$ {fiCalc.accruedInterest.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                      {transaction.fees ? `R$ ${transaction.fees.toFixed(2)}` : "-"}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" onClick={() => onEdit(transaction)} className="h-8 w-8 p-0" title="Editar">
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" title="Excluir">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. Isso excluirá permanentemente a transação de {transaction.ticker}.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDelete(transaction.id)}>Continuar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

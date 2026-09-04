@@ -5,6 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateManualPositions, Transaction } from "@/lib/finance-utils";
+import {
+  formatTickerForYahoo,
+  fetchDirectYahooData,
+  fetchMultipleAssetsDirectly,
+  DirectAssetData,
+} from "@/lib/b3/marketData";
 
 const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v2";
 const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v2";
@@ -196,32 +202,39 @@ export const useB3Data = () => {
     [toast],
   );
 
-  // Helper: format ticker for Yahoo Finance
-  const formatTickerForYahoo = (ticker: string): string => {
-    if (ticker.match(/^[A-Z]{4}\d{1,2}$/)) return `${ticker}.SA`;
-    return ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-  };
-
-  // Fetch dividend data from yfinance edge function and persist in financial_assets
+  // Fetch dividend data directly (internally) and persist in financial_assets
   const fetchAndStoreDividends = useCallback(async (tickers: string[]): Promise<any[]> => {
     if (tickers.length === 0) return [];
 
-    console.log(`Buscando dividendos completos (10 anos) para: ${tickers.join(", ")}`);
+    const formattedTickers = [...new Set(tickers.map(t => formatTickerForYahoo(t)).filter(Boolean))];
+    console.log(`Buscando dados e dividendos internamente para: ${formattedTickers.join(", ")}`);
 
+    let fetchedAssets: any[] = [];
+
+    // 1. Execute internally direct fetch first
     try {
-      const { data, error } = await supabase.functions.invoke("yfinance-data", {
-        body: { tickers, fullHistory: true },
-      });
+      fetchedAssets = await fetchMultipleAssetsDirectly(formattedTickers, true);
+    } catch (directErr) {
+      console.warn("Aviso ao buscar cotações internamente:", directErr);
+    }
 
-      if (error) {
-        console.error("Erro ao buscar dados yfinance:", error);
-        return [];
+    // 2. Fallback to Edge function if direct fetch returned empty
+    if (fetchedAssets.length === 0) {
+      try {
+        const { data, error } = await supabase.functions.invoke("yfinance-data", {
+          body: { tickers: formattedTickers, fullHistory: true },
+        });
+        if (!error && data?.assets && Array.isArray(data.assets)) {
+          fetchedAssets = data.assets;
+        }
+      } catch (edgeErr) {
+        console.info("Edge function não acessível:", edgeErr);
       }
+    }
 
-      const fetchedAssets = data?.assets || [];
-
-      // Persist into financial_assets so subsequent loads have full history
-      if (fetchedAssets.length > 0) {
+    // 3. Persist into Supabase financial_assets so database is always updated
+    if (fetchedAssets.length > 0) {
+      try {
         const rows = fetchedAssets.map((asset: any) => ({
           ticker: asset.ticker,
           name: asset.nome,
@@ -236,23 +249,24 @@ export const useB3Data = () => {
           .from("financial_assets")
           .upsert(rows, { onConflict: "ticker" });
         if (upsertError) {
-          console.warn("Falha ao persistir financial_assets:", upsertError);
+          console.warn("Aviso ao persistir financial_assets no banco:", upsertError);
+        } else {
+          console.log(`Salvo no banco ${rows.length} ativos com sucesso.`);
         }
+      } catch (upsertCatch) {
+        console.warn("Aviso ao gravar no banco de dados:", upsertCatch);
       }
-
-      return fetchedAssets.map((asset: any) => ({
-        ticker: asset.ticker,
-        dividendHistory: asset.historico_dividendos || [],
-      }));
-    } catch (err) {
-      console.error("Erro ao buscar/armazenar dividendos:", err);
-      return [];
     }
+
+    return fetchedAssets.map((asset: any) => ({
+      ticker: asset.ticker,
+      dividendHistory: asset.historico_dividendos || [],
+    }));
   }, []);
 
   // Buscar dados de evolução patrimonial
   const getPortfolioEvolutionData = useCallback(
-    async (period: string = "12m", hasManualData: boolean = false) => {
+    async (period: string = "12m", forceRefresh: boolean = false) => {
       setLoading(true);
       try {
         if (user) {
@@ -309,8 +323,11 @@ export const useB3Data = () => {
                 }));
 
                 const evolutionData = [];
-                const months = 12;
+                const months = 60; // Generate up to 5 years (60 months) of history for instant client-side filtering
                 const now = new Date();
+
+                // Cumulative CDI benchmark tracking
+                let cumulativeCdi = 0;
 
                 for (let i = months - 1; i >= 0; i--) {
                   const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -335,6 +352,9 @@ export const useB3Data = () => {
                         : (i === 0 && typeof assetData.preco_atual === 'number' ? assetData.preco_atual : pos.averagePrice);
                       totalMarketValue += price * pos.quantity;
                       totalCost += pos.totalCost;
+                    } else {
+                      totalMarketValue += (pos.averagePrice || 0) * pos.quantity;
+                      totalCost += pos.totalCost;
                     }
 
                     if (assetData && assetData.historico_dividendos && Array.isArray(assetData.historico_dividendos)) {
@@ -352,20 +372,23 @@ export const useB3Data = () => {
                   });
 
                   pluggyInvestments.forEach(inv => {
-                    totalMarketValue += inv.balance;
-                    totalCost += inv.balance;
+                    totalMarketValue += inv.balance || 0;
+                    totalCost += inv.balance || 0;
                   });
 
                   const profitability = totalCost > 0 ? ((totalMarketValue - totalCost) / totalCost) * 100 : 0;
 
+                  // Benchmark CDI ~0.9% / month
+                  cumulativeCdi += 0.88;
+
                   evolutionData.push({
                     month: monthKey,
-                    profitability,
-                    cdi: 0.8 + (Math.random() * 0.2),
-                    marketValue: totalMarketValue,
+                    profitability: Number(profitability.toFixed(2)),
+                    cdi: Number((cumulativeCdi / Math.max(1, (months - i))).toFixed(2)),
+                    marketValue: Math.round(totalMarketValue),
                     operations: 0,
-                    costs: 0,
-                    dividends: totalDividends
+                    costs: Math.round(totalCost),
+                    dividends: Math.round(totalDividends)
                   });
                 }
 
@@ -374,9 +397,7 @@ export const useB3Data = () => {
               }
             }
           }
-        }
 
-        if (hasManualData) {
           setPortfolioEvolution([]);
           return [];
         }
@@ -402,7 +423,7 @@ export const useB3Data = () => {
   );
 
   // Buscar ativos detalhados com integração Yahoo Finance
-  const getEnhancedAssetsData = useCallback(async (hasManualData: boolean = false) => {
+  const getEnhancedAssetsData = useCallback(async (forceRefresh: boolean = false) => {
     setLoading(true);
     try {
       if (user) {
@@ -443,73 +464,164 @@ export const useB3Data = () => {
             })
             .filter(Boolean) as string[];
 
-          const manualTickers = manualPositions.map(p => formatTickerForYahoo(p.ticker));
+          const manualTickers = manualPositions
+            .filter(p => p.asset_type !== "FIXED_INCOME")
+            .map(p => formatTickerForYahoo(p.ticker));
           const allTickers = [...new Set([...pluggyTickers, ...manualTickers])];
+
+          const cleanTicker = (t: string) => (t || "").replace(".SA", "").toUpperCase().trim();
 
           let yfinanceData: any[] = [];
           if (allTickers.length > 0) {
             try {
-              const { data: dbAssets, error: dbError } = await supabase
-                .from("financial_assets")
-                .select("*")
-                .in("ticker", allTickers);
+              let dbAssets: any[] | null = null;
+              let dbError = null;
+
+              const queryTickers = [...new Set([
+                ...allTickers,
+                ...allTickers.map(t => cleanTicker(t)),
+                ...allTickers.map(t => formatTickerForYahoo(t)),
+              ])];
+
+              if (!forceRefresh) {
+                const res = await supabase
+                  .from("financial_assets")
+                  .select("*")
+                  .in("ticker", queryTickers);
+                dbAssets = res.data;
+                dbError = res.error;
+              }
 
               const assetsFound: Set<string> = new Set();
 
-              if (!dbError && dbAssets) {
-                yfinanceData = dbAssets.map(asset => {
-                  assetsFound.add(asset.ticker);
-                  return {
-                    ticker: asset.ticker,
-                    nome: asset.name,
-                    setor: asset.sector,
-                    preco_atual: asset.current_price,
-                    dividendos_12m: asset.dividends_12m,
-                    historico_precos: asset.price_history || [],
-                    historico_dividendos: asset.dividend_history || []
-                  };
-                });
+              if (!dbError && dbAssets && !forceRefresh) {
+                yfinanceData = dbAssets
+                  .filter(asset => typeof asset.current_price === "number" && asset.current_price > 0)
+                  .map(asset => {
+                    const sym = cleanTicker(asset.ticker);
+                    assetsFound.add(sym);
+                    assetsFound.add(formatTickerForYahoo(sym));
+                    return {
+                      ticker: asset.ticker,
+                      nome: asset.name,
+                      setor: asset.sector,
+                      preco_atual: asset.current_price,
+                      dividendos_12m: asset.dividends_12m,
+                      historico_precos: asset.price_history || [],
+                      historico_dividendos: asset.dividend_history || []
+                    };
+                  });
               }
 
-              const missingTickers = allTickers.filter(t => !assetsFound.has(t));
+              const missingTickers = forceRefresh 
+                ? allTickers 
+                : allTickers.filter(t => !assetsFound.has(cleanTicker(t)));
 
               if (missingTickers.length > 0) {
-                console.log(`Tentando buscar ${missingTickers.length} ativos faltantes via Edge Function...`);
-                const { data: edgeData, error: edgeError } =
-                  await supabase.functions.invoke("yfinance-data", {
-                    body: { tickers: missingTickers },
-                  });
+                let newFetchedAssets: any[] = [];
+                
+                // 1. Internal direct fetch first
+                try {
+                  newFetchedAssets = await fetchMultipleAssetsDirectly(missingTickers, true);
+                } catch (directErr) {
+                  console.warn("Aviso ao buscar dados diretos de ativos:", directErr);
+                }
 
-                if (!edgeError && edgeData?.assets) {
-                  yfinanceData = [...yfinanceData, ...edgeData.assets];
+                // 2. Fallback to Edge function if needed
+                if (newFetchedAssets.length === 0) {
+                  try {
+                    const { data: edgeData, error: edgeError } =
+                      await supabase.functions.invoke("yfinance-data", {
+                        body: { tickers: missingTickers, fullHistory: true },
+                      });
+
+                    if (!edgeError && edgeData?.assets && Array.isArray(edgeData.assets)) {
+                      newFetchedAssets = edgeData.assets;
+                    }
+                  } catch (edgeErr) {
+                    console.info("Edge function não acessível em getEnhancedAssetsData.");
+                  }
+                }
+
+                // 3. Keep fetched assets in memory even if DB write fails
+                if (newFetchedAssets.length > 0) {
+                  try {
+                    const rows = newFetchedAssets.map((asset: any) => ({
+                      ticker: asset.ticker,
+                      name: asset.nome,
+                      sector: asset.setor,
+                      current_price: asset.preco_atual,
+                      dividends_12m: asset.dividendos_12m,
+                      price_history: asset.historico_precos || [],
+                      dividend_history: asset.historico_dividendos || [],
+                      updated_at: new Date().toISOString(),
+                    }));
+                    await supabase.from("financial_assets").upsert(rows, { onConflict: "ticker" });
+                  } catch (dbErr) {
+                    console.warn("Aviso ao gravar financial_assets:", dbErr);
+                  }
+                  
+                  const newSyms = new Set(newFetchedAssets.map(a => cleanTicker(a.ticker)));
+                  yfinanceData = [
+                    ...yfinanceData.filter(y => !newSyms.has(cleanTicker(y.ticker))),
+                    ...newFetchedAssets
+                  ];
                 }
               }
             } catch (err) {
-              console.warn("Erro ao buscar dados de ativos:", err);
+              console.warn("Aviso ao buscar dados de ativos:", err);
             }
           }
 
-          // Merge Data
+          // Helper to calculate accurate 12m dividends per share from events
+          const get12mDividendPerShare = (asset: any) => {
+            let div12m = typeof asset?.dividendos_12m === "number" ? asset.dividendos_12m : 0;
+            const history = asset?.historico_dividendos || asset?.dividend_history;
+            if (Array.isArray(history) && history.length > 0) {
+              const oneYearAgo = new Date();
+              oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+              const sumFromHist = history
+                .filter((d: any) => {
+                  const dDate = new Date(d.date || d.paymentDate || d.recordDate);
+                  return !isNaN(dDate.getTime()) && dDate >= oneYearAgo;
+                })
+                .reduce((sum: number, d: any) => {
+                  const amt = typeof d.amount === "number" ? d.amount : parseFloat(d.amount);
+                  return sum + (isNaN(amt) ? 0 : amt);
+                }, 0);
+              if (sumFromHist > 0) {
+                div12m = Number(sumFromHist.toFixed(4));
+              }
+            }
+            return div12m;
+          };
+
+          // Merge Data for Pluggy
           const enhancedPluggy = pluggyInvestments.map((inv) => {
             const name = inv.name || inv.code || "N/A";
             const tickerMatch = name.match(/([A-Z]{4}\d{1,2})/g);
-            const ticker = tickerMatch ? `${tickerMatch[0]}.SA` : null;
+            const sym = tickerMatch ? tickerMatch[0] : name;
+            const cleanSym = cleanTicker(sym);
 
-            const yfinanceAsset = ticker
-              ? yfinanceData.find((asset) => asset.ticker === ticker)
-              : null;
+            const yfinanceAsset = yfinanceData.find((asset) => cleanTicker(asset.ticker) === cleanSym);
 
-            const currentPrice = yfinanceAsset?.preco_atual || inv.balance / (inv.quantity || 1);
+            const currentPrice = (typeof yfinanceAsset?.preco_atual === "number" && yfinanceAsset.preco_atual > 0)
+              ? yfinanceAsset.preco_atual
+              : (inv.balance && inv.quantity ? inv.balance / inv.quantity : inv.balance || 0);
+
             const quantity = inv.quantity || 1;
-            const marketValue = currentPrice * quantity;
-            const cost = inv.balance || marketValue;
-            const profitLoss = marketValue - cost;
-            const profitability = cost > 0 ? (profitLoss / cost) * 100 : 0;
-            const accumulatedDividends = yfinanceAsset?.dividendos_12m || 0;
-            const yieldOnCost = cost > 0 && accumulatedDividends > 0 ? (accumulatedDividends / cost) * 100 : 0;
+            const marketValue = Number((currentPrice * quantity).toFixed(2));
+            const cost = Number((inv.balance || marketValue).toFixed(2));
+            const profitLoss = Number((marketValue - cost).toFixed(2));
+            const profitability = cost > 0 ? Number(((profitLoss / cost) * 100).toFixed(2)) : 0;
+            
+            const divPerShare = get12mDividendPerShare(yfinanceAsset);
+            const totalDivs = Number((divPerShare * quantity).toFixed(2));
+            const avgPrice = cost / quantity;
+            const yieldOnCost = avgPrice > 0 ? Number(((divPerShare / avgPrice) * 100).toFixed(2)) : 0;
 
             return {
-              symbol: tickerMatch ? tickerMatch[0] : name,
+              symbol: sym,
               name: yfinanceAsset?.nome || inv.name || "Investimento",
               type: inv.type,
               subtype: inv.subtype,
@@ -517,58 +629,69 @@ export const useB3Data = () => {
               quantity,
               marketValue,
               cost,
-              averagePrice: cost / quantity,
+              averagePrice: avgPrice,
               yieldOnCost,
-              accumulatedDividends,
+              accumulatedDividends: totalDivs,
               profitLoss,
               profitability,
             };
           });
 
+          // Merge Data for Manual Positions
           const enhancedManual = manualPositions.map((pos) => {
-            const lookupTicker = formatTickerForYahoo(pos.ticker);
-            const yfinanceAsset = yfinanceData.find((asset) => asset.ticker === lookupTicker);
+            const cleanSym = cleanTicker(pos.ticker);
+            const yfinanceAsset = yfinanceData.find((asset) => cleanTicker(asset.ticker) === cleanSym);
 
-            const currentPrice = yfinanceAsset?.preco_atual || pos.averagePrice;
-            const marketValue = currentPrice * pos.quantity;
-            const cost = pos.totalCost;
-            const profitLoss = marketValue - cost;
-            const profitability = cost > 0 ? (profitLoss / cost) * 100 : 0;
+            const isFixedIncome = pos.asset_type === "FIXED_INCOME";
+            const fixedCalc = pos.fixedIncome;
 
-            const dividendPerShare = yfinanceAsset?.dividendos_12m || 0;
-            const totalDividendsReceived = dividendPerShare * pos.quantity;
-            const yieldOnCostCalc = pos.averagePrice > 0 ? (dividendPerShare / pos.averagePrice) * 100 : 0;
+            const quantity = pos.quantity || 0;
+            const cost = Number((pos.totalCost || (pos.averagePrice * quantity)).toFixed(2));
+
+            let currentPrice = (typeof yfinanceAsset?.preco_atual === "number" && yfinanceAsset.preco_atual > 0)
+              ? yfinanceAsset.preco_atual
+              : (pos.averagePrice || 0);
+
+            let marketValue = Number((currentPrice * quantity).toFixed(2));
+            let profitLoss = Number((marketValue - cost).toFixed(2));
+            let profitability = cost > 0 ? Number(((profitLoss / cost) * 100).toFixed(2)) : 0;
+
+            // Se for Renda Fixa com cálculo de indexador (% CDI, IPCA, Prefixado, Selic)
+            if (isFixedIncome && fixedCalc) {
+              marketValue = fixedCalc.currentGrossAmount;
+              currentPrice = quantity > 0 ? Number((marketValue / quantity).toFixed(2)) : pos.averagePrice;
+              profitLoss = fixedCalc.accruedInterest;
+              profitability = fixedCalc.profitabilityPercent;
+            }
+
+            const divPerShare = get12mDividendPerShare(yfinanceAsset);
+            const totalDividendsReceived = Number((divPerShare * quantity).toFixed(2));
+            const yieldOnCostCalc = pos.averagePrice > 0 ? Number(((divPerShare / pos.averagePrice) * 100).toFixed(2)) : 0;
 
             return {
               symbol: pos.ticker,
               name: yfinanceAsset?.nome || pos.asset_name,
               type: pos.asset_type,
-              subtype: null,
+              subtype: isFixedIncome ? (fixedCalc?.parsedRate?.label || "Renda Fixa") : null,
+              asset_type: pos.asset_type,
               currentPrice,
               quantity: pos.quantity,
               marketValue,
-              cost: pos.totalCost,
+              cost,
               averagePrice: pos.averagePrice,
               yieldOnCost: yieldOnCostCalc,
               accumulatedDividends: totalDividendsReceived,
               profitLoss,
               profitability,
+              fixedIncome: fixedCalc,
             };
           });
 
-          const enhancedPluggyFixed = enhancedPluggy.map(p => {
-            const divPerShare = p.accumulatedDividends;
-            const totalDivs = divPerShare * p.quantity;
-            const yoc = p.averagePrice > 0 ? (divPerShare / p.averagePrice) * 100 : 0;
-            return { ...p, accumulatedDividends: totalDivs, yieldOnCost: yoc };
-          });
-
-          setEnhancedAssets([...enhancedPluggyFixed, ...enhancedManual]);
-          return [...enhancedPluggyFixed, ...enhancedManual];
+          const allCalculatedAssets = [...enhancedPluggy, ...enhancedManual];
+          setEnhancedAssets(allCalculatedAssets);
+          return allCalculatedAssets;
         }
-      }
 
-      if (hasManualData) {
         setEnhancedAssets([]);
         return [];
       }
@@ -593,7 +716,7 @@ export const useB3Data = () => {
 
   // Buscar histórico de dividendos dos ativos do usuário
   // Combines DB data + live yfinance data for missing/stale tickers
-  const getDividendHistoryData = useCallback(async (changedTickers?: string[]) => {
+  const getDividendHistoryData = useCallback(async (changedTickers?: string[], forceRefresh: boolean = false) => {
     setLoading(true);
     try {
       if (!user) {
@@ -601,38 +724,83 @@ export const useB3Data = () => {
         return [];
       }
 
-      // 1. Get user's tickers
+      // 1. Get user's tickers from transactions AND pluggy / Open Finance
       const { data: manualTransactions } = await supabase
         .from("investment_transactions")
         .select("ticker")
         .eq("user_id", user.id);
 
-      if (!manualTransactions || manualTransactions.length === 0) {
+      let pluggyTickers: string[] = [];
+      try {
+        const { data: pluggyItems } = await supabase
+          .from("pluggy_items")
+          .select("item_id")
+          .eq("user_id", user.id);
+
+        if (pluggyItems && pluggyItems.length > 0) {
+          const investmentPromises = pluggyItems.map((item) =>
+            supabase.functions.invoke("pluggy-investments", {
+              body: { itemId: item.item_id },
+            }),
+          );
+          const investmentResults = await Promise.all(investmentPromises);
+          pluggyTickers = investmentResults
+            .flatMap((result) => result.data?.investments || [])
+            .map((inv: any) => {
+              const name = inv.name || inv.code || "";
+              const match = name.match(/([A-Z]{4}\d{1,2})/g);
+              return match ? formatTickerForYahoo(match[0]) : null;
+            })
+            .filter(Boolean) as string[];
+        }
+      } catch (e) {
+        console.warn("Erro ao buscar pluggyTickers para dividendos:", e);
+      }
+
+      const rawManualTickers = (manualTransactions || [])
+        .map(t => formatTickerForYahoo(t.ticker))
+        .filter(Boolean);
+
+      const uniqueTickers = [...new Set([...rawManualTickers, ...pluggyTickers])];
+
+      if (uniqueTickers.length === 0) {
         setDividendHistory([]);
         return [];
       }
 
-      const uniqueTickers = [...new Set(
-        manualTransactions.map(t => formatTickerForYahoo(t.ticker))
-      )];
+      // 2. Get existing data from DB first (unless forceRefresh)
+      let dbHistoryMap = new Map<string, any[]>();
+      const queryTickers = [...new Set([
+        ...uniqueTickers,
+        ...uniqueTickers.map(t => t.replace(".SA", "")),
+        ...uniqueTickers.map(t => formatTickerForYahoo(t))
+      ])];
 
-      // 2. Get existing data from DB first
-      const { data: dbData, error: dbError } = await supabase
-        .from("financial_assets")
-        .select("ticker, dividend_history")
-        .in("ticker", uniqueTickers);
+      if (!forceRefresh) {
+        const { data: dbData, error: dbError } = await supabase
+          .from("financial_assets")
+          .select("ticker, dividend_history")
+          .in("ticker", queryTickers);
 
-      const dbHistoryMap = new Map<string, any[]>();
-      if (!dbError && dbData) {
-        dbData.forEach(asset => {
-          dbHistoryMap.set(asset.ticker, (asset.dividend_history as any[]) || []);
-        });
+        if (!dbError && dbData) {
+          dbData.forEach(asset => {
+            const rawTicker = (asset.ticker || "").toUpperCase().trim();
+            const saTicker = formatTickerForYahoo(rawTicker);
+            const cleanTicker = rawTicker.replace(".SA", "");
+            const history = (asset.dividend_history as any[]) || [];
+            dbHistoryMap.set(rawTicker, history);
+            dbHistoryMap.set(saTicker, history);
+            dbHistoryMap.set(cleanTicker, history);
+          });
+        }
       }
 
       // Determine which tickers need fresh data
       let tickersToFetch: string[] = [];
 
-      if (changedTickers && changedTickers.length > 0) {
+      if (forceRefresh) {
+        tickersToFetch = uniqueTickers;
+      } else if (changedTickers && changedTickers.length > 0) {
         tickersToFetch = changedTickers.map(t => formatTickerForYahoo(t));
       } else if (shouldFetchDividends()) {
         // First visit of the day: refetch all to ensure full 10-year history
@@ -642,7 +810,7 @@ export const useB3Data = () => {
         // Refetch tickers that are new OR have suspiciously short history (< 3 years)
         tickersToFetch = uniqueTickers.filter(t => {
           if (!previouslyFetched.includes(t)) return true;
-          const hist = dbHistoryMap.get(t) || [];
+          const hist = dbHistoryMap.get(t) || dbHistoryMap.get(t.replace(".SA", "")) || [];
           if (hist.length === 0) return true;
           const oldest = hist.reduce((min: string, d: any) => (d.date < min ? d.date : min), hist[0].date);
           const oldestYear = parseInt((oldest || "").slice(0, 4), 10);
@@ -657,7 +825,12 @@ export const useB3Data = () => {
         const freshData = await fetchAndStoreDividends(tickersToFetch);
         if (freshData.length === 0) fetchSucceeded = false;
         freshData.forEach(item => {
-          dbHistoryMap.set(item.ticker, item.dividendHistory);
+          const rawTicker = (item.ticker || "").toUpperCase().trim();
+          const saTicker = formatTickerForYahoo(rawTicker);
+          const cleanTicker = rawTicker.replace(".SA", "");
+          dbHistoryMap.set(rawTicker, item.dividendHistory);
+          dbHistoryMap.set(saTicker, item.dividendHistory);
+          dbHistoryMap.set(cleanTicker, item.dividendHistory);
         });
       }
 
@@ -668,10 +841,13 @@ export const useB3Data = () => {
 
       // 4. Build final result for all user tickers
       const historyData = uniqueTickers
-        .map(ticker => ({
-          ticker,
-          dividendHistory: dbHistoryMap.get(ticker) || []
-        }))
+        .map(ticker => {
+          const history = dbHistoryMap.get(ticker) || dbHistoryMap.get(ticker.replace(".SA", "")) || [];
+          return {
+            ticker,
+            dividendHistory: history,
+          };
+        })
         .filter(item => item.dividendHistory.length > 0);
 
       setDividendHistory(historyData);

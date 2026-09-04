@@ -68,61 +68,89 @@ async function fetchTickerDividends(ticker: string, months: number): Promise<Div
     
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     });
 
-    if (!response.ok) {
-      console.warn(`Failed to fetch dividends for ${ticker}: ${response.status}`);
-      return {
-        ticker,
-        totalDividends: 0,
-        dividendHistory: [],
-      };
-    }
+    const dividendHistory: Array<{ date: string; amount: number; paymentDate?: string; type?: string; status?: string }> = [];
 
-    const data = await response.json();
-    
-    // Extract dividend data
-    const chart = data?.chart?.result?.[0];
-    const events = chart?.events?.dividends;
+    if (response.ok) {
+      const data = await response.json();
+      const chart = data?.chart?.result?.[0];
+      const events = chart?.events?.dividends;
 
-    if (!events) {
-      console.log(`No dividend data found for ${ticker}`);
-      return {
-        ticker,
-        totalDividends: 0,
-        dividendHistory: [],
-      };
-    }
-
-    // Process dividends
-    const dividendHistory: Array<{ date: string; amount: number }> = [];
-    let totalDividends = 0;
-    let lastDividendDate: string | undefined;
-    let lastDividendAmount: number | undefined;
-
-    Object.values(events).forEach((div: any) => {
-      const amount = div.amount || 0;
-      const date = new Date(div.date * 1000).toISOString();
-      
-      dividendHistory.push({ date, amount });
-      totalDividends += amount;
-      
-      if (!lastDividendDate || date > lastDividendDate) {
-        lastDividendDate = date;
-        lastDividendAmount = amount;
+      if (events) {
+        Object.values(events).forEach((div: any) => {
+          const amount = div.amount || 0;
+          const date = new Date(div.date * 1000).toISOString().split('T')[0];
+          dividendHistory.push({ date, amount, status: 'paid' });
+        });
       }
-    });
+    }
+
+    // Brazilian enrichment
+    const cleanTicker = ticker.replace('.SA', '').trim().toUpperCase();
+    try {
+      const brapiRes = await fetch(`https://brapi.dev/api/quote/${encodeURIComponent(cleanTicker)}?dividends=true`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      if (brapiRes.ok) {
+        const brapiJson = await brapiRes.json();
+        const cashDivs = brapiJson?.results?.[0]?.dividendsData?.cashDividends;
+        if (Array.isArray(cashDivs)) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          for (const d of cashDivs) {
+            const rate = typeof d.rate === 'number' ? d.rate : parseFloat(d.rate);
+            if (!rate || isNaN(rate) || rate <= 0) continue;
+            const payDate = d.paymentDate ? new Date(d.paymentDate).toISOString().split('T')[0] : (d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split('T')[0] : null);
+            if (!payDate) continue;
+
+            const label = (d.label || d.relatedTo || 'DIVIDEND').toUpperCase();
+            let type = 'DIVIDEND';
+            if (label.includes('JCP') || label.includes('JUROS')) type = 'JCP';
+            else if (label.includes('RENDIMENTO') || label.includes('FII')) type = 'RENDIMENTO';
+
+            const isAnnounced = payDate >= todayStr;
+
+            const existing = dividendHistory.find(y => Math.abs(new Date(y.date).getTime() - new Date(payDate).getTime()) < 15 * 86400000 && Math.abs(y.amount - rate) < 0.02);
+            if (existing) {
+              existing.paymentDate = payDate;
+              existing.type = type;
+              existing.status = isAnnounced ? 'announced' : 'paid';
+            } else {
+              dividendHistory.push({
+                date: payDate,
+                amount: rate,
+                paymentDate: payDate,
+                type,
+                status: isAnnounced ? 'announced' : 'paid',
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`Brapi enrichment skipped for ${ticker}:`, e);
+    }
 
     // Sort by date descending
     dividendHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    console.log(`Found ${dividendHistory.length} dividends for ${ticker}, total: ${totalDividends}`);
+    let totalDividends = 0;
+    let lastDividendDate: string | undefined;
+    let lastDividendAmount: number | undefined;
+
+    dividendHistory.forEach(d => {
+      totalDividends += d.amount;
+      if (!lastDividendDate || d.date > lastDividendDate) {
+        lastDividendDate = d.date;
+        lastDividendAmount = d.amount;
+      }
+    });
 
     return {
       ticker,
-      totalDividends,
+      totalDividends: Number(totalDividends.toFixed(4)),
       lastDividendDate,
       lastDividendAmount,
       dividendHistory,

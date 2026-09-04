@@ -11,12 +11,13 @@ import { useOpenBanking } from "@/hooks/useOpenBanking";
 import { supabase } from "@/integrations/supabase/client";
 import { useBudgetScope } from "@/contexts/BudgetScopeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { TransactionForm } from "@/components/TransactionForm";
 import { mapAccountSubtype } from "@/lib/account-mapping";
 import {
   Wallet,
   Building2,
   CreditCard,
-  DollarSign,
 } from "lucide-react";
 
 interface FinancialData {
@@ -31,6 +32,7 @@ const Index = () => {
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [quickAddType, setQuickAddType] = useState<'income' | 'expense' | null>(null);
   const { scope } = useBudgetScope();
   const {
     connected: bankConnected,
@@ -154,12 +156,17 @@ const Index = () => {
     refetchBankData();
   };
 
+  const handleQuickAddSaved = () => {
+    setQuickAddType(null);
+    handleDataRefresh();
+  };
+
   if (authLoading || (loadingData && !financialData)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm">Carregando seus dados...</p>
         </div>
       </div>
     );
@@ -168,54 +175,61 @@ const Index = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Olá, bem-vindo de volta! 👋
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Aqui está um resumo das suas finanças
-          </p>
+    <div className="min-h-screen bg-background pb-12">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 md:py-8 max-w-7xl space-y-6 sm:space-y-8">
+        {/* Header Greeting */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              Visão Geral
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Acompanhe seu fluxo de caixa e compromissos do mês
+            </p>
+          </div>
         </div>
 
         <PWAInstallPrompt />
 
-        <div className="mb-6 sm:mb-8">
+        {/* 1. Core Summary Card with Thermometer & Quick Actions */}
+        <div>
           <FinancialSummaryCard
             balance={financialData?.balance ?? 0}
             income={financialData?.monthlyIncome ?? 0}
             expenses={financialData?.monthlyExpenses ?? 0}
             isLoading={loadingData || bankLoading}
+            onQuickAdd={(type) => setQuickAddType(type)}
           />
         </div>
 
+        {/* Bank & Credit Card Overview (if connected) */}
         {bankConnected && accounts.length > 0 && (
-          <div className="mb-6 sm:mb-8">
-            <div className="space-y-4 sm:space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Contas Bancárias</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Bank Accounts */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
+                  <h3 className="text-sm font-semibold">Contas Bancárias</h3>
                 </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
+                <div className="flex overflow-x-auto gap-3 pb-2 snap-x md:grid md:grid-cols-2 scrollbar-hide">
                   {accounts
                     .filter((acc) => acc.type === "BANK")
                     .map((account) => (
                       <div
                         key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
+                        className="p-3 bg-card border rounded-xl snap-center min-w-[70%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Wallet className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs font-medium truncate">
                             {account.marketingName || account.name}
                           </span>
                         </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                        <p className="text-[10px] text-muted-foreground mb-1 truncate">
                           {mapAccountSubtype(account.subtype)}
                         </p>
-                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
+                        <p className="text-sm sm:text-base font-bold truncate" translate="no">
                           {account.balance.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: account.currency || "BRL",
@@ -226,31 +240,32 @@ const Index = () => {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <h3 className="text-lg sm:text-xl font-semibold">Cartões de Crédito</h3>
+              {/* Credit Cards */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
+                  <h3 className="text-sm font-semibold">Cartões de Crédito</h3>
                 </div>
-                <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 scrollbar-hide">
+                <div className="flex overflow-x-auto gap-3 pb-2 snap-x md:grid md:grid-cols-2 scrollbar-hide">
                   {accounts
                     .filter((acc) => acc.type === "CREDIT")
                     .map((account) => (
                       <div
                         key={account.id}
-                        className="p-3 sm:p-4 bg-muted/30 rounded-lg snap-center min-w-[75%] xs:min-w-[60%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
+                        className="p-3 bg-card border rounded-xl snap-center min-w-[70%] sm:min-w-[45%] md:min-w-0 flex-shrink-0"
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium truncate">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CreditCard className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs font-medium truncate">
                             {account.marketingName || account.name}
                           </span>
                         </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                        <p className="text-[10px] text-muted-foreground mb-1 truncate">
                           {account.brand
                             ? `${account.brand} - ${mapAccountSubtype(account.subtype)}`
                             : mapAccountSubtype(account.subtype)}
                         </p>
-                        <p className="text-base sm:text-lg font-bold truncate" translate="no">
+                        <p className="text-sm sm:text-base font-bold truncate" translate="no">
                           {account.balance.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: account.currency || "BRL",
@@ -263,34 +278,30 @@ const Index = () => {
             </div>
 
             {bankTransactions.length > 0 && (
-              <Card className="mt-4 sm:mt-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">
+              <Card className="mt-2">
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-semibold">
                     Últimas Transações Bancárias
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {bankTransactions.slice(0, 10).map((transaction) => (
+                <CardContent className="px-4 pb-3">
+                  <div className="space-y-2 max-h-52 overflow-y-auto">
+                    {bankTransactions.slice(0, 5).map((transaction) => (
                       <div
                         key={transaction.id}
-                        className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1 xs:gap-2 p-2 sm:p-3 bg-muted/20 rounded"
+                        className="flex justify-between items-center gap-2 p-2 bg-muted/30 rounded-lg text-xs"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium truncate">
+                          <p className="font-medium truncate">
                             {transaction.description}
                           </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground" translate="no">
-                            {new Date(transaction.date).toLocaleDateString(
-                              "pt-BR",
-                            )}
+                          <p className="text-[10px] text-muted-foreground" translate="no">
+                            {new Date(transaction.date).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                         <span
-                          className={`text-xs sm:text-sm font-medium whitespace-nowrap ${
-                            transaction.amount >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
+                          className={`font-semibold whitespace-nowrap ${
+                            transaction.amount >= 0 ? "text-emerald-600" : "text-rose-600"
                           }`}
                           translate="no"
                         >
@@ -309,47 +320,43 @@ const Index = () => {
           </div>
         )}
 
-        <div className="mb-6 sm:mb-8">
+        {/* 2. Main Transaction List */}
+        <div>
           <TransactionList
             key={refreshKey}
             onTransactionChange={handleDataRefresh}
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-          <div className="w-full">
-            <FamilyGroups />
-          </div>
+        {/* 3. Planning & Coordination Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="w-full">
             <ScheduledTasks />
           </div>
-        </div>
-
-        <div className="mb-6 sm:mb-8">
-          <SubscriptionStatus />
-        </div>
-
-        <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-success/10 border border-success/20 rounded-lg">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-success mt-0.5 sm:mt-1 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-sm sm:text-base text-success mb-1 sm:mb-2">
-                Sistema de Autenticação e Grupos Ativo! 🎉
-              </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-3">
-                Agora você pode criar grupos, compartilhar tarefas agendadas
-                entre membros da família e receber notificações por email e
-                push. Seus dados estão protegidos e sincronizados com o
-                Supabase.
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                Use os "Grupos" para compartilhar tarefas com sua família usando
-                o código de convite.
-              </p>
-            </div>
+          <div className="w-full">
+            <FamilyGroups />
           </div>
         </div>
+
+        {/* Subscription / Plan Status (subtle & non-intrusive) */}
+        <div>
+          <SubscriptionStatus />
+        </div>
       </main>
+
+      {/* Quick Add Transaction Modal */}
+      <Dialog open={quickAddType !== null} onOpenChange={(open) => !open && setQuickAddType(null)}>
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogTitle className="sr-only">Lançamento Rápido</DialogTitle>
+          {quickAddType && (
+            <TransactionForm
+              initialType={quickAddType}
+              onSave={handleQuickAddSaved}
+              onCancel={() => setQuickAddType(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

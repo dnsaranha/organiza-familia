@@ -12,15 +12,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, GraduationCap, Heart, ChevronDown, ChevronUp, CalendarClock, TrendingUp } from "lucide-react";
+import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, GraduationCap, Heart, ChevronDown, ChevronUp, CalendarClock, TrendingUp, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { format, addMonths, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSubscription } from "@/hooks/useSubscription";
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
+import { useB3Data } from "@/hooks/useB3Data";
 
 interface Goal {
-  id: string; user_id: string; group_id: string | null; title: string; description: string | null; target_amount: number; current_amount: number; deadline: string | null; category: string; icon: string; color: string; created_at: string; updated_at: string; monthly_contribution: number | null;
+  id: string;
+  user_id: string;
+  group_id: string | null;
+  title: string;
+  description: string | null;
+  target_amount: number;
+  current_amount: number;
+  deadline: string | null;
+  category: string;
+  icon: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+  monthly_contribution: number | null;
+  linked_asset_ticker?: string | null;
+  linked_asset_type?: string | null;
+  reserved_percentage?: number | null;
 }
 
 interface HistoryData {
@@ -170,11 +187,29 @@ export default function GoalsPage() {
   const [addValue, setAddValue] = useState("");
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
+  const { enhancedAssets, getEnhancedAssetsData } = useB3Data();
+
   const [formData, setFormData] = useState({
-    title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))", monthly_contribution: "", auto_contribution: false,
+    title: "",
+    description: "",
+    target_amount: "",
+    current_amount: "",
+    deadline: "",
+    category: "Reserva de Emergência",
+    icon: "piggy",
+    color: "hsl(var(--primary))",
+    monthly_contribution: "",
+    auto_contribution: false,
+    linked_asset_ticker: "none",
+    reserved_percentage: "100",
   });
 
-  useEffect(() => { if (user) { fetchGoals(); } }, [user, scope]);
+  useEffect(() => {
+    if (user) {
+      fetchGoals();
+      getEnhancedAssetsData();
+    }
+  }, [user, scope, getEnhancedAssetsData]);
 
   const fetchGoals = async () => {
     if (!user) return;
@@ -196,7 +231,11 @@ export default function GoalsPage() {
     if (!formData.title || !formData.target_amount) { toast.error("Preencha o título e valor da meta"); return; }
     try {
       const monthlyContribution = formData.monthly_contribution ? parseFloat(formData.monthly_contribution) : null;
-      const goalData = { 
+      const isLinked = formData.linked_asset_ticker && formData.linked_asset_ticker !== "none";
+      const selectedAsset = isLinked ? enhancedAssets.find((a) => a.symbol === formData.linked_asset_ticker) : null;
+      const reservedPct = isLinked ? parseFloat(formData.reserved_percentage) || 100 : 100;
+
+      const goalData: any = { 
         user_id: user.id, 
         group_id: scope === "personal" ? null : scope, 
         title: formData.title, 
@@ -207,26 +246,51 @@ export default function GoalsPage() {
         category: formData.category, 
         icon: formData.icon, 
         color: formData.color,
-        monthly_contribution: monthlyContribution
+        monthly_contribution: monthlyContribution,
+        linked_asset_ticker: isLinked ? formData.linked_asset_ticker : null,
+        linked_asset_type: selectedAsset ? (selectedAsset.type || selectedAsset.asset_type || "OTHER") : null,
+        reserved_percentage: reservedPct
       };
       
       let goalId = editingGoal?.id;
       
       if (editingGoal) {
-        const { error } = await supabase.from("savings_goals").update(goalData).eq("id", editingGoal.id);
-        if (error) throw error;
+        let { error } = await supabase.from("savings_goals").update(goalData).eq("id", editingGoal.id);
+        if (error && (error.code === 'PGRST204' || error.message?.includes('column'))) {
+          // Fallback if column not yet added in Supabase
+          const fallbackData = { ...goalData };
+          delete fallbackData.linked_asset_ticker;
+          delete fallbackData.linked_asset_type;
+          delete fallbackData.reserved_percentage;
+          const fallbackRes = await supabase.from("savings_goals").update(fallbackData).eq("id", editingGoal.id);
+          if (fallbackRes.error) throw fallbackRes.error;
+          toast.info("Meta atualizada! Execute o comando SQL no Supabase para salvar o vínculo.");
+        } else if (error) {
+          throw error;
+        } else {
+          toast.success("Meta atualizada!");
+        }
         
         // Delete existing auto contribution task if auto_contribution is disabled
         if (!formData.auto_contribution) {
           await supabase.from("scheduled_tasks").delete().eq("description", `Auto-contribuição: ${editingGoal.title}`).eq("user_id", user.id);
         }
-        
-        toast.success("Meta atualizada!");
       } else {
-        const { data, error } = await supabase.from("savings_goals").insert(goalData).select().single();
-        if (error) throw error;
-        goalId = data.id;
-        toast.success("Meta criada!");
+        let insertRes = await supabase.from("savings_goals").insert(goalData).select().single();
+        if (insertRes.error && (insertRes.error.code === 'PGRST204' || insertRes.error.message?.includes('column'))) {
+          const fallbackData = { ...goalData };
+          delete fallbackData.linked_asset_ticker;
+          delete fallbackData.linked_asset_type;
+          delete fallbackData.reserved_percentage;
+          insertRes = await supabase.from("savings_goals").insert(fallbackData).select().single();
+          if (insertRes.error) throw insertRes.error;
+          toast.info("Meta criada! Execute o comando SQL no Supabase para salvar o vínculo.");
+        } else if (insertRes.error) {
+          throw insertRes.error;
+        } else {
+          toast.success("Meta criada!");
+        }
+        goalId = insertRes.data?.id;
       }
       
       // Create/Update scheduled task for auto contribution
@@ -266,6 +330,26 @@ export default function GoalsPage() {
     } catch (error: any) { console.error("Error saving goal:", error); toast.error("Erro ao salvar meta"); }
   };
 
+  const handleSyncAssetValue = async (goal: Goal) => {
+    if (!goal.linked_asset_ticker) return;
+    const asset = enhancedAssets.find((a) => a.symbol === goal.linked_asset_ticker);
+    if (!asset) {
+      toast.error("Ativo vinculado não encontrado na carteira atual.");
+      return;
+    }
+    const pct = goal.reserved_percentage || 100;
+    const currentVal = (asset.marketValue * pct) / 100;
+    try {
+      const { error } = await supabase.from("savings_goals").update({ current_amount: currentVal }).eq("id", goal.id);
+      if (error) throw error;
+      toast.success(`Meta atualizada com o saldo do ativo: ${formatCurrency(currentVal)}`);
+      fetchGoals();
+    } catch (err: any) {
+      console.error("Erro ao sincronizar ativo:", err);
+      toast.error("Erro ao sincronizar saldo do ativo.");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase.from("savings_goals").delete().eq("id", id);
@@ -292,7 +376,21 @@ export default function GoalsPage() {
     } catch (error: any) { console.error("Error adding value to goal:", error); toast.error("Erro ao adicionar valor."); }
   };
 
-  const resetForm = () => setFormData({ title: "", description: "", target_amount: "", current_amount: "", deadline: "", category: "Reserva de Emergência", icon: "piggy", color: "hsl(var(--primary))", monthly_contribution: "", auto_contribution: false });
+  const resetForm = () => setFormData({
+    title: "",
+    description: "",
+    target_amount: "",
+    current_amount: "",
+    deadline: "",
+    category: "Reserva de Emergência",
+    icon: "piggy",
+    color: "hsl(var(--primary))",
+    monthly_contribution: "",
+    auto_contribution: false,
+    linked_asset_ticker: "none",
+    reserved_percentage: "100",
+  });
+
   const openEditDialog = async (goal: Goal) => { 
     // Check if auto contribution task exists
     const { data: existingTask } = await supabase.from("scheduled_tasks")
@@ -312,7 +410,9 @@ export default function GoalsPage() {
       icon: goal.icon, 
       color: goal.color, 
       monthly_contribution: goal.monthly_contribution?.toString() || "",
-      auto_contribution: !!existingTask
+      auto_contribution: !!existingTask,
+      linked_asset_ticker: goal.linked_asset_ticker || "none",
+      reserved_percentage: (goal.reserved_percentage || 100).toString(),
     }); 
     setIsDialogOpen(true); 
   };
@@ -353,6 +453,78 @@ export default function GoalsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">Ao ativar, será criada uma tarefa recorrente mensal para lembrar da contribuição.</p>
               </div>
+
+              {/* Vínculo com Ativo de Investimento */}
+              <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-primary" />
+                  <Label className="font-medium">Vincular a Ativo de Investimento</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Acompanhe a meta reservando um ativo da sua carteira (ex: CDB, Tesouro Direto). O saldo e juros acumulados do ativo atualizam o valor da meta.
+                </p>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Ativo da Carteira</Label>
+                  <Select 
+                    value={formData.linked_asset_ticker} 
+                    onValueChange={(value) => {
+                      setFormData((prev) => {
+                        const next = { ...prev, linked_asset_ticker: value };
+                        if (value !== "none") {
+                          const asset = enhancedAssets.find((a) => a.symbol === value);
+                          if (asset) {
+                            const pct = parseFloat(prev.reserved_percentage) || 100;
+                            const calcAmount = (asset.marketValue * pct) / 100;
+                            next.current_amount = calcAmount.toFixed(2);
+                          }
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um ativo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum (Meta manual em dinheiro)</SelectItem>
+                      {enhancedAssets.map((asset) => (
+                        <SelectItem key={asset.symbol} value={asset.symbol}>
+                          {asset.symbol} - {asset.name || asset.symbol} ({formatCurrency(asset.marketValue)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.linked_asset_ticker !== "none" && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-xs">Percentual do Ativo Reservado (%)</Label>
+                      <span className="font-medium text-primary">{formData.reserved_percentage}%</span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.reserved_percentage}
+                      onChange={(e) => {
+                        const pctStr = e.target.value;
+                        setFormData((prev) => {
+                          const next = { ...prev, reserved_percentage: pctStr };
+                          const asset = enhancedAssets.find((a) => a.symbol === prev.linked_asset_ticker);
+                          if (asset) {
+                            const pct = parseFloat(pctStr) || 100;
+                            const calcAmount = (asset.marketValue * pct) / 100;
+                            next.current_amount = calcAmount.toFixed(2);
+                          }
+                          return next;
+                        });
+                      }}
+                      placeholder="100"
+                    />
+                  </div>
+                )}
+              </div>
               <div><Label>Categoria</Label><Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{GOAL_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select></div>
               <div><Label>Ícone</Label><div className="flex gap-2 flex-wrap mt-2">{Object.entries(GOAL_ICONS).map(([key, Icon]) => (<Button key={key} type="button" variant={formData.icon === key ? "default" : "outline"} size="icon" onClick={() => setFormData({ ...formData, icon: key })}><Icon className="h-4 w-4" /></Button>))}</div></div>
               <div><Label>Cor</Label><div className="flex gap-2 flex-wrap mt-2">{GOAL_COLORS.map((color) => (<Button key={color.value} type="button" variant="outline" size="icon" className="relative" style={{ backgroundColor: color.value }} onClick={() => setFormData({ ...formData, color: color.value })}>{formData.color === color.value && (<div className="absolute inset-0 flex items-center justify-center"><div className="w-2 h-2 bg-white rounded-full" /></div>)}</Button>))}</div></div>
@@ -372,8 +544,15 @@ export default function GoalsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {goals.map((goal) => {
             const Icon = GOAL_ICONS[goal.icon] || Target;
-            const progress = getProgress(goal.current_amount, goal.target_amount);
-            const remaining = goal.target_amount - goal.current_amount;
+            const linkedAsset = goal.linked_asset_ticker
+              ? enhancedAssets.find((a) => a.symbol === goal.linked_asset_ticker)
+              : null;
+            const reservedPct = goal.reserved_percentage || 100;
+            const effectiveCurrentAmount = linkedAsset
+              ? (linkedAsset.marketValue * reservedPct) / 100
+              : goal.current_amount;
+            const progress = getProgress(effectiveCurrentAmount, goal.target_amount);
+            const remaining = goal.target_amount - effectiveCurrentAmount;
             const isExpanded = expandedGoalId === goal.id;
 
             return (
@@ -394,8 +573,51 @@ export default function GoalsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 flex-1 flex flex-col">
                   {goal.description && (<p className="text-sm text-muted-foreground">{goal.description}</p>)}
+
+                  {goal.linked_asset_ticker && (() => {
+                    const linkedAsset = enhancedAssets.find((a) => a.symbol === goal.linked_asset_ticker);
+                    const reservedPct = goal.reserved_percentage || 100;
+                    const assetVal = linkedAsset ? (linkedAsset.marketValue * reservedPct) / 100 : null;
+
+                    return (
+                      <div className="p-2.5 rounded-lg border bg-muted/40 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold flex items-center gap-1.5 text-primary">
+                            <Landmark className="h-3.5 w-3.5" />
+                            {linkedAsset ? `${linkedAsset.name || linkedAsset.symbol} (${linkedAsset.symbol})` : goal.linked_asset_ticker}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[11px] flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleSyncAssetValue(goal)}
+                            title="Sincronizar valor da meta com o saldo atualizado do ativo"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Sincronizar
+                          </Button>
+                        </div>
+                        {linkedAsset && (
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span>Saldo reservado ({reservedPct}%): {formatCurrency(assetVal || 0)}</span>
+                            {linkedAsset.subtype && (
+                              <span className="font-medium text-foreground bg-background px-1.5 py-0.5 rounded border text-[10px]">
+                                {linkedAsset.subtype}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {linkedAsset?.fixedIncome && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                            Juros acumulados: +{formatCurrency((linkedAsset.fixedIncome.accruedInterest * reservedPct) / 100)}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="space-y-2" data-tutorial="goal-progress">
-                    <div className="flex justify-between text-sm"><span>{formatCurrency(goal.current_amount)}</span><span className="text-muted-foreground">{formatCurrency(goal.target_amount)}</span></div>
+                    <div className="flex justify-between text-sm"><span>{formatCurrency(effectiveCurrentAmount)}</span><span className="text-muted-foreground">{formatCurrency(goal.target_amount)}</span></div>
                     <Progress value={progress} className="h-2" />
                     <div className="flex justify-between text-xs text-muted-foreground"><span>{progress.toFixed(1)}% completo</span><span>Faltam {formatCurrency(remaining > 0 ? remaining : 0)}</span></div>
                   </div>
@@ -406,7 +628,7 @@ export default function GoalsPage() {
                       Contribuição mensal: {formatCurrency(goal.monthly_contribution)}
                     </p>
                   )}
-                  {isExpanded && <GoalHistoryChart goalId={goal.id} color={goal.color} targetAmount={goal.target_amount} currentAmount={goal.current_amount} monthlyContribution={goal.monthly_contribution} />}
+                  {isExpanded && <GoalHistoryChart goalId={goal.id} color={goal.color} targetAmount={goal.target_amount} currentAmount={effectiveCurrentAmount} monthlyContribution={goal.monthly_contribution} />}
                   <div className="flex-grow" />
                   <div className="mt-auto pt-4">
                     {isAddingValue === goal.id ? (

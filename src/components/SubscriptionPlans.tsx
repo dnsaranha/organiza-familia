@@ -13,23 +13,7 @@ export const SubscriptionPlans = () => {
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-
-  // Safe navigation function that checks for router context
-  const navigate = (() => {
-    try {
-      const routerNavigate = useNavigate();
-      return routerNavigate;
-    } catch (error) {
-      // Fallback navigation using window.location if router context is not available
-      return (path: string) => {
-        if (path.startsWith("/")) {
-          window.location.href = window.location.origin + path;
-        } else {
-          window.location.href = path;
-        }
-      };
-    }
-  })();
+  const navigate = useNavigate();
 
   const handleSubscribe = async (
     priceId: string,

@@ -6,9 +6,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  ReferenceArea,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,19 +41,26 @@ interface FinancialAssetRow {
 
 interface Props {
   data?: AssetDividendData[];
+  userAssets?: any[];
   loading?: boolean;
 }
+
+const formatCompactCurrency = (v: number) => {
+  if (Math.abs(v) >= 1000000) return `R$ ${(v / 1000000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1000) return `R$ ${(v / 1000).toFixed(0)}k`;
+  return `R$ ${Math.round(v)}`;
+};
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(v);
 
-const normalize = (t: string) => t.replace(".SA", "").toUpperCase();
+const normalize = (t: string) => (t || "").replace(".SA", "").toUpperCase().trim();
 
-const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
+const MonthlyAssetBreakdownChart = ({ data = [], userAssets = [], loading = false }: Props) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [assets, setAssets] = useState<FinancialAssetRow[]>([]);
@@ -171,20 +176,36 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
       }
       const marketValue = qty * price;
 
-      // dividends paid this month (per unit) × qty held at dividend date
+      // dividends paid this month (per unit) × qty held at dividend record date
       const divs = dividendByTicker.get(ticker) || [];
       let proventos = 0;
       let proventosAcumulados = 0;
       for (const d of divs) {
-        const dd = new Date(d.date);
+        const payDateStr = (d as any).paymentDate || (d as any).payment_date || d.date;
+        const recDateStr = (d as any).recordDate || (d as any).record_date || d.date;
+        const dd = new Date(payDateStr);
+        const recDate = new Date(recDateStr);
         if (dd > monthEnd) continue;
-        // qty held at dd
+        // qty held at record date
         let q = 0;
-        for (const t of txs) {
-          const td = new Date(t.transaction_date);
-          if (td > dd) break;
-          if (t.transaction_type === "buy" || t.transaction_type === "bonus" || t.transaction_type === "split") q += t.quantity;
-          else if (t.transaction_type === "sell" || t.transaction_type === "grouping") q -= t.quantity;
+        if (txs.length > 0) {
+          const firstTxDate = new Date(txs[0].transaction_date);
+          if (recDate >= firstTxDate) {
+            for (const t of txs) {
+              const td = new Date(t.transaction_date);
+              if (td > recDate) break;
+              if (t.transaction_type === "buy" || t.transaction_type === "bonus" || t.transaction_type === "split") q += t.quantity;
+              else if (t.transaction_type === "sell" || t.transaction_type === "grouping") q -= t.quantity;
+            }
+          }
+        } else if (Array.isArray(userAssets) && userAssets.length > 0) {
+          const held = userAssets.find(a => normalize(a.symbol || a.ticker || "") === ticker);
+          if (held && Number(held.quantity) > 0) {
+            const diffYears = new Date().getFullYear() - recDate.getFullYear();
+            if (diffYears <= 1) {
+              q = Number(held.quantity);
+            }
+          }
         }
         q = Math.max(0, q);
         const val = (d.amount || 0) * q;
@@ -214,58 +235,73 @@ const MonthlyAssetBreakdownChart = ({ data = [], loading = false }: Props) => {
     setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Operações, Custos e Proventos</CardTitle>
+    <Card className="border">
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base font-semibold">Operações e Proventos</CardTitle>
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => move(-1)}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <div className="px-2.5 py-0.5 rounded border text-xs font-mono font-medium min-w-[70px] text-center bg-muted/40">
+            {label}
+          </div>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => move(1)}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-1">
         {loading ? (
-          <div className="h-80 flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Carregando dados...</div>
+          <div className="h-72 flex items-center justify-center">
+            <div className="animate-pulse text-xs text-muted-foreground">Carregando dados...</div>
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-80 flex items-center justify-center text-muted-foreground">
+          <div className="h-72 flex items-center justify-center text-xs text-muted-foreground">
             Nenhum dado para {label}.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 34 + 60)}>
+          <ResponsiveContainer width="100%" height={Math.max(260, chartData.length * 32 + 40)}>
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+              margin={{ top: 4, right: 12, left: -8, bottom: 4 }}
               barCategoryGap={4}
               barGap={1}
             >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
+              <XAxis
+                type="number"
+                tickFormatter={formatCompactCurrency}
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+              />
               <YAxis
                 type="category"
                 dataKey="ticker"
-                width={56}
-                tick={{ fontSize: 10 }}
+                width={50}
+                tick={{ fontSize: 10, fontWeight: 600 }}
+                tickLine={false}
+                axisLine={false}
               />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
-              <Legend wrapperStyle={{ fontSize: 11 }} iconSize={8} />
-              <Bar dataKey="marketValue" stackId="patrimonio" name="Valor de mercado" fill="#2563eb" barSize={7} />
-              <Bar dataKey="proventosAcumulados" stackId="patrimonio" name="Proventos acumulados" fill="#1e3a8a" barSize={7} />
-              <Bar dataKey="cost" name="Custo" fill="#f97316" barSize={7} />
-              <Bar dataKey="proventos" name="Proventos (mês)" fill="#60a5fa" barSize={7} />
-              <Bar dataKey="operations" name="Operações" fill="#10b981" barSize={7} />
+              <Tooltip
+                formatter={(v: number) => formatCurrency(v)}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  borderColor: "hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                }}
+              />
+              <Bar dataKey="marketValue" stackId="patrimonio" name="Valor de mercado" fill="#3b82f6" radius={[0, 3, 3, 0]} barSize={6} />
+              <Bar dataKey="proventosAcumulados" stackId="patrimonio" name="Proventos acumulados" fill="#1d4ed8" radius={[0, 3, 3, 0]} barSize={6} />
+              <Bar dataKey="cost" name="Custo" fill="#f97316" radius={[0, 3, 3, 0]} barSize={6} />
+              <Bar dataKey="proventos" name="Proventos (mês)" fill="#10b981" radius={[0, 3, 3, 0]} barSize={6} />
+              <Bar dataKey="operations" name="Operações" fill="#8b5cf6" radius={[0, 3, 3, 0]} barSize={6} />
             </BarChart>
           </ResponsiveContainer>
         )}
-
-        <div className="flex items-center gap-2 mt-4">
-          <Button variant="outline" size="icon" onClick={() => move(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="px-3 py-1 rounded border text-sm font-medium min-w-[88px] text-center">
-            {label}
-          </div>
-          <Button variant="outline" size="icon" onClick={() => move(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

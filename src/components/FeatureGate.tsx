@@ -125,20 +125,16 @@ export function LimitGate({
   children,
   onLimitReached,
 }: LimitGateProps) {
-  const { limits, plan } = useSubscription();
+  const { limits } = useSubscription();
   const limit = limits[limitKey];
   
-  if (typeof limit !== 'number') {
-    return <>{children}</>;
-  }
+  const isLimitReached = typeof limit === 'number' && currentCount >= limit && limit !== Infinity;
 
-  const isLimitReached = currentCount >= limit && limit !== Infinity;
-
-  if (isLimitReached && onLimitReached) {
-    React.useEffect(() => {
+  React.useEffect(() => {
+    if (isLimitReached && onLimitReached) {
       onLimitReached();
-    }, [isLimitReached]);
-  }
+    }
+  }, [isLimitReached, onLimitReached]);
 
   return <>{children}</>;
 }

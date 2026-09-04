@@ -17,9 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Download, Search, ArrowUpDown } from "lucide-react";
+import { Download, Search, ArrowUpDown, Calculator, Info } from "lucide-react";
 import { useState, useMemo } from "react";
 import { mapInvestmentType, investmentMapping } from "@/lib/investment-mapping";
+import { FixedIncomeDetailsDialog } from "@/components/FixedIncomeDetailsDialog";
+import { FixedIncomeCalculationResult } from "@/lib/fixed-income-calculator";
 
 // Add asset_type to AssetData
 interface AssetData {
@@ -37,6 +39,7 @@ interface AssetData {
   profitLoss: number;
   profitability: number;
   asset_type?: string; // Manual asset type
+  fixedIncome?: FixedIncomeCalculationResult;
 }
 
 interface EnhancedAssetTableProps {
@@ -64,6 +67,7 @@ const EnhancedAssetTable = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("marketValue");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [selectedFixedIncomeAsset, setSelectedFixedIncomeAsset] = useState<AssetData | null>(null);
 
   const filterOptions = useMemo(() => {
     const mainTypes = investmentMapping.map((item) => item.label_pt);
@@ -329,74 +333,109 @@ const EnhancedAssetTable = ({
               ) : (
                 filteredAndSortedAssets.map((asset) => {
                   const displayType = getAssetDisplayType(asset);
-                  return (
-                    <TableRow key={asset.symbol} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">
-                        <div>
-                          <p className="font-semibold">{asset.symbol}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-24">
-                            {asset.name}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={getAssetTypeColor(asset)}
+                    const isFixedIncome = asset.asset_type === "FIXED_INCOME" || asset.type === "FIXED_INCOME" || !!asset.fixedIncome;
+                    const fiLabel = asset.fixedIncome?.parsedRate?.label || (isFixedIncome ? asset.subtype : null);
+
+                    return (
+                      <TableRow key={asset.symbol} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          <div className="flex items-start justify-between gap-1">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-semibold">{asset.symbol}</p>
+                                {fiLabel && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-4 border-amber-500/30 text-amber-800 dark:text-amber-300 bg-amber-500/10 font-medium"
+                                  >
+                                    {fiLabel}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate max-w-28 sm:max-w-44">
+                                {asset.name}
+                              </p>
+                            </div>
+                            {isFixedIncome && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-amber-600 dark:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 shrink-0"
+                                title="Ver cálculo de juros e simulações da renda fixa"
+                                onClick={() => setSelectedFixedIncomeAsset(asset)}
+                              >
+                                <Calculator className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={getAssetTypeColor(asset)}
+                          >
+                            {displayType || "N/A"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(asset.currentPrice)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {asset.quantity
+                            ? asset.quantity.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: asset.quantity < 1 ? 6 : 0,
+                              })
+                            : "0"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(asset.marketValue)}
+                        </TableCell>
+                        <TableCell>{formatCurrency(asset.cost)}</TableCell>
+                        <TableCell>
+                          {formatCurrency(asset.averagePrice)}
+                        </TableCell>
+                        <TableCell className="text-success dark:text-success-light font-medium">
+                          {formatPercent(asset.yieldOnCost)}
+                        </TableCell>
+                        <TableCell className="text-primary dark:text-primary-light font-medium">
+                          {isFixedIncome && asset.fixedIncome
+                            ? formatCurrency(asset.fixedIncome.accruedInterest)
+                            : formatCurrency(asset.accumulatedDividends)}
+                        </TableCell>
+                        <TableCell
+                          className={`font-medium ${
+                            asset.profitLoss >= 0
+                              ? "text-success dark:text-success-light"
+                              : "text-expense dark:text-expense-light"
+                          }`}
                         >
-                          {displayType || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(asset.currentPrice)}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {asset.quantity
-                          ? asset.quantity.toLocaleString("pt-BR", {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: asset.quantity < 1 ? 6 : 0,
-                            })
-                          : "0"}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(asset.marketValue)}
-                      </TableCell>
-                      <TableCell>{formatCurrency(asset.cost)}</TableCell>
-                      <TableCell>
-                        {formatCurrency(asset.averagePrice)}
-                      </TableCell>
-                      <TableCell className="text-success dark:text-success-light font-medium">
-                        {formatPercent(asset.yieldOnCost)}
-                      </TableCell>
-                      <TableCell className="text-primary dark:text-primary-light font-medium">
-                        {formatCurrency(asset.accumulatedDividends)}
-                      </TableCell>
-                      <TableCell
-                        className={`font-medium ${
-                          asset.profitLoss >= 0
-                            ? "text-success dark:text-success-light"
-                            : "text-expense dark:text-expense-light"
-                        }`}
-                      >
-                        {formatCurrency(asset.profitLoss)}
-                      </TableCell>
-                      <TableCell
-                        className={`font-medium ${
-                          asset.profitability >= 0
-                            ? "text-success dark:text-success-light"
-                            : "text-expense dark:text-expense-light"
-                        }`}
-                      >
-                        {asset.profitability >= 0 ? "+" : ""}
-                        {formatPercent(asset.profitability)}
-                      </TableCell>
-                    </TableRow>
-                  );
+                          {formatCurrency(asset.profitLoss)}
+                        </TableCell>
+                        <TableCell
+                          className={`font-medium ${
+                            asset.profitability >= 0
+                              ? "text-success dark:text-success-light"
+                              : "text-expense dark:text-expense-light"
+                          }`}
+                        >
+                          {asset.profitability >= 0 ? "+" : ""}
+                          {formatPercent(asset.profitability)}
+                        </TableCell>
+                      </TableRow>
+                    );
                 })
               )}
             </TableBody>
           </Table>
         </div>
       </CardContent>
+
+      {/* Modal didático com detalhes dos juros e simulador de renda fixa */}
+      <FixedIncomeDetailsDialog
+        isOpen={!!selectedFixedIncomeAsset}
+        onOpenChange={(open) => !open && setSelectedFixedIncomeAsset(null)}
+        asset={selectedFixedIncomeAsset}
+      />
     </Card>
   );
 };

@@ -1,4 +1,8 @@
 import { Tables } from "@/integrations/supabase/types";
+import {
+  calculateFixedIncomeYield,
+  FixedIncomeCalculationResult,
+} from "@/lib/fixed-income-calculator";
 
 // Re-exporting for broader use
 export type InvestmentTransaction = Tables<'investment_transactions'>;
@@ -11,6 +15,7 @@ export interface Position {
   quantity: number;
   totalCost: number;
   averagePrice: number;
+  fixedIncome?: FixedIncomeCalculationResult;
 }
 
 /**
@@ -70,14 +75,80 @@ export const calculateManualPositions = (transactions: InvestmentTransaction[]):
     }
 
     if (quantity > 0.000001) {
-        positions.push({
-            ticker,
-            asset_name: assetName,
-            asset_type: assetType,
-            quantity,
-            totalCost: totalCostBasis,
-            averagePrice: totalCostBasis / quantity
-        });
+      let fixedIncomeResult: FixedIncomeCalculationResult | undefined = undefined;
+
+      if (assetType === 'FIXED_INCOME' && totalCostBasis > 0) {
+        const buyTxs = txs.filter(t => t.transaction_type === 'buy');
+        const totalOriginalBought = buyTxs.reduce(
+          (sum, t) => sum + (t.quantity * t.price) + (t.fees || 0),
+          0
+        );
+        const remainingRatio = totalOriginalBought > 0 ? Math.min(1, totalCostBasis / totalOriginalBought) : 1;
+
+        let aggregatedGross = 0;
+        let aggregatedAccruedInterest = 0;
+        let aggregatedNet = 0;
+        let aggregatedIr = 0;
+        let representativeResult: FixedIncomeCalculationResult | null = null;
+
+        for (const t of buyTxs) {
+          const txCost = ((t.quantity * t.price) + (t.fees || 0)) * remainingRatio;
+          if (txCost <= 0) continue;
+
+          let txRate: string | null = null;
+          let txCategory: string | null = null;
+          let txDueDate: string | null = null;
+
+          if (t.notes) {
+            const parts = t.notes.split(" | ");
+            parts.forEach(p => {
+              if (p.startsWith("Taxa: ")) txRate = p.replace("Taxa: ", "").trim();
+              if (p.startsWith("Categoria: ")) txCategory = p.replace("Categoria: ", "").trim();
+              if (p.startsWith("Vencimento: ")) txDueDate = p.replace("Vencimento: ", "").trim();
+            });
+          }
+
+          const res = calculateFixedIncomeYield({
+            initialAmount: txCost,
+            startDate: t.transaction_date,
+            rawRate: txRate,
+            assetName: t.asset_name || assetName,
+            category: txCategory,
+            dueDate: txDueDate,
+          });
+
+          aggregatedGross += res.currentGrossAmount;
+          aggregatedAccruedInterest += res.accruedInterest;
+          aggregatedNet += res.currentNetAmount;
+          aggregatedIr += res.irAmount;
+          representativeResult = res;
+        }
+
+        if (representativeResult) {
+          fixedIncomeResult = {
+            ...representativeResult,
+            initialAmount: Number(totalCostBasis.toFixed(2)),
+            currentGrossAmount: Number(aggregatedGross.toFixed(2)),
+            accruedInterest: Number(aggregatedAccruedInterest.toFixed(2)),
+            profitabilityPercent: totalCostBasis > 0
+              ? Number(((aggregatedAccruedInterest / totalCostBasis) * 100).toFixed(2))
+              : 0,
+            currentNetAmount: Number(aggregatedNet.toFixed(2)),
+            netInterest: Number((aggregatedNet - totalCostBasis).toFixed(2)),
+            irAmount: Number(aggregatedIr.toFixed(2)),
+          };
+        }
+      }
+
+      positions.push({
+        ticker,
+        asset_name: assetName,
+        asset_type: assetType,
+        quantity,
+        totalCost: totalCostBasis,
+        averagePrice: totalCostBasis / quantity,
+        fixedIncome: fixedIncomeResult,
+      });
     }
   }
 

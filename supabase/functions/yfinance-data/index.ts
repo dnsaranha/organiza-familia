@@ -9,6 +9,11 @@ interface YFinanceRequest {
 interface DividendEvent {
   date: string;
   amount: number;
+  paymentDate?: string;
+  recordDate?: string;
+  approvedOn?: string;
+  type?: string;
+  status?: string;
 }
 
 interface HistoricalPrice {
@@ -24,6 +29,74 @@ interface AssetData {
   dividendos_12m: number;
   historico_dividendos: DividendEvent[];
   historico_precos: HistoricalPrice[];
+}
+
+// Fetch Brazilian corporate events / dividends (B3 / Brapi) to enrich announced & scheduled dividends
+async function fetchBrazilianDividends(cleanTicker: string): Promise<DividendEvent[]> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const url = `https://brapi.dev/api/quote/${encodeURIComponent(cleanTicker)}?dividends=true`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return [];
+
+    const json = await res.json();
+    const result = json?.results?.[0];
+    const cashDivs = result?.dividendsData?.cashDividends;
+
+    if (!Array.isArray(cashDivs) || cashDivs.length === 0) return [];
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const brazEvents: DividendEvent[] = [];
+
+    for (const d of cashDivs) {
+      const rate = typeof d.rate === "number" ? d.rate : parseFloat(d.rate);
+      if (!rate || isNaN(rate) || rate <= 0) continue;
+
+      // Prefer paymentDate, fallback to lastDatePrior (Data Com) or approvedOn
+      const rawDate = d.paymentDate || d.lastDatePrior || d.approvedOn;
+      if (!rawDate) continue;
+
+      const dateObj = new Date(rawDate);
+      if (isNaN(dateObj.getTime())) continue;
+
+      const dateStr = dateObj.toISOString().split("T")[0];
+      const paymentDateStr = d.paymentDate ? new Date(d.paymentDate).toISOString().split("T")[0] : undefined;
+      const recordDateStr = d.lastDatePrior ? new Date(d.lastDatePrior).toISOString().split("T")[0] : undefined;
+      const approvedOnStr = d.approvedOn ? new Date(d.approvedOn).toISOString().split("T")[0] : undefined;
+
+      const label = (d.label || d.relatedTo || "DIVIDEND").toUpperCase();
+      let type = "DIVIDEND";
+      if (label.includes("JCP") || label.includes("JUROS")) type = "JCP";
+      else if (label.includes("RENDIMENTO") || label.includes("FII")) type = "RENDIMENTO";
+
+      const isAnnounced = (paymentDateStr && paymentDateStr >= todayStr) || (recordDateStr && recordDateStr >= todayStr);
+
+      brazEvents.push({
+        date: paymentDateStr || dateStr,
+        amount: Number(rate.toFixed(4)),
+        paymentDate: paymentDateStr,
+        recordDate: recordDateStr,
+        approvedOn: approvedOnStr,
+        type,
+        status: isAnnounced ? "announced" : "paid",
+      });
+    }
+
+    return brazEvents;
+  } catch (e) {
+    console.warn(`Aviso: Busca complementar brasileira para ${cleanTicker} falhou ou expirou:`, e);
+    return [];
+  }
 }
 
 // Fetch ticker data with configurable history depth
@@ -84,9 +157,8 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
     }
   }
 
-  // Build dividend history
+  // Build dividend history from Yahoo Finance
   const historico_dividendos: DividendEvent[] = [];
-  let dividendos_12m = 0;
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
@@ -95,16 +167,86 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
     if (divData && divData.amount) {
       const divDate = new Date(parseInt(timestamp) * 1000);
       const date = divDate.toISOString().split('T')[0];
-      historico_dividendos.push({ date, amount: divData.amount });
-      // Only sum last 12 months for dividendos_12m
-      if (divDate >= oneYearAgo) {
-        dividendos_12m += divData.amount;
+      historico_dividendos.push({
+        date,
+        amount: divData.amount,
+        status: divDate > new Date() ? "announced" : "paid",
+      });
+    }
+  }
+
+  // Enrich with Brazilian sources (CVM / B3 / Brapi events)
+  const cleanTicker = ticker.replace('.SA', '').trim().toUpperCase();
+  const brazilianDividends = await fetchBrazilianDividends(cleanTicker);
+
+  if (brazilianDividends.length > 0) {
+    console.log(`Encontrados ${brazilianDividends.length} eventos de proventos brasileiros para ${cleanTicker}`);
+    
+    // Merge Brazilian dividends with Yahoo Finance dividends without duplication
+    for (const bDiv of brazilianDividends) {
+      const bDate = bDiv.paymentDate || bDiv.date;
+      const bAmount = bDiv.amount;
+
+      // Find match in Yahoo Finance history (within 15 days and close amount)
+      const existingIdx = historico_dividendos.findIndex(yDiv => {
+        const diffDays = Math.abs(
+          (new Date(yDiv.date).getTime() - new Date(bDate).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return diffDays <= 15 && Math.abs(yDiv.amount - bAmount) < 0.02;
+      });
+
+      if (existingIdx >= 0) {
+        // Enhance existing entry with metadata (payment date, type, record date, announced status)
+        const payDate = bDiv.paymentDate || bDiv.date;
+        historico_dividendos[existingIdx] = {
+          ...historico_dividendos[existingIdx],
+          date: payDate,
+          paymentDate: payDate,
+          recordDate: bDiv.recordDate || historico_dividendos[existingIdx].date,
+          approvedOn: bDiv.approvedOn,
+          type: bDiv.type || historico_dividendos[existingIdx].type,
+          status: bDiv.status || historico_dividendos[existingIdx].status,
+        };
+      } else {
+        // Add new Brazilian announced or paid dividend
+        historico_dividendos.push(bDiv);
+      }
+    }
+  }
+
+  // Handle Brazilian FIIs without explicit paymentDate (Yahoo puts ex-date at end of month, paid on 15th of next month)
+  const isFII = cleanTicker.endsWith('11') || cleanTicker.includes('FII');
+  for (let i = 0; i < historico_dividendos.length; i++) {
+    const item = historico_dividendos[i];
+    if (!item.paymentDate && item.date) {
+      const d = new Date(item.date);
+      if (isFII && d.getDate() >= 25) {
+        // Ex-date at end of month -> payment occurs ~14-15th of following month
+        const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 15);
+        const payStr = nextMonth.toISOString().split('T')[0];
+        item.recordDate = item.date;
+        item.paymentDate = payStr;
+        item.date = payStr;
+        item.type = item.type || "RENDIMENTO";
+        const todayStr = new Date().toISOString().split('T')[0];
+        item.status = payStr >= todayStr ? "announced" : "paid";
+      } else {
+        item.paymentDate = item.date;
       }
     }
   }
 
   // Sort dividends by date ascending
   historico_dividendos.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Compute 12m dividend yield sum accurately
+  let dividendos_12m = 0;
+  for (const div of historico_dividendos) {
+    const dDate = new Date(div.paymentDate || div.date);
+    if (dDate >= oneYearAgo) {
+      dividendos_12m += div.amount;
+    }
+  }
 
   console.log(`Dados obtidos para ${ticker}: preço=${preco_atual}, div_12m=${dividendos_12m}, hist_precos=${historico_precos.length}, hist_divs=${historico_dividendos.length}`);
 

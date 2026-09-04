@@ -3,7 +3,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   ComposedChart,
   Bar,
@@ -40,6 +39,7 @@ interface TransactionData {
 
 interface DividendHistoryChartProps {
   data?: AssetDividendData[];
+  assets?: any[];
   loading?: boolean;
 }
 
@@ -47,6 +47,7 @@ const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 
 const DividendHistoryChart = ({
   data = [],
+  assets = [],
   loading = false,
 }: DividendHistoryChartProps) => {
   const [period, setPeriod] = useState<"6m" | "12m" | "24m" | "all">("12m");
@@ -67,20 +68,49 @@ const DividendHistoryChart = ({
   }, [data]);
 
   const getQuantityAtDate = (ticker: string, date: Date): number => {
-    const normalized = ticker.replace(".SA", "");
-    let qty = 0;
+    const normalized = (ticker || "").replace(".SA", "").toUpperCase().trim();
     const sorted = transactions
-      .filter(tx => tx.ticker.replace(".SA", "") === normalized)
+      .filter(tx => (tx.ticker || "").replace(".SA", "").toUpperCase().trim() === normalized)
       .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
-    for (const tx of sorted) {
-      if (new Date(tx.transaction_date) > date) break;
-      if (tx.transaction_type === "buy" || tx.transaction_type === "bonus" || tx.transaction_type === "split") {
-        qty += tx.quantity;
-      } else if (tx.transaction_type === "sell" || tx.transaction_type === "grouping") {
-        qty -= tx.quantity;
+
+    if (sorted.length > 0) {
+      const firstTxDate = new Date(sorted[0].transaction_date);
+      // If the dividend date is prior to user's first transaction, balance was 0
+      if (date < firstTxDate) {
+        return 0;
+      }
+
+      let qty = 0;
+      for (const tx of sorted) {
+        const txDate = new Date(tx.transaction_date);
+        if (txDate > date) break;
+        if (tx.transaction_type === "buy" || tx.transaction_type === "bonus" || tx.transaction_type === "split") {
+          qty += tx.quantity;
+        } else if (tx.transaction_type === "sell" || tx.transaction_type === "grouping") {
+          qty -= tx.quantity;
+        }
+      }
+      return Math.max(0, qty);
+    }
+
+    // Fallback: only if user has NO transactions registered (Open Banking position only)
+    if (Array.isArray(assets) && assets.length > 0) {
+      const held = assets.find(a => ((a.symbol || a.ticker || "") as string).replace(".SA", "").toUpperCase().trim() === normalized);
+      if (held && Number(held.quantity) > 0) {
+        const diffYears = new Date().getFullYear() - date.getFullYear();
+        if (diffYears <= 1) {
+          return Number(held.quantity);
+        }
       }
     }
-    return Math.max(0, qty);
+
+    return 0;
+  };
+
+  const formatCompactCurrency = (value: number) => {
+    if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+    return `R$ ${Math.round(value)}`;
   };
 
   const formatCurrency = (value: number) =>
@@ -100,10 +130,13 @@ const DividendHistoryChart = ({
       if (!Array.isArray(asset.dividendHistory)) return;
       asset.dividendHistory.forEach(div => {
         if (!div.date || typeof div.amount !== "number") return;
-        const date = new Date(div.date);
+        const payDateStr = (div as any).paymentDate || (div as any).payment_date || div.date;
+        const recDateStr = (div as any).recordDate || (div as any).record_date || div.date;
+        const date = new Date(payDateStr);
+        const recDate = new Date(recDateStr);
         if (cutoff && date < cutoff) return;
 
-        const qty = getQuantityAtDate(asset.ticker, date);
+        const qty = getQuantityAtDate(asset.ticker, recDate);
         if (qty === 0) return;
 
         const value = div.amount * qty;
@@ -172,26 +205,50 @@ const DividendHistoryChart = ({
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <div className="h-80 flex items-center justify-center text-muted-foreground">
+            <div className="h-72 flex items-center justify-center text-xs text-muted-foreground">
               Nenhum provento no período selecionado.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis tickFormatter={(v) => formatCurrency(v)} width={90} />
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={chartData} margin={{ top: 12, right: 10, left: -14, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.25} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                />
+                <YAxis
+                  tickFormatter={formatCompactCurrency}
+                  width={52}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip
                   formatter={(value: number) => [formatCurrency(value), "Proventos"]}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    borderColor: "hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  }}
                 />
-                <Legend />
-                <Bar dataKey="totalDividends" fill="hsl(var(--primary))" name="Proventos do mês" />
+                <Bar
+                  dataKey="totalDividends"
+                  fill="hsl(var(--primary))"
+                  name="Proventos"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={36}
+                />
                 <Line
                   type="monotone"
                   dataKey="totalDividends"
-                  stroke="hsl(var(--chart-2, var(--primary)))"
+                  stroke="#10b981"
                   strokeWidth={2}
-                  dot={{ r: 3 }}
+                  dot={{ r: 3, fill: "#10b981" }}
+                  activeDot={{ r: 5 }}
                   name="Tendência"
                 />
               </ComposedChart>

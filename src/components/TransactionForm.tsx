@@ -26,6 +26,7 @@ interface TransactionFormProps {
   onSave: () => void;
   onCancel?: () => void;
   transactionToEdit?: Transaction | null;
+  initialType?: Transaction['type'];
 }
 
 interface FamilyGroup {
@@ -33,10 +34,10 @@ interface FamilyGroup {
   name: string;
 }
 
-export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: TransactionFormProps) => {
+export const TransactionForm = ({ onSave, onCancel, transactionToEdit, initialType = 'expense' }: TransactionFormProps) => {
   const isEditMode = !!transactionToEdit;
 
-  const [type, setType] = useState<Transaction['type']>('expense');
+  const [type, setType] = useState<Transaction['type']>(initialType);
   const { displayValue: amountDisplay, numericValue: amountValue, handleChange: handleAmountChange, setValue: setAmountValue } = useCurrencyInput(0);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -119,14 +120,14 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit }: Transac
         setSelectedDate(parse(transactionToEdit.date, 'yyyy-MM-dd', new Date()));
       }
     } else {
-      setType('expense');
+      setType(initialType || 'expense');
       setAmountValue(0);
       setCategory('');
       setDescription('');
       setSelectedDate(new Date());
       setGroupId(null);
     }
-  }, [isEditMode, transactionToEdit, setAmountValue]);
+  }, [isEditMode, transactionToEdit, initialType, setAmountValue]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

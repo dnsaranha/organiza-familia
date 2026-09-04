@@ -48,6 +48,7 @@ interface TransactionData {
 
 interface DividendMonthlyTableProps {
   assetsData: AssetDividendData[];
+  assets?: any[];
   loading?: boolean;
 }
 
@@ -56,7 +57,7 @@ const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 type PeriodFilter = "current_year" | "12_months" | "all";
 type DisplayMode = "value" | "yield";
 
-export function DividendMonthlyTable({ assetsData, loading = false }: DividendMonthlyTableProps) {
+export function DividendMonthlyTable({ assetsData, assets = [], loading = false }: DividendMonthlyTableProps) {
   const [showFilter, setShowFilter] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [selectedTickers, setSelectedTickers] = useState<string[]>([]);
@@ -90,7 +91,10 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
     const fetchPrices = async () => {
       if (assetsData.length === 0) return;
 
-      const tickers = assetsData.map(a => a.ticker);
+      const tickers = [...new Set([
+        ...assetsData.map(a => a.ticker),
+        ...assetsData.map(a => a.ticker.replace(".SA", ""))
+      ])];
       const { data, error } = await supabase
         .from("financial_assets")
         .select("ticker, current_price")
@@ -101,6 +105,7 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
         data.forEach(asset => {
           if (asset.current_price) {
             priceMap.set(asset.ticker, asset.current_price);
+            priceMap.set(asset.ticker.replace(".SA", ""), asset.current_price);
           }
         });
         setAssetPrices(priceMap);
@@ -112,7 +117,7 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
 
   // Get unique tickers and asset types
   const availableTickers = useMemo(() => {
-    return [...new Set(assetsData.map(a => a.ticker.replace(".SA", "")))];
+    return [...new Set(assetsData.map(a => (a.ticker || "").replace(".SA", "").toUpperCase().trim()))];
   }, [assetsData]);
 
   const availableTypes = useMemo(() => {
@@ -125,25 +130,46 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
 
   // Calculate quantity held at a specific date for a ticker
   const getQuantityAtDate = (ticker: string, date: Date): number => {
-    const normalizedTicker = ticker.replace(".SA", "");
-    let quantity = 0;
+    const normalizedTicker = (ticker || "").replace(".SA", "").toUpperCase().trim();
 
     const sortedTxs = transactions
-      .filter(tx => tx.ticker.replace(".SA", "") === normalizedTicker)
+      .filter(tx => (tx.ticker || "").replace(".SA", "").toUpperCase().trim() === normalizedTicker)
       .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
 
-    for (const tx of sortedTxs) {
-      const txDate = new Date(tx.transaction_date);
-      if (txDate > date) break;
+    if (sortedTxs.length > 0) {
+      const firstTxDate = new Date(sortedTxs[0].transaction_date);
+      // If the dividend record date is prior to the user's first purchase date, balance is 0
+      if (date < firstTxDate) {
+        return 0;
+      }
 
-      if (tx.transaction_type === "buy") {
-        quantity += tx.quantity;
-      } else if (tx.transaction_type === "sell") {
-        quantity -= tx.quantity;
+      let quantity = 0;
+      for (const tx of sortedTxs) {
+        const txDate = new Date(tx.transaction_date);
+        if (txDate > date) break;
+
+        if (tx.transaction_type === "buy" || tx.transaction_type === "bonus" || tx.transaction_type === "split") {
+          quantity += tx.quantity;
+        } else if (tx.transaction_type === "sell" || tx.transaction_type === "grouping") {
+          quantity -= tx.quantity;
+        }
+      }
+      return Math.max(0, quantity);
+    }
+
+    // Fallback: only if user has NO transactions registered (e.g. Open Banking account sync only)
+    if (Array.isArray(assets) && assets.length > 0) {
+      const held = assets.find(a => ((a.symbol || a.ticker || "") as string).replace(".SA", "").toUpperCase().trim() === normalizedTicker);
+      if (held && Number(held.quantity) > 0) {
+        // Only apply to current or last year for Open Banking snapshot without transaction history
+        const diffYears = new Date().getFullYear() - date.getFullYear();
+        if (diffYears <= 1) {
+          return Number(held.quantity);
+        }
       }
     }
 
-    return Math.max(0, quantity);
+    return 0;
   };
 
   // Filter assets by selected tickers and types
@@ -185,7 +211,10 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
       asset.dividendHistory.forEach(div => {
         if (!div.date || typeof div.amount !== "number") return;
 
-        const date = new Date(div.date);
+        const payDateStr = (div as any).paymentDate || (div as any).payment_date || div.date;
+        const recDateStr = (div as any).recordDate || (div as any).record_date || div.date;
+        const date = new Date(payDateStr);
+        const recordDate = new Date(recDateStr);
         const year = date.getFullYear();
         const month = date.getMonth();
 
@@ -193,8 +222,8 @@ export function DividendMonthlyTable({ assetsData, loading = false }: DividendMo
         if (periodFilter === "current_year" && year !== currentYear) return;
         if (periodFilter === "12_months" && date < twelveMonthsAgo) return;
 
-        // Get quantity at dividend date
-        const quantity = getQuantityAtDate(asset.ticker, date);
+        // Get quantity at dividend record date
+        const quantity = getQuantityAtDate(asset.ticker, recordDate);
         if (quantity === 0) return;
 
         // Calculate value based on display mode

@@ -64,16 +64,11 @@ export const b3Client = {
         },
       );
 
-      if (error) {
-        console.warn(
-          "Erro ao buscar benchmark, usando dados mock:",
-          JSON.stringify(error, null, 2),
-        );
-        return { value: 10.75, change: 0.25 }; // Mock CDI data
+      if (!error && data?.value) {
+        return data;
       }
-      return data;
-    } catch (error) {
-      console.error("Erro ao buscar benchmark:", error);
+      return { value: 10.75, change: 0.25 }; // Mock CDI data
+    } catch {
       return { value: 10.75, change: 0.25 }; // Mock CDI data
     }
   },
