@@ -88,18 +88,20 @@ export const FixedIncomeDetailsDialog = ({
                 <DialogTitle className="text-base sm:text-lg font-bold">
                   {asset.name}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                  <span>Código: {asset.symbol}</span>
-                  {parsedRate && (
-                    <Badge variant="secondary" className="text-[10px] font-semibold bg-amber-500/15 text-amber-900 dark:text-amber-200">
-                      {parsedRate.label}
-                    </Badge>
-                  )}
-                  {isExempt && (
-                    <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 flex items-center gap-0.5">
-                      <ShieldCheck className="h-3 w-3" /> Isento de IR
-                    </Badge>
-                  )}
+                <DialogDescription asChild>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                    <span>Código: {asset.symbol}</span>
+                    {parsedRate && (
+                      <Badge variant="secondary" className="text-[10px] font-semibold bg-amber-500/15 text-amber-900 dark:text-amber-200">
+                        {parsedRate.label}
+                      </Badge>
+                    )}
+                    {isExempt && (
+                      <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 flex items-center gap-0.5">
+                        <ShieldCheck className="h-3 w-3" /> Isento de IR
+                      </Badge>
+                    )}
+                  </div>
                 </DialogDescription>
               </div>
             </div>
