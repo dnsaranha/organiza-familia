@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Target, Plus, Trash2, Edit, Wallet, PiggyBank, Car, Home, Plane, GraduationCap, Heart, ChevronDown, ChevronUp, CalendarClock, TrendingUp, Landmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { format, addMonths, differenceInMonths } from "date-fns";
+import { format, addMonths, differenceInMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSubscription } from "@/hooks/useSubscription";
 import { LimitAlert, useCanAdd } from "@/components/LimitAlert";
@@ -53,126 +53,387 @@ const GOAL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 const GOAL_COLORS = [ { name: "Azul", value: "hsl(var(--primary))" }, { name: "Verde", value: "hsl(142, 76%, 36%)" }, { name: "Roxo", value: "hsl(262, 83%, 58%)" }, { name: "Laranja", value: "hsl(25, 95%, 53%)" }, { name: "Rosa", value: "hsl(330, 81%, 60%)" }, { name: "Ciano", value: "hsl(186, 94%, 41%)" } ];
 const GOAL_CATEGORIES = [ "Reserva de Emergência", "Viagem", "Veículo", "Imóvel", "Educação", "Saúde", "Aposentadoria", "Outro" ];
 
-const GoalHistoryChart = ({ goalId, color, targetAmount, currentAmount, monthlyContribution }: { goalId: string, color: string, targetAmount: number, currentAmount: number, monthlyContribution: number | null }) => {
-    const [historyData, setHistoryData] = useState<HistoryData[]>([]);
-    const [loading, setLoading] = useState(true);
+interface GoalHistoryChartProps {
+  goalId: string;
+  color: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution: number | null;
+  deadline?: string | null;
+  createdAt?: string;
+  linkedAsset?: any;
+  reservedPercentage?: number | null;
+}
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            setLoading(true);
-            try {
-                const { data, error } = await supabase.from('transactions').select('date, amount').eq('goal_id', goalId).order('date', { ascending: true });
-                if (error) throw error;
-                
-                let cumulativeAmount = 0;
-                const processedData: HistoryData[] = data.map(tx => {
-                    cumulativeAmount += tx.amount;
-                    return { 
-                        date: format(new Date(tx.date), 'MM/yy'), 
-                        rawDate: new Date(tx.date),
-                        value: tx.amount, 
-                        cumulative: cumulativeAmount,
-                        target: targetAmount
-                    };
-                });
+const GoalHistoryChart = ({
+  goalId,
+  color,
+  targetAmount,
+  currentAmount,
+  monthlyContribution,
+  deadline,
+  createdAt,
+  linkedAsset,
+  reservedPercentage = 100,
+}: GoalHistoryChartProps) => {
+  const [historyData, setHistoryData] = useState<HistoryData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-                // Add trend projection if we have contribution data
-                if (processedData.length > 0 && monthlyContribution && monthlyContribution > 0) {
-                    const lastDataPoint = processedData[processedData.length - 1];
-                    const remaining = targetAmount - lastDataPoint.cumulative;
-                    const monthsToGoal = Math.ceil(remaining / monthlyContribution);
-                    
-                    // Add future projections
-                    let projectedAmount = lastDataPoint.cumulative;
-                    for (let i = 1; i <= Math.min(monthsToGoal, 24); i++) {
-                        projectedAmount += monthlyContribution;
-                        if (projectedAmount >= targetAmount) projectedAmount = targetAmount;
-                        const futureDate = addMonths(lastDataPoint.rawDate, i);
-                        processedData.push({
-                            date: format(futureDate, 'MM/yy'),
-                            rawDate: futureDate,
-                            value: 0,
-                            cumulative: lastDataPoint.cumulative,
-                            target: targetAmount,
-                            trend: projectedAmount
-                        });
-                        if (projectedAmount >= targetAmount) break;
-                    }
-                } else if (processedData.length >= 2) {
-                    // Calculate average contribution rate for trend
-                    const firstPoint = processedData[0];
-                    const lastPoint = processedData[processedData.length - 1];
-                    const monthsDiff = Math.max(1, differenceInMonths(lastPoint.rawDate, firstPoint.rawDate));
-                    const avgMonthlyRate = lastPoint.cumulative / monthsDiff;
-                    
-                    if (avgMonthlyRate > 0) {
-                        const remaining = targetAmount - lastPoint.cumulative;
-                        const monthsToGoal = Math.ceil(remaining / avgMonthlyRate);
-                        
-                        let projectedAmount = lastPoint.cumulative;
-                        for (let i = 1; i <= Math.min(monthsToGoal, 24); i++) {
-                            projectedAmount += avgMonthlyRate;
-                            if (projectedAmount >= targetAmount) projectedAmount = targetAmount;
-                            const futureDate = addMonths(lastPoint.rawDate, i);
-                            processedData.push({
-                                date: format(futureDate, 'MM/yy'),
-                                rawDate: futureDate,
-                                value: 0,
-                                cumulative: lastPoint.cumulative,
-                                target: targetAmount,
-                                trend: projectedAmount
-                            });
-                            if (projectedAmount >= targetAmount) break;
-                        }
-                    }
-                }
-                
-                setHistoryData(processedData);
-            } catch (error: any) {
-                console.error("Error fetching goal history:", error);
-                toast.error("Erro ao carregar o histórico da meta.");
-            } finally {
-                setLoading(false);
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setLoading(true);
+      try {
+        const currentVal = Number(Math.max(0, currentAmount).toFixed(2));
+        const reservedPct = (reservedPercentage || 100) / 100;
+        const now = new Date();
+        const todayStr = format(now, "MM/yy");
+
+        // 1. Buscar transações manuais vinculadas à meta
+        const { data: txs, error } = await supabase
+          .from("transactions")
+          .select("date, amount")
+          .eq("goal_id", goalId)
+          .order("date", { ascending: true });
+
+        if (error) throw error;
+
+        const validTxs = (txs || []).filter((tx) => typeof tx.amount === "number" && tx.amount > 0);
+        const processedData: HistoryData[] = [];
+
+        // 2. Construir histórico passado até o momento atual (Hoje)
+        if (linkedAsset) {
+          // Meta vinculada a um investimento (ex: Caixinha, CDB, Tesouro)
+          const fixedCalc = linkedAsset.fixedIncome;
+          const initialCost = fixedCalc?.initialAmount
+            ? fixedCalc.initialAmount * reservedPct
+            : linkedAsset.cost
+            ? linkedAsset.cost * reservedPct
+            : Math.max(0, currentVal - (fixedCalc?.accruedInterest ? fixedCalc.accruedInterest * reservedPct : 0));
+
+          const rawStartDate = fixedCalc?.startDate
+            ? new Date(fixedCalc.startDate)
+            : createdAt
+            ? new Date(createdAt)
+            : subMonths(now, 1);
+
+          const isSameMonth = format(rawStartDate, "MM/yy") === todayStr;
+          const startDate = isSameMonth ? subMonths(now, 1) : rawStartDate;
+
+          // Ponto inicial do investimento
+          processedData.push({
+            date: format(startDate, "MM/yy"),
+            rawDate: startDate,
+            value: Number(initialCost.toFixed(2)),
+            cumulative: Number(initialCost.toFixed(2)),
+            target: targetAmount,
+          });
+
+          // Adicionar transações intermediárias se existirem
+          validTxs.forEach((tx) => {
+            const txDate = new Date(tx.date);
+            const txDateStr = format(txDate, "MM/yy");
+            if (txDateStr !== format(startDate, "MM/yy") && txDateStr !== todayStr) {
+              const prev = processedData[processedData.length - 1]?.cumulative || initialCost;
+              processedData.push({
+                date: txDateStr,
+                rawDate: txDate,
+                value: tx.amount,
+                cumulative: Number((prev + tx.amount).toFixed(2)),
+                target: targetAmount,
+              });
             }
-        };
-        fetchHistory();
-    }, [goalId, targetAmount, monthlyContribution]);
+          });
 
-    if (loading) return <div className="h-24 flex items-center justify-center text-sm">Carregando gráfico...</div>;
-    if (historyData.length === 0) return <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">Nenhum histórico de contribuição.</div>;
+          // Ponto atual (Hoje): reflete fielmente o saldo reservado do investimento
+          processedData.push({
+            date: todayStr,
+            rawDate: now,
+            value: Math.max(0, Number((currentVal - (processedData[processedData.length - 1]?.cumulative || 0)).toFixed(2))),
+            cumulative: currentVal,
+            target: targetAmount,
+            trend: currentVal, // Conecta a área acumulada com a linha de projeção futura
+          });
+        } else if (validTxs.length > 0) {
+          // Meta manual com histórico de transações
+          const totalFromTxs = validTxs.reduce((sum, tx) => sum + tx.amount, 0);
+          const baseAmount = Math.max(0, currentVal - totalFromTxs);
 
-    const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value);
+          let runningTotal = baseAmount;
+          if (baseAmount > 0) {
+            const firstTxDate = new Date(validTxs[0].date);
+            const initialDate = createdAt ? new Date(createdAt) : subMonths(firstTxDate, 1);
+            processedData.push({
+              date: format(initialDate, "MM/yy"),
+              rawDate: initialDate,
+              value: Number(baseAmount.toFixed(2)),
+              cumulative: Number(baseAmount.toFixed(2)),
+              target: targetAmount,
+            });
+          }
 
-    return (
-        <div className="h-48 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={historyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                    <defs>
-                        <linearGradient id={`colorCumulative-${goalId}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor={color} stopOpacity={0.1}/>
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value)} domain={[0, targetAmount * 1.1]} />
-                    <Tooltip 
-                        contentStyle={{ fontSize: '12px', borderRadius: '0.5rem', backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }} 
-                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'cumulative' ? 'Acumulado' : name === 'trend' ? 'Projeção' : 'Meta']} 
-                    />
-                    <ReferenceLine y={targetAmount} stroke="hsl(var(--destructive))" strokeDasharray="5 5" strokeWidth={2} label={{ value: 'Meta', position: 'right', fontSize: 10, fill: 'hsl(var(--destructive))' }} />
-                    <Area type="monotone" dataKey="cumulative" stroke={color} fillOpacity={1} fill={`url(#colorCumulative-${goalId})`} strokeWidth={2} name="cumulative" />
-                    <Line type="monotone" dataKey="trend" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} name="trend" />
-                </ComposedChart>
-            </ResponsiveContainer>
-            {historyData.some(d => d.trend) && (
-                <p className="text-xs text-muted-foreground text-center mt-1 flex items-center justify-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    Projeção: meta atingida em {historyData.filter(d => d.trend && d.trend >= targetAmount)[0]?.date || 'N/A'}
-                </p>
+          validTxs.forEach((tx) => {
+            runningTotal += tx.amount;
+            processedData.push({
+              date: format(new Date(tx.date), "MM/yy"),
+              rawDate: new Date(tx.date),
+              value: tx.amount,
+              cumulative: Number(runningTotal.toFixed(2)),
+              target: targetAmount,
+            });
+          });
+
+          const lastPoint = processedData[processedData.length - 1];
+          if (!lastPoint || lastPoint.date !== todayStr) {
+            processedData.push({
+              date: todayStr,
+              rawDate: now,
+              value: 0,
+              cumulative: currentVal,
+              target: targetAmount,
+              trend: currentVal,
+            });
+          } else {
+            lastPoint.cumulative = currentVal;
+            lastPoint.trend = currentVal;
+          }
+        } else {
+          // Meta manual sem transações registradas
+          const startDate = createdAt ? new Date(createdAt) : subMonths(now, 1);
+          const isSameMonth = format(startDate, "MM/yy") === todayStr;
+          const effectiveStartDate = isSameMonth ? subMonths(now, 1) : startDate;
+
+          processedData.push({
+            date: format(effectiveStartDate, "MM/yy"),
+            rawDate: effectiveStartDate,
+            value: currentVal,
+            cumulative: currentVal,
+            target: targetAmount,
+          });
+
+          processedData.push({
+            date: todayStr,
+            rawDate: now,
+            value: 0,
+            cumulative: currentVal,
+            target: targetAmount,
+            trend: currentVal,
+          });
+        }
+
+        // 3. Projeção Futura (Trend)
+        const annualRate = linkedAsset?.fixedIncome?.annualizedRatePercent || (linkedAsset?.subtype?.includes("CDI") ? 11.7 : 0);
+        const monthlyYieldRate = annualRate > 0 ? Math.pow(1 + annualRate / 100, 1 / 12) - 1 : 0;
+        const aporte = monthlyContribution && monthlyContribution > 0 ? monthlyContribution : 0;
+
+        let projectedAmount = currentVal;
+        let goalReached = currentVal >= targetAmount;
+        const maxMonths = 36;
+
+        if (currentVal >= targetAmount) {
+          // Meta já batida
+        } else if (aporte > 0 || monthlyYieldRate > 0) {
+          for (let i = 1; i <= maxMonths; i++) {
+            projectedAmount = projectedAmount * (1 + monthlyYieldRate) + aporte;
+            const futureDate = addMonths(now, i);
+            const isReached = projectedAmount >= targetAmount;
+
+            if (isReached && !goalReached) {
+              goalReached = true;
+              projectedAmount = targetAmount;
+            }
+
+            processedData.push({
+              date: format(futureDate, "MM/yy"),
+              rawDate: futureDate,
+              value: 0,
+              cumulative: undefined, // Mantém a área preenchida somente no realizado
+              target: targetAmount,
+              trend: Number(projectedAmount.toFixed(2)),
+            });
+
+            if (isReached) break;
+          }
+        } else if (deadline) {
+          const deadlineDate = new Date(deadline);
+          if (deadlineDate > now) {
+            const monthsToDeadline = Math.max(1, differenceInMonths(deadlineDate, now));
+            const neededAporte = (targetAmount - currentVal) / monthsToDeadline;
+
+            for (let i = 1; i <= monthsToDeadline; i++) {
+              projectedAmount = currentVal + neededAporte * i;
+              const futureDate = addMonths(now, i);
+              const isReached = projectedAmount >= targetAmount;
+
+              if (isReached && !goalReached) {
+                goalReached = true;
+                projectedAmount = targetAmount;
+              }
+
+              processedData.push({
+                date: format(futureDate, "MM/yy"),
+                rawDate: futureDate,
+                value: 0,
+                cumulative: undefined,
+                target: targetAmount,
+                trend: Number(projectedAmount.toFixed(2)),
+              });
+
+              if (isReached) break;
+            }
+          }
+        }
+
+        setHistoryData(processedData);
+      } catch (error: any) {
+        console.error("Error fetching goal history:", error);
+        toast.error("Erro ao carregar o histórico da meta.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [goalId, targetAmount, currentAmount, monthlyContribution, deadline, createdAt, linkedAsset, reservedPercentage]);
+
+  if (loading) return <div className="h-24 flex items-center justify-center text-sm">Carregando gráfico...</div>;
+  if (historyData.length === 0) return <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">Nenhum histórico de contribuição.</div>;
+
+  const formatCompactCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact" }).format(value);
+
+  const formatFullCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  const annualRate = linkedAsset?.fixedIncome?.annualizedRatePercent || (linkedAsset?.subtype?.includes("CDI") ? 11.7 : 0);
+  const monthlyYieldRate = annualRate > 0 ? Math.pow(1 + annualRate / 100, 1 / 12) - 1 : 0;
+  const aporte = monthlyContribution && monthlyContribution > 0 ? monthlyContribution : 0;
+  const targetReachedPoint = historyData.find((d) => d.trend && d.trend >= targetAmount);
+  const isAlreadyReached = currentAmount >= targetAmount;
+
+  return (
+    <div className="h-52 w-full mt-4 flex flex-col">
+      <div className="flex-1 w-full min-h-[170px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={historyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id={`colorCumulative-${goalId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.8} />
+                <stop offset="95%" stopColor={color} stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+            <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
+            <YAxis
+              fontSize={10}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => formatCompactCurrency(value)}
+              domain={[0, Math.ceil(Math.max(targetAmount, currentAmount) * 1.15)]}
+            />
+            <Tooltip
+              contentStyle={{
+                fontSize: "12px",
+                borderRadius: "0.5rem",
+                backgroundColor: "hsl(var(--background))",
+                border: "1px solid hsl(var(--border))",
+              }}
+              formatter={(value: any, name: string) => {
+                if (value === undefined || value === null) return [null, null];
+                const label = name === "cumulative" ? "Saldo Acumulado" : name === "trend" ? "Projeção" : "Meta";
+                return [formatFullCurrency(Number(value)), label];
+              }}
+            />
+            <ReferenceLine
+              y={targetAmount}
+              stroke="hsl(var(--destructive))"
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              label={{
+                value: "Meta",
+                position: "right",
+                fontSize: 10,
+                fill: "hsl(var(--destructive))",
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="cumulative"
+              stroke={color}
+              fillOpacity={1}
+              fill={`url(#colorCumulative-${goalId})`}
+              strokeWidth={2}
+              name="cumulative"
+              connectNulls={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="trend"
+              stroke="hsl(var(--muted-foreground))"
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              dot={{ r: 2 }}
+              name="trend"
+              connectNulls
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="text-xs text-muted-foreground text-center mt-2 px-2">
+        {isAlreadyReached ? (
+          <p className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center justify-center gap-1">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Meta atingida com sucesso! ({formatFullCurrency(currentAmount)})
+          </p>
+        ) : targetReachedPoint ? (
+          <p className="flex flex-wrap items-center justify-center gap-1 leading-relaxed">
+            <TrendingUp className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>
+              Projeção: meta atingida em <strong className="text-foreground font-semibold">{targetReachedPoint.date}</strong>
+            </span>
+            {aporte > 0 && monthlyYieldRate > 0 && (
+              <span className="text-[11px] opacity-80">
+                (com aportes de {formatFullCurrency(aporte)}/mês + rendimento de {linkedAsset?.subtype || "investimento"})
+              </span>
             )}
-        </div>
-    );
+            {aporte > 0 && monthlyYieldRate === 0 && (
+              <span className="text-[11px] opacity-80">
+                (com aportes de {formatFullCurrency(aporte)}/mês)
+              </span>
+            )}
+            {aporte === 0 && monthlyYieldRate > 0 && (
+              <span className="text-[11px] opacity-80">
+                (apenas com rendimento de {linkedAsset?.subtype || "110% CDI"})
+              </span>
+            )}
+            {aporte === 0 && monthlyYieldRate === 0 && deadline && (
+              <span className="text-[11px] opacity-80">
+                (com base no prazo estipulado)
+              </span>
+            )}
+          </p>
+        ) : monthlyYieldRate > 0 && aporte === 0 ? (
+          <p className="flex items-center justify-center gap-1 text-[11px]">
+            <Landmark className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>
+              Rendimento estimado: +{formatFullCurrency(currentAmount * monthlyYieldRate)}/mês ({linkedAsset?.subtype || "110% CDI"}). Adicione uma contribuição mensal para acelerar.
+            </span>
+          </p>
+        ) : deadline && targetAmount > currentAmount ? (
+          <p className="flex items-center justify-center gap-1 text-[11px]">
+            <CalendarClock className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>
+              Prazo: {format(new Date(deadline), "MM/yy")} • Aporte sugerido: {formatFullCurrency((targetAmount - currentAmount) / Math.max(1, differenceInMonths(new Date(deadline), new Date())))}/mês
+            </span>
+          </p>
+        ) : (
+          <p className="flex items-center justify-center gap-1 text-[11px]">
+            <span>Saldo atual: {formatFullCurrency(currentAmount)}. Configure um aporte mensal para projetar a data de conclusão.</span>
+          </p>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default function GoalsPage() {
@@ -628,7 +889,19 @@ export default function GoalsPage() {
                       Contribuição mensal: {formatCurrency(goal.monthly_contribution)}
                     </p>
                   )}
-                  {isExpanded && <GoalHistoryChart goalId={goal.id} color={goal.color} targetAmount={goal.target_amount} currentAmount={effectiveCurrentAmount} monthlyContribution={goal.monthly_contribution} />}
+                  {isExpanded && (
+                    <GoalHistoryChart
+                      goalId={goal.id}
+                      color={goal.color}
+                      targetAmount={goal.target_amount}
+                      currentAmount={effectiveCurrentAmount}
+                      monthlyContribution={goal.monthly_contribution}
+                      deadline={goal.deadline}
+                      createdAt={goal.created_at}
+                      linkedAsset={linkedAsset}
+                      reservedPercentage={goal.reserved_percentage || 100}
+                    />
+                  )}
                   <div className="flex-grow" />
                   <div className="mt-auto pt-4">
                     {isAddingValue === goal.id ? (

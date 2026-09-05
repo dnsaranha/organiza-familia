@@ -17,12 +17,26 @@ interface UserCategory {
 }
 
 export const useUserCategories = () => {
-  const [userCategories, setUserCategories] = useState<UserCategory[]>([]);
-  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { scope } = useBudgetScope();
+  const cacheKey = user ? `user_categories_${user.id}_${scope}` : null;
 
-  const fetchCategories = useCallback(async () => {
+  // Initialize with cached categories if available to avoid empty states during network blips
+  const [userCategories, setUserCategories] = useState<UserCategory[]>(() => {
+    if (cacheKey) {
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore parse error
+      }
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  const fetchCategories = useCallback(async (retryCount = 0) => {
     if (!user) {
       setUserCategories([]);
       setLoading(false);
@@ -40,16 +54,53 @@ export const useUserCategories = () => {
 
       const { data, error } = await query.order("name");
       if (error) throw error;
-      setUserCategories((data as UserCategory[]) || []);
-    } catch (err) {
-      console.error("Error fetching user categories:", err);
+
+      const categories = (data as UserCategory[]) || [];
+      setUserCategories(categories);
+      
+      // Cache successful response
+      if (cacheKey) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(categories));
+        } catch {
+          // ignore storage quota errors
+        }
+      }
+    } catch (err: any) {
+      const isNetworkError =
+        err?.message?.includes("Failed to fetch") ||
+        err?.name === "TypeError" ||
+        err?.message?.includes("aborted") ||
+        err?.message?.includes("NetworkError");
+
+      if (isNetworkError) {
+        // Mild warning for transient connection drops instead of fatal applet error
+        console.warn("Network offline or busy while loading categories. Using cached data.");
+        // Retry once after 2.5s if retryCount is 0
+        if (retryCount < 2) {
+          setTimeout(() => {
+            fetchCategories(retryCount + 1);
+          }, 2500);
+        }
+      } else {
+        console.error("Error fetching user categories:", err);
+      }
     } finally {
       setLoading(false);
     }
-  }, [user, scope]);
+  }, [user, scope, cacheKey]);
 
   useEffect(() => {
     fetchCategories();
+
+    // Re-fetch when device regains connectivity
+    const handleOnline = () => {
+      fetchCategories();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
   }, [fetchCategories]);
 
   // Combine default categories with user categories

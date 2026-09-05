@@ -247,7 +247,12 @@ export function useSubscription(): SubscriptionState {
         .single();
 
       if (subError && subError.code !== 'PGRST116') {
-        console.error('Error fetching subscription:', subError);
+        const isNetwork = subError.message?.includes('Failed to fetch') || subError.message?.includes('NetworkError');
+        if (isNetwork) {
+          console.warn('Conexão instável ao verificar assinatura.');
+        } else {
+          console.error('Error fetching subscription:', subError);
+        }
       }
 
       let permissionStatus = 'free';

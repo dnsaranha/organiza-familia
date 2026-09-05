@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,8 +70,25 @@ export const SupportChat = () => {
     if (!user) return;
 
     let channel: any = null;
+    let isMounted = true;
+    let retryTimeout: NodeJS.Timeout | null = null;
+    const cacheKey = `support_messages_cache_${user.id}`;
 
-    const fetchAndSubscribe = async () => {
+    // Load cached messages if available
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          calculateUnread(parsed);
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    const fetchAndSubscribe = async (retryCount = 0) => {
       setLoading(true);
       try {
         // Fetch initial messages
@@ -82,61 +99,115 @@ export const SupportChat = () => {
           .order('created_at', { ascending: true });
 
         if (error) throw error;
+        if (!isMounted) return;
 
         const msgs = data || [];
         setMessages(msgs);
         calculateUnread(msgs);
 
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(msgs));
+        } catch {
+          // ignore quota issues
+        }
+
         // Subscribe to new messages
-        channel = supabase
-          .channel('support_messages')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
-            const newMsg = payload.new as Message;
-            // Prevent duplicate messages if optimistic update already added it
-            setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
+        if (!channel) {
+          channel = supabase
+            .channel(`support_messages_${user.id}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${user.id}` }, (payload) => {
+              const newMsg = payload.new as Message;
+              // Prevent duplicate messages if optimistic update already added it
+              setMessages(prev => {
+                if (prev.some(m => m.id === newMsg.id)) return prev;
+                const next = [...prev, newMsg];
+                try {
+                  localStorage.setItem(cacheKey, JSON.stringify(next));
+                } catch {
+                  // ignore
+                }
+                return next;
+              });
 
-            if (newMsg.is_from_admin) {
-              if (!isOpenRef.current) {
-                setUnreadCount(prev => prev + 1);
-                setIsVisible(true);
-              } else {
-                // If chat is open, immediately mark the new message as read
-                markMessagesAsRead();
+              if (newMsg.is_from_admin) {
+                if (!isOpenRef.current) {
+                  setUnreadCount(prev => prev + 1);
+                  setIsVisible(true);
+                } else {
+                  // If chat is open, immediately mark the new message as read in DB
+                  supabase.from('support_messages').update({ is_read: true }).eq('id', newMsg.id).then();
+                }
               }
-            }
-          })
-          .subscribe();
+            })
+            .subscribe();
+        }
 
-      } catch (err) {
-        console.error('Error fetching messages:', err);
+      } catch (err: any) {
+        if (!isMounted) return;
+
+        const isNetworkError =
+          err?.message?.includes("Failed to fetch") ||
+          err?.name === "TypeError" ||
+          err?.message?.includes("aborted") ||
+          err?.message?.includes("NetworkError");
+
+        if (isNetworkError) {
+          console.warn('Conexão instável ou offline ao carregar mensagens de suporte.');
+          if (retryCount < 2) {
+            retryTimeout = setTimeout(() => {
+              if (isMounted) fetchAndSubscribe(retryCount + 1);
+            }, 3000);
+          }
+        } else {
+          console.error('Error fetching messages:', err);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchAndSubscribe();
 
+    const handleOnline = () => {
+      if (isMounted) fetchAndSubscribe();
+    };
+    window.addEventListener('online', handleOnline);
+
     return () => {
+      isMounted = false;
+      if (retryTimeout) clearTimeout(retryTimeout);
+      window.removeEventListener('online', handleOnline);
       if (channel) supabase.removeChannel(channel);
     };
   }, [user, calculateUnread]);
 
-  // Scroll management
-  const scrollToBottom = useCallback(() => {
+  // Scroll management: instant alignment to bottom without animation lag
+  const scrollToBottom = useCallback((instant = true) => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      if (instant) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      } else {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
   }, []);
 
-  // Effect to scroll to bottom when chat opens or new messages arrive
+  // Jump directly and instantly to the latest message as soon as chat is opened
+  useLayoutEffect(() => {
+    if (isOpen) {
+      scrollToBottom(true);
+    }
+  }, [isOpen, scrollToBottom]);
+
+  // Keep bottom aligned when new messages arrive or are sent
   useEffect(() => {
-      if (isOpen) {
-          setTimeout(scrollToBottom, 50);
-      }
-  }, [isOpen, messages, scrollToBottom]);
+    if (isOpen) {
+      scrollToBottom(true);
+    }
+  }, [messages.length, isOpen, scrollToBottom]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user) return;
@@ -254,24 +325,24 @@ export const SupportChat = () => {
             </Button>
           </CardHeader>
           <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
-            <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+            <div className="flex-1 p-3 overflow-y-auto space-y-3" ref={scrollRef}>
               {loading && messages.length === 0 ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhuma mensagem ainda. Envie uma para começar!</p>
               ) : (
-                <div className="space-y-3">
-                  {messages.map((msg) => (
-                    <div key={msg.id} id={`msg-${msg.id}`} className={`flex text-sm ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
-                      <div className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.is_from_admin ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground'}`}>
-                         <p>{msg.message}</p>
-                         <p className="text-xs text-right mt-1 ${msg.is_from_admin ? 'text-muted-foreground' : 'text-blue-200'}">{new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit'})}</p>
-                      </div>
+                messages.map((msg) => (
+                  <div key={msg.id} id={`msg-${msg.id}`} className={`flex text-sm ${msg.is_from_admin ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.is_from_admin ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground'}`}>
+                       <p className="whitespace-pre-wrap">{msg.message}</p>
+                       <p className={`text-[10px] text-right mt-1 ${msg.is_from_admin ? 'text-muted-foreground' : 'text-primary-foreground/75'}`}>
+                         {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit'})}
+                       </p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))
               )}
-            </ScrollArea>
+            </div>
             <div className="p-3 border-t flex gap-2 flex-shrink-0 bg-background">
               <Input
                 value={newMessage}
