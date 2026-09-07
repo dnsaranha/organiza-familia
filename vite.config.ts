@@ -3,6 +3,37 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const aiServerPlugin = () => ({
+  name: 'ai-server-plugin',
+  configureServer(server: any) {
+    server.middlewares.use('/api/ai/chat', async (req: any, res: any) => {
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end('Method Not Allowed');
+        return;
+      }
+      let body = '';
+      req.on('data', (chunk: any) => {
+        body += chunk;
+      });
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const { processAIChat } = await import('./src/server/geminiHandler');
+          const result = await processAIChat(parsed);
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 200;
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err?.message || 'Erro ao processar mensagem com a IA' }));
+        }
+      });
+    });
+  },
+});
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -67,7 +98,7 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(
+  plugins: [react(), aiServerPlugin(), mode === "development" && componentTagger()].filter(
     Boolean
   ),
   resolve: {

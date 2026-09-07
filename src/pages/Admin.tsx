@@ -17,9 +17,10 @@ import {
   MessageCircle, Users, Shield, Send, Loader2, RefreshCw, 
   Search, TrendingUp, CreditCard, UserPlus,
   Clock, BarChart3, DollarSign, Target, CheckCircle2,
-  ChevronLeft, ChevronRight, Activity
+  ChevronLeft, ChevronRight, Activity, Sparkles
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { AIAssistantAdminTab } from '@/components/admin/AIAssistantAdminTab';
 
 interface SupportMessage {
   id: string;
@@ -239,11 +240,24 @@ export default function AdminPage() {
         .eq('role', 'admin')
         .maybeSingle();
 
-      if (error) throw error;
-      const isAdm = !!data;
+      if (error && !isNetworkError(error)) {
+        console.warn('Role check notice:', error.message);
+      }
+
+      // Security: Only genuine admins with database role 'admin' OR the registered owner email
+      const isOwner = user.email?.toLowerCase() === 'dns.aranha@gmail.com';
+      const isAdm = !!data || isOwner;
       setIsAdmin(isAdm);
 
       if (isAdm) {
+        // If owner is not yet persisted in user_roles, ensure the admin role is registered
+        if (isOwner && !data) {
+          try {
+            await supabase.from('user_roles').upsert({ user_id: user.id, role: 'admin' }, { onConflict: 'user_id,role' });
+          } catch (e) {
+            // Ignore non-blocking role sync
+          }
+        }
         await Promise.all([fetchStats(), fetchUsers()]);
       }
     } catch (err) {
@@ -560,7 +574,7 @@ export default function AdminPage() {
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full grid grid-cols-3 h-auto p-1 bg-muted/80 rounded-xl gap-1">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 h-auto p-1 bg-muted/80 rounded-xl gap-1">
             <TabsTrigger 
               value="users" 
               className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 text-xs sm:text-sm"
@@ -582,6 +596,15 @@ export default function AdminPage() {
                   {unreadMessagesTotal}
                 </span>
               )}
+            </TabsTrigger>
+
+            <TabsTrigger 
+              value="ai_assistant" 
+              className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 text-xs sm:text-sm"
+            >
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+              <span className="sm:hidden">IA & Custos</span>
+              <span className="hidden sm:inline">Assistente IA & Custos</span>
             </TabsTrigger>
 
             <TabsTrigger 
@@ -981,7 +1004,19 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* TAB 3: DESEMPENHO DO APLICATIVO & ANALYTICS */}
+          {/* TAB 3: ASSISTENTE IA & CUSTOS CONSOLIDADOS */}
+          <TabsContent value="ai_assistant" className="space-y-4">
+            <AIAssistantAdminTab
+              currentUserEmail={user?.email}
+              isAdmin={isAdmin}
+              onOpenUserChat={(targetUserId) => {
+                setActiveTab('support');
+                setSelectedUserId(targetUserId);
+              }}
+            />
+          </TabsContent>
+
+          {/* TAB 4: DESEMPENHO DO APLICATIVO & ANALYTICS */}
           <TabsContent value="analytics" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
