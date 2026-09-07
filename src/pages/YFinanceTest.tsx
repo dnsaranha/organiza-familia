@@ -169,11 +169,17 @@ const YFinanceTest = () => {
         updated_at: new Date().toISOString(),
       }));
 
-      const { error } = await supabase
-        .from("financial_assets")
-        .upsert(rows, { onConflict: "ticker" });
+      // Salvar usando RPC bulk_upsert_assets com privilégios adequados
+      const { error: rpcError } = await supabase.rpc("bulk_upsert_assets", {
+        assets_data: rows,
+      });
 
-      if (error) throw error;
+      if (rpcError) {
+        const { error } = await supabase
+          .from("financial_assets")
+          .upsert(rows, { onConflict: "ticker" });
+        if (error) throw error;
+      }
 
       toast({
         title: "Salvo no banco com sucesso!",

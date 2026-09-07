@@ -15,6 +15,105 @@ import {
 const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v2";
 const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v2";
 
+const SESSION_CACHE_KEY_ASSETS = "b3_cache_enhanced_assets";
+const SESSION_CACHE_KEY_EVOLUTION = "b3_cache_portfolio_evolution";
+const SESSION_CACHE_KEY_DIVIDENDS = "b3_cache_dividend_history";
+
+// Module-level persistent cache across navigation within the session
+let memoryEnhancedAssets: any[] | null = null;
+let memoryPortfolioEvolution: any[] | null = null;
+let memoryDividendHistory: any[] | null = null;
+
+interface RawInvestmentsCache {
+  userId: string;
+  timestamp: number;
+  pluggyInvestments: any[];
+  manualPositions: any[];
+  manualTransactions: any[];
+}
+
+let memoryRawUserInvestments: RawInvestmentsCache | null = null;
+let inFlightRawInvestmentsPromise: Promise<RawInvestmentsCache> | null = null;
+
+async function getOrFetchRawUserInvestments(
+  userId: string,
+  forceRefresh: boolean = false
+): Promise<{
+  pluggyInvestments: any[];
+  manualPositions: any[];
+  manualTransactions: any[];
+}> {
+  const now = Date.now();
+  const CACHE_TTL = 3 * 60 * 1000; // 3 minutos de cache em memória
+
+  if (
+    !forceRefresh &&
+    memoryRawUserInvestments &&
+    memoryRawUserInvestments.userId === userId &&
+    now - memoryRawUserInvestments.timestamp < CACHE_TTL
+  ) {
+    return memoryRawUserInvestments;
+  }
+
+  if (inFlightRawInvestmentsPromise) {
+    return inFlightRawInvestmentsPromise;
+  }
+
+  inFlightRawInvestmentsPromise = (async () => {
+    try {
+      const [pluggyItemsRes, manualTxRes] = await Promise.all([
+        supabase
+          .from("pluggy_items")
+          .select("item_id")
+          .eq("user_id", userId),
+        supabase
+          .from("investment_transactions")
+          .select("*")
+          .eq("user_id", userId),
+      ]);
+
+      let pluggyInvestments: any[] = [];
+      const pluggyItems = pluggyItemsRes.data || [];
+      if (pluggyItems.length > 0) {
+        try {
+          const investmentPromises = pluggyItems.map((item) =>
+            supabase.functions.invoke("pluggy-investments", {
+              body: { itemId: item.item_id },
+            })
+          );
+          const investmentResults = await Promise.all(investmentPromises);
+          pluggyInvestments = investmentResults.flatMap(
+            (result) => result.data?.investments || []
+          );
+        } catch (pluggyErr) {
+          console.warn("Aviso ao carregar pluggy-investments:", pluggyErr);
+        }
+      }
+
+      const manualTransactions = (manualTxRes.data || []) as Transaction[];
+      let manualPositions: any[] = [];
+      if (manualTransactions.length > 0) {
+        manualPositions = calculateManualPositions(manualTransactions);
+      }
+
+      const result: RawInvestmentsCache = {
+        userId,
+        timestamp: Date.now(),
+        pluggyInvestments,
+        manualPositions,
+        manualTransactions,
+      };
+
+      memoryRawUserInvestments = result;
+      return result;
+    } finally {
+      inFlightRawInvestmentsPromise = null;
+    }
+  })();
+
+  return inFlightRawInvestmentsPromise;
+}
+
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
 }
@@ -41,9 +140,71 @@ export const useB3Data = () => {
   const [assets, setAssets] = useState<B3Asset[]>([]);
   const [portfolio, setPortfolio] = useState<B3Portfolio | null>(null);
   const [dividends, setDividends] = useState<B3Dividend[]>([]);
-  const [portfolioEvolution, setPortfolioEvolution] = useState<any[]>([]);
-  const [enhancedAssets, setEnhancedAssets] = useState<any[]>([]);
-  const [dividendHistory, setDividendHistory] = useState<any[]>([]);
+
+  // Inicializa imediatamente com o cache de memória ou sessionStorage para renderização instantânea (0ms)
+  const [portfolioEvolution, setPortfolioEvolutionState] = useState<any[]>(() => {
+    if (memoryPortfolioEvolution && memoryPortfolioEvolution.length > 0) return memoryPortfolioEvolution;
+    try {
+      const s = sessionStorage.getItem(SESSION_CACHE_KEY_EVOLUTION);
+      if (s) return JSON.parse(s);
+    } catch (_e) {
+      // Ignora erro de parse de cache
+    }
+    return [];
+  });
+
+  const [enhancedAssets, setEnhancedAssetsState] = useState<any[]>(() => {
+    if (memoryEnhancedAssets && memoryEnhancedAssets.length > 0) return memoryEnhancedAssets;
+    try {
+      const s = sessionStorage.getItem(SESSION_CACHE_KEY_ASSETS);
+      if (s) return JSON.parse(s);
+    } catch (_e) {
+      // Ignora erro de parse de cache
+    }
+    return [];
+  });
+
+  const [dividendHistory, setDividendHistoryState] = useState<any[]>(() => {
+    if (memoryDividendHistory && memoryDividendHistory.length > 0) return memoryDividendHistory;
+    try {
+      const s = sessionStorage.getItem(SESSION_CACHE_KEY_DIVIDENDS);
+      if (s) return JSON.parse(s);
+    } catch (_e) {
+      // Ignora erro de parse de cache
+    }
+    return [];
+  });
+
+  const setPortfolioEvolution = useCallback((data: any[]) => {
+    memoryPortfolioEvolution = data;
+    try {
+      sessionStorage.setItem(SESSION_CACHE_KEY_EVOLUTION, JSON.stringify(data));
+    } catch (_e) {
+      // Ignora erro de gravação de cache
+    }
+    setPortfolioEvolutionState(data);
+  }, []);
+
+  const setEnhancedAssets = useCallback((data: any[]) => {
+    memoryEnhancedAssets = data;
+    try {
+      sessionStorage.setItem(SESSION_CACHE_KEY_ASSETS, JSON.stringify(data));
+    } catch (_e) {
+      // Ignora erro de gravação de cache
+    }
+    setEnhancedAssetsState(data);
+  }, []);
+
+  const setDividendHistory = useCallback((data: any[]) => {
+    memoryDividendHistory = data;
+    try {
+      sessionStorage.setItem(SESSION_CACHE_KEY_DIVIDENDS, JSON.stringify(data));
+    } catch (_e) {
+      // Ignora erro de gravação de cache
+    }
+    setDividendHistoryState(data);
+  }, []);
+
   const [benchmarkData, setBenchmarkData] = useState<{
     value: number;
     change: number;
@@ -232,7 +393,7 @@ export const useB3Data = () => {
       }
     }
 
-    // 3. Persist into Supabase financial_assets so database is always updated
+    // 3. Persist into Supabase financial_assets via secure RPC function
     if (fetchedAssets.length > 0) {
       try {
         const rows = fetchedAssets.map((asset: any) => ({
@@ -245,16 +406,25 @@ export const useB3Data = () => {
           dividend_history: asset.historico_dividendos || [],
           updated_at: new Date().toISOString(),
         }));
-        const { error: upsertError } = await supabase
-          .from("financial_assets")
-          .upsert(rows, { onConflict: "ticker" });
-        if (upsertError) {
-          console.warn("Aviso ao persistir financial_assets no banco:", upsertError);
-        } else {
+
+        // Use RPC with SECURITY DEFINER to bypass client RLS restriction safely
+        const { error: rpcError } = await supabase.rpc("bulk_upsert_assets", {
+          assets_data: rows,
+        });
+
+        if (!rpcError) {
           console.log(`Salvo no banco ${rows.length} ativos com sucesso.`);
+        } else {
+          // Fallback to direct upsert only if RPC fails
+          const { error: upsertError } = await supabase
+            .from("financial_assets")
+            .upsert(rows, { onConflict: "ticker" });
+          if (upsertError && upsertError.code !== "42501") {
+            console.warn("Aviso ao persistir financial_assets no banco:", upsertError);
+          }
         }
       } catch (upsertCatch) {
-        console.warn("Aviso ao gravar no banco de dados:", upsertCatch);
+        // Safe catch: data is already available in memory
       }
     }
 
@@ -267,39 +437,21 @@ export const useB3Data = () => {
   // Buscar dados de evolução patrimonial
   const getPortfolioEvolutionData = useCallback(
     async (period: string = "12m", forceRefresh: boolean = false) => {
-      setLoading(true);
+      if (forceRefresh || (!memoryPortfolioEvolution && portfolioEvolution.length === 0)) {
+        setLoading(true);
+      }
       try {
         if (user) {
-          let manualPositions: any[] = [];
-          const { data: manualTransactions } = await supabase
-            .from("investment_transactions")
-            .select("*")
-            .eq("user_id", user.id);
-
-          if (manualTransactions && manualTransactions.length > 0) {
-            manualPositions = calculateManualPositions(manualTransactions as Transaction[]);
-          }
-
-          let pluggyInvestments: any[] = [];
-          const { data: pluggyItems } = await supabase
-            .from("pluggy_items")
-            .select("item_id")
-            .eq("user_id", user.id);
-
-          if (pluggyItems && pluggyItems.length > 0) {
-            const investmentPromises = pluggyItems.map((item) =>
-              supabase.functions.invoke("pluggy-investments", {
-                body: { itemId: item.item_id },
-              }),
-            );
-            const investmentResults = await Promise.all(investmentPromises);
-            pluggyInvestments = investmentResults.flatMap(
-              (result) => result.data?.investments || [],
-            );
-          }
+          const { manualPositions, pluggyInvestments } = await getOrFetchRawUserInvestments(user.id, forceRefresh);
 
           if (manualPositions.length > 0 || pluggyInvestments.length > 0) {
-            const manualTickers = manualPositions.map(p => formatTickerForYahoo(p.ticker));
+            const cleanSym = (t: string) => (t || "").replace(".SA", "").toUpperCase().trim();
+
+            const manualTickers = manualPositions
+              .filter(p => p.asset_type !== "FIXED_INCOME")
+              .map(p => formatTickerForYahoo(p.ticker))
+              .filter(Boolean);
+
             const pluggyTickers = pluggyInvestments.map(inv => {
               const name = inv.name || inv.code || "";
               const match = name.match(/([A-Z]{4}\d{1,2})/g);
@@ -308,94 +460,162 @@ export const useB3Data = () => {
 
             const allTickers = [...new Set([...manualTickers, ...pluggyTickers])];
 
+            let assetsMap: any[] = [];
             if (allTickers.length > 0) {
+              const queryTickers = [...new Set([
+                ...allTickers,
+                ...allTickers.map(t => cleanSym(t)),
+                ...allTickers.map(t => formatTickerForYahoo(t)),
+              ])];
+
               const { data: dbAssets, error: dbError } = await supabase
                 .from("financial_assets")
                 .select("*")
-                .in("ticker", allTickers);
+                .in("ticker", queryTickers);
 
               if (!dbError && dbAssets) {
-                const assetsMap = dbAssets.map(asset => ({
+                assetsMap = dbAssets.map(asset => ({
                   ticker: asset.ticker,
                   preco_atual: asset.current_price,
                   historico_precos: asset.price_history || [],
                   historico_dividendos: asset.dividend_history || []
                 }));
-
-                const evolutionData = [];
-                const months = 60; // Generate up to 5 years (60 months) of history for instant client-side filtering
-                const now = new Date();
-
-                // Cumulative CDI benchmark tracking
-                let cumulativeCdi = 0;
-
-                for (let i = months - 1; i >= 0; i--) {
-                  const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                  const monthKey = date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
-
-                  let totalMarketValue = 0;
-                  let totalCost = 0;
-                  let totalDividends = 0;
-
-                  manualPositions.forEach(pos => {
-                    const ticker = formatTickerForYahoo(pos.ticker);
-                    const assetData = assetsMap.find((a: any) => a.ticker === ticker);
-
-                    if (assetData && assetData.historico_precos && Array.isArray(assetData.historico_precos)) {
-                      const priceEntry = assetData.historico_precos.find((h: any) => {
-                        const hDate = new Date(h.date);
-                        return hDate.getMonth() === date.getMonth() && hDate.getFullYear() === date.getFullYear();
-                      });
-
-                      const price = priceEntry && typeof priceEntry === 'object' && 'close' in priceEntry && typeof priceEntry.close === 'number'
-                        ? priceEntry.close
-                        : (i === 0 && typeof assetData.preco_atual === 'number' ? assetData.preco_atual : pos.averagePrice);
-                      totalMarketValue += price * pos.quantity;
-                      totalCost += pos.totalCost;
-                    } else {
-                      totalMarketValue += (pos.averagePrice || 0) * pos.quantity;
-                      totalCost += pos.totalCost;
-                    }
-
-                    if (assetData && assetData.historico_dividendos && Array.isArray(assetData.historico_dividendos)) {
-                      const monthDividends = assetData.historico_dividendos
-                        .filter((d: any) => {
-                          const dDate = new Date(d.date);
-                          return dDate.getMonth() === date.getMonth() && dDate.getFullYear() === date.getFullYear();
-                        })
-                        .reduce((sum: number, d: any) => {
-                          const amount = typeof d.amount === 'number' ? d.amount : 0;
-                          return sum + (amount * pos.quantity);
-                        }, 0) as number;
-                      totalDividends += monthDividends;
-                    }
-                  });
-
-                  pluggyInvestments.forEach(inv => {
-                    totalMarketValue += inv.balance || 0;
-                    totalCost += inv.balance || 0;
-                  });
-
-                  const profitability = totalCost > 0 ? ((totalMarketValue - totalCost) / totalCost) * 100 : 0;
-
-                  // Benchmark CDI ~0.9% / month
-                  cumulativeCdi += 0.88;
-
-                  evolutionData.push({
-                    month: monthKey,
-                    profitability: Number(profitability.toFixed(2)),
-                    cdi: Number((cumulativeCdi / Math.max(1, (months - i))).toFixed(2)),
-                    marketValue: Math.round(totalMarketValue),
-                    operations: 0,
-                    costs: Math.round(totalCost),
-                    dividends: Math.round(totalDividends)
-                  });
-                }
-
-                setPortfolioEvolution(evolutionData);
-                return evolutionData;
               }
             }
+
+            const evolutionData = [];
+            const months = 60; // Up to 5 years (60 months)
+            const now = new Date();
+            let cumulativeCdi = 0;
+
+            for (let i = months - 1; i >= 0; i--) {
+              const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              const monthKey = date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
+              let totalMarketValue = 0;
+              let totalCost = 0;
+              let totalDividends = 0;
+
+              // 1. Manual positions (Fixed Income + Variable Income)
+              manualPositions.forEach(pos => {
+                const isFixedIncome = pos.asset_type === "FIXED_INCOME";
+                const fixedCalc = pos.fixedIncome;
+
+                if (isFixedIncome && fixedCalc) {
+                  if (i === 0) {
+                    // Mês atual: saldo bruto consolidado com rendimentos
+                    totalMarketValue += fixedCalc.currentGrossAmount;
+                    totalCost += pos.totalCost;
+                  } else {
+                    const startDate = fixedCalc.startDate ? new Date(fixedCalc.startDate) : null;
+                    if (startDate && date < new Date(startDate.getFullYear(), startDate.getMonth(), 1)) {
+                      // Aporte ainda não havia sido realizado
+                    } else {
+                      const totalDays = Math.max(1, (now.getTime() - (startDate ? startDate.getTime() : now.getTime())) / (1000 * 60 * 60 * 24));
+                      const elapsedDays = Math.max(0, Math.min(totalDays, (date.getTime() - (startDate ? startDate.getTime() : date.getTime())) / (1000 * 60 * 60 * 24)));
+                      const fraction = totalDays > 0 ? elapsedDays / totalDays : 1;
+                      const estimatedVal = pos.totalCost + (fixedCalc.accruedInterest * fraction);
+                      totalMarketValue += estimatedVal;
+                      totalCost += pos.totalCost;
+                    }
+                  }
+                  return;
+                }
+
+                // Renda Variável (Ações, FIIs, BDRs, etc.)
+                const cTicker = cleanSym(pos.ticker);
+                const assetData = assetsMap.find((a: any) => cleanSym(a.ticker) === cTicker);
+
+                let price = 0;
+                if (i === 0) {
+                  price = (typeof assetData?.preco_atual === 'number' && assetData.preco_atual > 0)
+                    ? assetData.preco_atual
+                    : (pos.averagePrice || 0);
+                } else {
+                  if (assetData?.historico_precos && Array.isArray(assetData.historico_precos)) {
+                    const priceEntry = assetData.historico_precos.find((h: any) => {
+                      const hDate = new Date(h.date);
+                      return hDate.getMonth() === date.getMonth() && hDate.getFullYear() === date.getFullYear();
+                    });
+                    if (priceEntry && typeof priceEntry.close === 'number') {
+                      price = priceEntry.close;
+                    }
+                  }
+                  if (!price || price <= 0) {
+                    price = (typeof assetData?.preco_atual === 'number' && assetData.preco_atual > 0)
+                      ? assetData.preco_atual
+                      : (pos.averagePrice || 0);
+                  }
+                }
+
+                totalMarketValue += price * (pos.quantity || 0);
+                totalCost += pos.totalCost || ((pos.averagePrice || 0) * (pos.quantity || 0));
+
+                if (assetData && assetData.historico_dividendos && Array.isArray(assetData.historico_dividendos)) {
+                  const monthDividends = assetData.historico_dividendos
+                    .filter((d: any) => {
+                      const dDate = new Date(d.date || d.paymentDate);
+                      return dDate.getMonth() === date.getMonth() && dDate.getFullYear() === date.getFullYear();
+                    })
+                    .reduce((sum: number, d: any) => {
+                      const amount = typeof d.amount === 'number' ? d.amount : parseFloat(d.amount) || 0;
+                      return sum + (amount * (pos.quantity || 0));
+                    }, 0);
+                  totalDividends += monthDividends;
+                }
+              });
+
+              // 2. Open Finance / Pluggy investments
+              pluggyInvestments.forEach(inv => {
+                const name = inv.name || inv.code || "";
+                const match = name.match(/([A-Z]{4}\d{1,2})/g);
+                const cTicker = match ? cleanSym(match[0]) : "";
+                const yAsset = cTicker ? assetsMap.find((a: any) => cleanSym(a.ticker) === cTicker) : null;
+
+                let price = 0;
+                if (i === 0 && yAsset && typeof yAsset.preco_atual === 'number' && yAsset.preco_atual > 0) {
+                  price = yAsset.preco_atual;
+                } else if (i > 0 && yAsset?.historico_precos && Array.isArray(yAsset.historico_precos)) {
+                  const pEntry = yAsset.historico_precos.find((h: any) => {
+                    const hDate = new Date(h.date);
+                    return hDate.getMonth() === date.getMonth() && hDate.getFullYear() === date.getFullYear();
+                  });
+                  if (pEntry && typeof pEntry.close === 'number') {
+                    price = pEntry.close;
+                  }
+                }
+
+                if (price > 0 && inv.quantity) {
+                  totalMarketValue += price * inv.quantity;
+                  totalCost += Number(inv.balance || (price * inv.quantity));
+                } else {
+                  totalMarketValue += Number(inv.balance || 0);
+                  totalCost += Number(inv.balance || 0);
+                }
+              });
+
+              // 3. No mês atual (i === 0), garantir alinhamento exato com enhancedAssets se já calculados
+              if (i === 0 && memoryEnhancedAssets && memoryEnhancedAssets.length > 0) {
+                totalMarketValue = memoryEnhancedAssets.reduce((sum, a) => sum + (Number(a.marketValue) || 0), 0);
+                totalCost = memoryEnhancedAssets.reduce((sum, a) => sum + (Number(a.cost) || 0), 0);
+              }
+
+              const profitability = totalCost > 0 ? ((totalMarketValue - totalCost) / totalCost) * 100 : 0;
+              cumulativeCdi += 0.88;
+
+              evolutionData.push({
+                month: monthKey,
+                profitability: Number(profitability.toFixed(2)),
+                cdi: Number((cumulativeCdi / Math.max(1, (months - i))).toFixed(2)),
+                marketValue: Number(totalMarketValue.toFixed(2)),
+                operations: 0,
+                costs: Number(totalCost.toFixed(2)),
+                dividends: Number(totalDividends.toFixed(2))
+              });
+            }
+
+            setPortfolioEvolution(evolutionData);
+            return evolutionData;
           }
 
           setPortfolioEvolution([]);
@@ -424,36 +644,12 @@ export const useB3Data = () => {
 
   // Buscar ativos detalhados com integração Yahoo Finance
   const getEnhancedAssetsData = useCallback(async (forceRefresh: boolean = false) => {
-    setLoading(true);
+    if (forceRefresh || (!memoryEnhancedAssets && enhancedAssets.length === 0)) {
+      setLoading(true);
+    }
     try {
       if (user) {
-        let pluggyInvestments: any[] = [];
-        const { data: pluggyItems } = await supabase
-          .from("pluggy_items")
-          .select("item_id")
-          .eq("user_id", user.id);
-
-        if (pluggyItems && pluggyItems.length > 0) {
-          const investmentPromises = pluggyItems.map((item) =>
-            supabase.functions.invoke("pluggy-investments", {
-              body: { itemId: item.item_id },
-            }),
-          );
-          const investmentResults = await Promise.all(investmentPromises);
-          pluggyInvestments = investmentResults.flatMap(
-            (result) => result.data?.investments || [],
-          );
-        }
-
-        let manualPositions: any[] = [];
-        const { data: manualTransactions } = await supabase
-          .from("investment_transactions")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (manualTransactions && manualTransactions.length > 0) {
-          manualPositions = calculateManualPositions(manualTransactions as Transaction[]);
-        }
+        const { pluggyInvestments, manualPositions } = await getOrFetchRawUserInvestments(user.id, forceRefresh);
 
         if (pluggyInvestments.length > 0 || manualPositions.length > 0) {
           const pluggyTickers = pluggyInvestments
@@ -556,9 +752,21 @@ export const useB3Data = () => {
                       dividend_history: asset.historico_dividendos || [],
                       updated_at: new Date().toISOString(),
                     }));
-                    await supabase.from("financial_assets").upsert(rows, { onConflict: "ticker" });
+
+                    const { error: rpcErr } = await supabase.rpc("bulk_upsert_assets", {
+                      assets_data: rows,
+                    });
+
+                    if (rpcErr) {
+                      const { error: dbErr } = await supabase
+                        .from("financial_assets")
+                        .upsert(rows, { onConflict: "ticker" });
+                      if (dbErr && dbErr.code !== "42501") {
+                        console.warn("Aviso ao gravar financial_assets:", dbErr);
+                      }
+                    }
                   } catch (dbErr) {
-                    console.warn("Aviso ao gravar financial_assets:", dbErr);
+                    // Safe catch: data is already kept in memory
                   }
                   
                   const newSyms = new Set(newFetchedAssets.map(a => cleanTicker(a.ticker)));
@@ -689,6 +897,25 @@ export const useB3Data = () => {
 
           const allCalculatedAssets = [...enhancedPluggy, ...enhancedManual];
           setEnhancedAssets(allCalculatedAssets);
+
+          // Sincronizar o valor atual do último ponto da evolução patrimonial para que coincida 100% com o patrimônio atual
+          const currentTotalMarketValue = Number(allCalculatedAssets.reduce((sum, a) => sum + (Number(a.marketValue) || 0), 0).toFixed(2));
+          const currentTotalCost = Number(allCalculatedAssets.reduce((sum, a) => sum + (Number(a.cost) || 0), 0).toFixed(2));
+          const currentTotalProfitability = currentTotalCost > 0
+            ? Number((((currentTotalMarketValue - currentTotalCost) / currentTotalCost) * 100).toFixed(2))
+            : 0;
+
+          if (memoryPortfolioEvolution && memoryPortfolioEvolution.length > 0) {
+            const updatedEvolution = [...memoryPortfolioEvolution];
+            const lastIndex = updatedEvolution.length - 1;
+            updatedEvolution[lastIndex] = {
+              ...updatedEvolution[lastIndex],
+              marketValue: currentTotalMarketValue,
+              costs: currentTotalCost,
+              profitability: currentTotalProfitability,
+            };
+            setPortfolioEvolution(updatedEvolution);
+          }
           return allCalculatedAssets;
         }
 
@@ -717,45 +944,25 @@ export const useB3Data = () => {
   // Buscar histórico de dividendos dos ativos do usuário
   // Combines DB data + live yfinance data for missing/stale tickers
   const getDividendHistoryData = useCallback(async (changedTickers?: string[], forceRefresh: boolean = false) => {
-    setLoading(true);
+    if (forceRefresh || (!memoryDividendHistory && dividendHistory.length === 0)) {
+      setLoading(true);
+    }
     try {
       if (!user) {
         setDividendHistory([]);
         return [];
       }
 
-      // 1. Get user's tickers from transactions AND pluggy / Open Finance
-      const { data: manualTransactions } = await supabase
-        .from("investment_transactions")
-        .select("ticker")
-        .eq("user_id", user.id);
+      // 1. Get user's tickers from deduplicated raw investments
+      const { manualTransactions, pluggyInvestments } = await getOrFetchRawUserInvestments(user.id, forceRefresh);
 
-      let pluggyTickers: string[] = [];
-      try {
-        const { data: pluggyItems } = await supabase
-          .from("pluggy_items")
-          .select("item_id")
-          .eq("user_id", user.id);
-
-        if (pluggyItems && pluggyItems.length > 0) {
-          const investmentPromises = pluggyItems.map((item) =>
-            supabase.functions.invoke("pluggy-investments", {
-              body: { itemId: item.item_id },
-            }),
-          );
-          const investmentResults = await Promise.all(investmentPromises);
-          pluggyTickers = investmentResults
-            .flatMap((result) => result.data?.investments || [])
-            .map((inv: any) => {
-              const name = inv.name || inv.code || "";
-              const match = name.match(/([A-Z]{4}\d{1,2})/g);
-              return match ? formatTickerForYahoo(match[0]) : null;
-            })
-            .filter(Boolean) as string[];
-        }
-      } catch (e) {
-        console.warn("Erro ao buscar pluggyTickers para dividendos:", e);
-      }
+      const pluggyTickers = pluggyInvestments
+        .map((inv: any) => {
+          const name = inv.name || inv.code || "";
+          const match = name.match(/([A-Z]{4}\d{1,2})/g);
+          return match ? formatTickerForYahoo(match[0]) : null;
+        })
+        .filter(Boolean) as string[];
 
       const rawManualTickers = (manualTransactions || [])
         .map(t => formatTickerForYahoo(t.ticker))

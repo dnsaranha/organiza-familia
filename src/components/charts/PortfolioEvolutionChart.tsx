@@ -63,9 +63,19 @@ export const PortfolioEvolutionChart = ({
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
+  };
+
+  const formatAxisCurrency = (value: number) => {
+    if (Math.abs(value) >= 1000000) {
+      return `R$ ${(value / 1000000).toFixed(1)}M`;
+    }
+    if (Math.abs(value) >= 1000) {
+      return `R$ ${(value / 1000).toFixed(0)}k`;
+    }
+    return `R$ ${value.toFixed(0)}`;
   };
 
   const formatPercent = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
@@ -144,7 +154,7 @@ export const PortfolioEvolutionChart = ({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tickFormatter={formatCurrency}
+                tickFormatter={formatAxisCurrency}
                 tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}

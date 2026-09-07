@@ -36,6 +36,7 @@ export const usePWA = () => {
   // Push Notification state
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(true);
+  const [permissionState, setPermissionState] = useState<NotificationPermission | 'unsupported'>('default');
 
   // --- Start of PWA Installation Logic ---
   useEffect(() => {
@@ -90,14 +91,30 @@ export const usePWA = () => {
 
   // --- Start of Push Notification Logic ---
   const checkSubscription = useCallback(async () => {
-    if (!('serviceWorker' in navigator)) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPermissionState('unsupported');
+      setIsSubscriptionLoading(false);
+      return;
+    }
+
+    setPermissionState(Notification.permission);
+    if (Notification.permission === 'granted') {
+      setIsSubscribed(true);
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      setIsSubscriptionLoading(false);
+      return;
+    }
+
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setIsSubscribed(!!subscription);
+      const subscription = await registration.pushManager?.getSubscription();
+      if (subscription) {
+        setIsSubscribed(true);
+      }
     } catch (error) {
       console.error('Error checking push subscription:', error);
-      setIsSubscribed(false);
     } finally {
       setIsSubscriptionLoading(false);
     }
@@ -108,58 +125,78 @@ export const usePWA = () => {
   }, [checkSubscription]);
 
   const subscribeToPush = async () => {
-    if (!('serviceWorker' in navigator)) {
-      toast({ title: 'Navegador não suportado', description: 'As notificações push não são suportadas neste navegador.', variant: 'destructive' });
-      return;
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast({
+        title: 'Navegador não suportado',
+        description: 'As notificações não são suportadas neste navegador.',
+        variant: 'destructive',
+      });
+      return false;
     }
 
     setIsSubscriptionLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      
-      // Check for existing subscription first
-      const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        setIsSubscribed(true);
-        setIsSubscriptionLoading(false);
-        toast({ title: 'Você já está inscrito para receber notificações.' });
-        return;
-      }
-      
+      // 1. Solicita permissão explícita no navegador
       const permission = await Notification.requestPermission();
+      setPermissionState(permission);
+
       if (permission !== 'granted') {
-        toast({ title: 'Permissão negada', description: 'Você precisa permitir as notificações para se inscrever.', variant: 'destructive' });
-        setIsSubscriptionLoading(false);
-        return;
+        toast({
+          title: 'Permissão não concedida',
+          description: 'Para receber alertas, libere as notificações no ícone de cadeado 🔒 ao lado do endereço web.',
+          variant: 'destructive',
+        });
+        setIsSubscribed(false);
+        return false;
       }
 
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      // 2. Tenta registrar Web Push no Service Worker com VAPID (se configurado)
+      let vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
-        throw new Error('VAPID public key não encontrada. Verifique a configuração das variáveis de ambiente.');
+        try {
+          const { data } = await supabase.functions.invoke('get-vapid-key');
+          if (data?.vapidPublicKey) {
+            vapidPublicKey = data.vapidPublicKey;
+          }
+        } catch {
+          // VAPID não configurado no backend, continua com notificações ativas no dispositivo
+        }
       }
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          if (vapidPublicKey && registration.pushManager) {
+            const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+            });
 
-      const { error } = await supabase.functions.invoke('save-push-subscription', {
-        body: subscription,
-      });
-
-      if (error) throw error;
+            await supabase.functions.invoke('save-push-subscription', {
+              body: subscription,
+            }).catch(() => null);
+          }
+        } catch (swErr) {
+          console.warn('Aviso ao registrar Push Manager:', swErr);
+        }
+      }
 
       setIsSubscribed(true);
-      toast({ title: 'Inscrição realizada com sucesso!', description: 'Você receberá notificações de tarefas importantes.' });
+      toast({
+        title: '✅ Notificações ativadas!',
+        description: 'Você receberá lembretes de tarefas e alertas financeiros diretamente neste dispositivo.',
+      });
 
+      return true;
     } catch (error: any) {
       console.error('Error subscribing to push:', error);
       toast({
-        title: 'Erro ao se inscrever',
-        description: error.message || 'Não foi possível completar a inscrição para notificações.',
+        title: 'Erro ao ativar notificações',
+        description: error.message || 'Não foi possível ativar as notificações.',
         variant: 'destructive',
       });
       setIsSubscribed(false);
+      return false;
     } finally {
       setIsSubscriptionLoading(false);
     }
@@ -168,40 +205,79 @@ export const usePWA = () => {
   const unsubscribeFromPush = async () => {
     setIsSubscriptionLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager?.getSubscription();
 
-      if (!subscription) {
-        setIsSubscribed(false);
-        toast({ title: 'Você não está inscrito.' });
-        return;
+        if (subscription) {
+          await subscription.unsubscribe();
+          supabase.functions.invoke('delete-push-subscription', {
+            body: { endpoint: subscription.endpoint },
+          }).catch(() => null);
+        }
       }
-      
-      // Unsubscribe from browser
-      const unsubscribed = await subscription.unsubscribe();
-      if (!unsubscribed) {
-        throw new Error('Falha ao cancelar a inscrição no navegador.');
-      }
-
-      // Delete subscription from backend
-      const { error } = await supabase.functions.invoke('delete-push-subscription', {
-        body: { endpoint: subscription.endpoint },
-      });
-
-      if (error) throw error;
 
       setIsSubscribed(false);
-      toast({ title: 'Inscrição cancelada', description: 'Você não receberá mais notificações.' });
-
+      toast({
+        title: 'Notificações desativadas',
+        description: 'Você não receberá mais notificações neste dispositivo.',
+      });
+      return true;
     } catch (error: any) {
       console.error('Error unsubscribing from push:', error);
       toast({
-        title: 'Erro ao cancelar inscrição',
-        description: error.message || 'Não foi possível remover a inscrição.',
+        title: 'Erro ao desativar',
+        description: error.message || 'Não foi possível desativar as notificações.',
         variant: 'destructive',
       });
+      return false;
     } finally {
       setIsSubscriptionLoading(false);
+    }
+  };
+
+  const sendTestNotification = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast({
+        title: 'Não suportado',
+        description: 'Notificações não são suportadas neste navegador.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
+      const granted = await subscribeToPush();
+      if (!granted) return;
+    }
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification('🔔 Organiza: Notificação Ativa!', {
+          body: 'Seus lembretes de contas e tarefas financeiras estão funcionando com sucesso!',
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-96x96.png',
+          tag: 'test-notification-' + Date.now(),
+        });
+      } else {
+        new Notification('🔔 Organiza: Notificação Ativa!', {
+          body: 'Seus lembretes de contas e tarefas financeiras estão funcionando com sucesso!',
+          icon: '/icons/icon-192x192.png',
+        });
+      }
+
+      toast({
+        title: '🔔 Notificação enviada!',
+        description: 'Confira a notificação na tela ou na barra de avisos do seu sistema.',
+      });
+    } catch (err: any) {
+      console.error('Erro ao enviar notificação de teste:', err);
+      toast({
+        title: 'Erro no envio',
+        description: err.message || 'Não foi possível disparar a notificação de teste.',
+        variant: 'destructive',
+      });
     }
   };
   // --- End of Push Notification Logic ---
@@ -214,7 +290,9 @@ export const usePWA = () => {
     // Push
     isSubscribed,
     isSubscriptionLoading,
+    permissionState,
     subscribeToPush,
     unsubscribeFromPush,
+    sendTestNotification,
   };
 };

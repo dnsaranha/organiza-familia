@@ -31,15 +31,13 @@ const Investments = () => {
     loading,
   } = useB3Data();
 
-  // Load data on mount
+  // Load data on mount in parallel
   useEffect(() => {
-    const loadInitialData = async () => {
-      await getEnhancedAssetsData(false);
-      await getPortfolioEvolutionData("12m", false);
-      await getDividendHistoryData(undefined, false);
-    };
-
-    loadInitialData();
+    Promise.allSettled([
+      getEnhancedAssetsData(false),
+      getPortfolioEvolutionData("12m", false),
+      getDividendHistoryData(undefined, false),
+    ]);
   }, [getEnhancedAssetsData, getPortfolioEvolutionData, getDividendHistoryData]);
 
   const totalValue = useMemo(() => {
@@ -65,18 +63,22 @@ const Investments = () => {
     return enhancedAssets.reduce((sum, asset) => sum + (Number(asset.accumulatedDividends) || 0), 0);
   }, [enhancedAssets]);
 
+  const isInitialLoading = loading && enhancedAssets.length === 0;
+
   const handleRefresh = async (changedTickers?: string[]) => {
     try {
       toast({
         title: "Atualizando cotações...",
-        description: "Buscando dados de mercado e salvando no banco.",
+        description: "Buscando dados mais recentes de mercado.",
       });
-      await getEnhancedAssetsData(true);
-      await getPortfolioEvolutionData("12m", true);
-      await getDividendHistoryData(changedTickers, true);
+      await Promise.allSettled([
+        getEnhancedAssetsData(true),
+        getPortfolioEvolutionData("12m", true),
+        getDividendHistoryData(changedTickers, true),
+      ]);
       toast({
         title: "Cotações atualizadas",
-        description: "Dados atualizados e salvos no banco de dados com sucesso!",
+        description: "Dados atualizados e sincronizados com sucesso!",
       });
     } catch (err) {
       toast({
@@ -118,7 +120,7 @@ const Investments = () => {
               className="gap-2 text-xs font-medium"
             >
               <RefreshCcw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              Atualizar Cotações
+              {loading ? "Sincronizando..." : "Atualizar Cotações"}
             </Button>
           </div>
         </div>
@@ -129,7 +131,7 @@ const Investments = () => {
             title="Patrimônio Total"
             amount={totalValue}
             isCurrency
-            isLoading={loading}
+            isLoading={isInitialLoading}
           />
           <FinancialCard
             title="Lucro / Prejuízo"
@@ -137,7 +139,7 @@ const Investments = () => {
             isCurrency
             isPositive={totalProfitLoss > 0.005}
             isNegative={totalProfitLoss < -0.005}
-            isLoading={loading}
+            isLoading={isInitialLoading}
           />
           <FinancialCard
             title="Rentabilidade"
@@ -145,13 +147,13 @@ const Investments = () => {
             isPercentage
             isPositive={totalProfitability > 0.005}
             isNegative={totalProfitability < -0.005}
-            isLoading={loading}
+            isLoading={isInitialLoading}
           />
           <FinancialCard
             title="Proventos (12M)"
             amount={totalDividends12M}
             isCurrency
-            isLoading={loading}
+            isLoading={isInitialLoading}
           />
         </div>
 
@@ -180,13 +182,13 @@ const Investments = () => {
           <TabsContent value="portfolio" className="space-y-6 mt-0">
             {/* Visual Allocation and Evolution */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AssetAllocationChart data={enhancedAssets as any} isLoading={loading} />
-              <PortfolioEvolutionChart data={portfolioEvolution} loading={loading} />
+              <AssetAllocationChart data={enhancedAssets as any} isLoading={isInitialLoading} />
+              <PortfolioEvolutionChart data={portfolioEvolution} loading={isInitialLoading && portfolioEvolution.length === 0} />
             </div>
 
             {/* Assets Table */}
             <div className="space-y-3">
-              <EnhancedAssetTable assets={enhancedAssets} loading={loading} />
+              <EnhancedAssetTable assets={enhancedAssets} loading={isInitialLoading} />
             </div>
           </TabsContent>
 
@@ -194,18 +196,18 @@ const Investments = () => {
           <TabsContent value="dividends" className="space-y-6 mt-0">
             {/* Upcoming Schedules & Monthly Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DividendScheduleCard data={dividendHistory} assets={enhancedAssets} loading={loading} />
-              <MonthlyAssetBreakdownChart data={dividendHistory} userAssets={enhancedAssets} loading={loading} />
+              <DividendScheduleCard data={dividendHistory} assets={enhancedAssets} loading={isInitialLoading && dividendHistory.length === 0} />
+              <MonthlyAssetBreakdownChart data={dividendHistory} userAssets={enhancedAssets} loading={isInitialLoading && dividendHistory.length === 0} />
             </div>
 
             {/* Dividend History Chart */}
             <div>
-              <DividendHistoryChart data={dividendHistory} assets={enhancedAssets} loading={loading} />
+              <DividendHistoryChart data={dividendHistory} assets={enhancedAssets} loading={isInitialLoading && dividendHistory.length === 0} />
             </div>
 
             {/* Detailed Monthly Dividend Table */}
             <div>
-              <DividendMonthlyTable assetsData={dividendHistory} assets={enhancedAssets} loading={loading} />
+              <DividendMonthlyTable assetsData={dividendHistory} assets={enhancedAssets} loading={isInitialLoading && dividendHistory.length === 0} />
             </div>
           </TabsContent>
 
