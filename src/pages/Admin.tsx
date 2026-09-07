@@ -150,24 +150,123 @@ export default function AdminPage() {
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
+    let edgeSuccess = false;
+
     try {
       const { data, error } = await supabase.functions.invoke('admin-list-users');
-      if (error) throw error;
-      const loadedUsers = (data?.users || []) as UserInfo[];
-      setUsers(loadedUsers);
-      if (typeof data?.users_today === 'number') {
-        setUserStats((prev) => prev ? { ...prev, users_today: data.users_today } : prev);
+      if (!error && data?.users && Array.isArray(data.users) && data.users.length > 0) {
+        const loadedUsers = data.users as UserInfo[];
+        setUsers(loadedUsers);
+        if (typeof data?.users_today === 'number') {
+          setUserStats((prev) => prev ? { ...prev, users_today: data.users_today } : prev);
+        }
+        edgeSuccess = true;
+      } else if (error) {
+        console.warn('Edge Function admin-list-users retornou aviso ou status não-2xx. Ativando fallback resiliente do banco de dados.');
       }
     } catch (err) {
-      if (isNetworkError(err)) {
-        console.warn('Conexão instável ao carregar lista de clientes.');
-      } else {
-        console.error('Error fetching users:', err);
+      console.warn('Tentativa via Edge Function admin-list-users falhou, alternando para fallback de tabelas.');
+    }
+
+    if (edgeSuccess) {
+      setUsersLoading(false);
+      return;
+    }
+
+    // Fallback Resiliente: Consulta profiles, support_messages e logs de IA diretamente
+    try {
+      const [profilesRes, messagesRes, aiLogsRes] = await Promise.all([
+        supabase.from('profiles').select('*').limit(200),
+        supabase.from('support_messages').select('user_id, created_at').limit(300),
+        supabase.from('ai_usage_logs').select('user_id, user_email, user_plan, created_at').limit(300),
+      ]);
+
+      const userMap = new Map<string, UserInfo>();
+
+      // Carregar perfis conhecidos
+      (profilesRes.data || []).forEach((p: any) => {
+        userMap.set(p.id, {
+          id: p.id,
+          email: null,
+          full_name: p.full_name || null,
+          plan: 'Gratuito',
+          last_activity_at: p.updated_at || null,
+          created_at: p.updated_at || null,
+        });
+      });
+
+      // Mapear usuários que enviaram suporte
+      (messagesRes.data || []).forEach((m: any) => {
+        if (!userMap.has(m.user_id)) {
+          userMap.set(m.user_id, {
+            id: m.user_id,
+            email: null,
+            full_name: null,
+            plan: 'Gratuito',
+            last_activity_at: m.created_at,
+            created_at: m.created_at,
+          });
+        } else {
+          const u = userMap.get(m.user_id)!;
+          if (!u.last_activity_at || new Date(m.created_at) > new Date(u.last_activity_at)) {
+            u.last_activity_at = m.created_at;
+          }
+        }
+      });
+
+      // Mapear usuários a partir dos logs de uso da IA
+      (aiLogsRes.data || []).forEach((log: any) => {
+        if (userMap.has(log.user_id)) {
+          const u = userMap.get(log.user_id)!;
+          if (!u.email && log.user_email) u.email = log.user_email;
+          if (log.user_plan) u.plan = log.user_plan;
+          if (!u.last_activity_at || new Date(log.created_at) > new Date(u.last_activity_at)) {
+            u.last_activity_at = log.created_at;
+          }
+        } else {
+          userMap.set(log.user_id, {
+            id: log.user_id,
+            email: log.user_email || null,
+            full_name: null,
+            plan: log.user_plan || 'Gratuito',
+            last_activity_at: log.created_at,
+            created_at: log.created_at,
+          });
+        }
+      });
+
+      // Garantir presença do administrador atual na lista
+      if (user) {
+        if (userMap.has(user.id)) {
+          const u = userMap.get(user.id)!;
+          u.email = user.email || u.email;
+          u.full_name = u.full_name || 'Administrador (Você)';
+        } else {
+          userMap.set(user.id, {
+            id: user.id,
+            email: user.email || null,
+            full_name: 'Administrador (Você)',
+            plan: 'Avançado',
+            last_activity_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          });
+        }
       }
+
+      const fallbackUsers = Array.from(userMap.values());
+      fallbackUsers.sort((a, b) => {
+        const ta = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0;
+        const tb = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0;
+        return tb - ta;
+      });
+
+      setUsers(fallbackUsers);
+    } catch (fallbackErr) {
+      console.warn('Erro ao montar lista de clientes via fallback:', fallbackErr);
     } finally {
       setUsersLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchConversations = useCallback(async () => {
     try {

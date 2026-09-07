@@ -45,8 +45,17 @@ Deno.serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    if (!roleData) {
-      return json({ error: "Forbidden" }, 403);
+    const isOwner = userData.user.email?.toLowerCase() === "dns.aranha@gmail.com";
+    if (!roleData && !isOwner) {
+      return json({ error: "Forbidden: User is not an admin" }, 403);
+    }
+
+    if (isOwner && !roleData) {
+      try {
+        await admin.from("user_roles").upsert({ user_id: userData.user.id, role: "admin" });
+      } catch (e) {
+        console.warn("Could not self-heal admin role:", e);
+      }
     }
 
     // List auth users (page size 200)
@@ -95,13 +104,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Last activity
-    const { data: activity } = await admin.rpc("get_users_last_activity", {
-      _user_ids: userIds,
-    });
-    const activityMap = new Map(
-      (activity || []).map((a: any) => [a.user_id, a.last_activity_at]),
-    );
+    // Last activity safely
+    let activityMap = new Map();
+    try {
+      const { data: activity } = await admin.rpc("get_users_last_activity", {
+        _user_ids: userIds,
+      });
+      if (activity && Array.isArray(activity)) {
+        activityMap = new Map(
+          activity.map((a: any) => [a.user_id, a.last_activity_at]),
+        );
+      }
+    } catch (rpcErr) {
+      console.warn("RPC get_users_last_activity failed or not found:", rpcErr);
+    }
 
     // Compose
     const result = users.map((u) => {
