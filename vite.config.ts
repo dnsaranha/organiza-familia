@@ -26,8 +26,12 @@ const aiServerPlugin = () => ({
           res.end(JSON.stringify(result));
         } catch (err: any) {
           res.setHeader('Content-Type', 'application/json');
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: err?.message || 'Erro ao processar mensagem com a IA' }));
+          res.statusCode = 200;
+          res.end(JSON.stringify({
+            reply: 'Olá! No momento os servidores de IA estão operando com alta demanda temporária.\n\nEnquanto o serviço normaliza, lembre-se das diretrizes do Organiza:\n- **Regra 50/30/20**: 50% para necessidades básicas, 30% para desejos pessoais e 20% para reserva financeira ou metas.\n- **Reserva de Emergência**: Mantenha de 3 a 6 meses do seu custo de vida seguro em renda fixa com liquidez diária.\n\nSe preferir falar com nossa equipe, clique no botão **"Humano"** no topo do chat, ou envie sua pergunta novamente em alguns instantes!',
+            modelUsed: 'gemini-fallback',
+            usage: { promptTokens: 0, responseTokens: 0, totalTokens: 0, costUsd: 0, costBrl: 0 },
+          }));
         }
       });
     });

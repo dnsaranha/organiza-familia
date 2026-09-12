@@ -180,13 +180,34 @@ export const TransactionList = ({ onTransactionChange }: TransactionListProps) =
   }, [budgetFilter, categoryFilter, dateRange]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchGroups = async () => {
       if (!user) return;
-      const { data, error } = await supabase.rpc('get_user_groups')
-      if (error) console.error("Erro ao buscar grupos para filtro:", error);
-      else setGroups(data as FamilyGroup[] || []);
+      try {
+        const { data, error } = await supabase.rpc('get_user_groups');
+        if (error) {
+          const isNetworkError =
+            error?.message?.includes('Failed to fetch') ||
+            error?.name === 'TypeError' ||
+            error?.message?.includes('aborted') ||
+            error?.message?.includes('NetworkError');
+
+          if (isNetworkError) {
+            console.warn('Conexão instável ao buscar grupos para filtro de transações.');
+          } else {
+            console.warn('Aviso ao buscar grupos para filtro:', error?.message || error);
+          }
+        } else if (isMounted && data) {
+          setGroups((data as FamilyGroup[]) || []);
+        }
+      } catch (err: any) {
+        console.warn('Instabilidade de rede ao buscar grupos para filtro:', err?.message || err);
+      }
     };
     fetchGroups();
+    return () => {
+      isMounted = false;
+    };
 
     const savedFilters = localStorage.getItem('transactionFilters');
     if (savedFilters) {

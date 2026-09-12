@@ -51,6 +51,45 @@ export interface AIUserUsageSummary {
   last_interaction_at: string;
 }
 
+export interface AIChatFinancialCategory {
+  category: string;
+  amount: number;
+  percentage: number;
+}
+
+export interface AIChatRecentTransaction {
+  date: string;
+  description: string;
+  category: string;
+  amount: number;
+  type: 'income' | 'expense';
+  paymentMethod?: string;
+}
+
+export interface AIChatInvestmentItem {
+  ticker: string;
+  assetName?: string;
+  assetType?: string;
+  quantity: number;
+  averagePrice: number;
+  totalCost: number;
+}
+
+export interface AIChatGoalItem {
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  progressPercentage: number;
+  deadline?: string;
+}
+
+export interface AIChatUpcomingBill {
+  title: string;
+  amount: number;
+  dueDate: string;
+  category?: string;
+}
+
 export interface AIChatFinancialContext {
   monthlyIncome?: number;
   monthlyExpenses?: number;
@@ -59,6 +98,12 @@ export interface AIChatFinancialContext {
   activeGoalsCount?: number;
   topCategory?: string;
   totalInvested?: number;
+  topCategories?: AIChatFinancialCategory[];
+  recentTransactions?: AIChatRecentTransaction[];
+  portfolioItems?: AIChatInvestmentItem[];
+  investmentAllocations?: Record<string, { amount: number; percentage: number }>;
+  goals?: AIChatGoalItem[];
+  upcomingBills?: AIChatUpcomingBill[];
 }
 
 export interface AIChatRequest {
@@ -83,4 +128,56 @@ export interface AIChatResponse {
     costUsd: number;
     costBrl: number;
   };
+}
+
+export type SmartDraftType = 'transaction' | 'goal' | 'investment' | 'scheduled_task';
+
+export interface SmartDraftTransaction {
+  type: 'expense' | 'income';
+  amount: number;
+  description: string;
+  category: string;
+  date: string; // YYYY-MM-DD
+  payment_method?: string;
+}
+
+export interface SmartDraftGoal {
+  title: string;
+  target_amount: number;
+  current_amount?: number;
+  category?: string;
+  deadline?: string; // YYYY-MM-DD
+  monthly_contribution?: number;
+}
+
+export interface SmartDraftInvestment {
+  ticker: string;
+  asset_name: string;
+  transaction_type: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  transaction_date: string; // YYYY-MM-DD
+  asset_type?: string;
+  notes?: string;
+}
+
+export interface SmartDraftScheduledTask {
+  title: string;
+  task_type: 'expense' | 'income' | 'reminder';
+  value: number;
+  schedule_date: string; // YYYY-MM-DD
+  category?: string;
+  is_recurring?: boolean;
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+}
+
+export interface SmartDraft {
+  id: string;
+  draftType: SmartDraftType;
+  title: string;
+  transaction?: SmartDraftTransaction;
+  goal?: SmartDraftGoal;
+  investment?: SmartDraftInvestment;
+  scheduled_task?: SmartDraftScheduledTask;
+  status: 'pending' | 'saved' | 'discarded';
 }

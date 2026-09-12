@@ -128,14 +128,57 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
   const loadGroups = async () => {
     if (!user) return;
 
+    const cacheKey = `user_groups_${user.id}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setGroups(parsed);
+        }
+      }
+    } catch {
+      // Ignorar erro de leitura de cache
+    }
+
     try {
       const { data, error } = await (supabase as any).rpc('get_user_groups');
 
-      if (error) throw error;
-      setGroups((data || []) as FamilyGroup[]);
-    } catch (error) {
-       // Silent fail or console error as per original code
-       if (error instanceof Error && !error.message.includes("Failed to fetch") && !error.message.includes("aborted")) {
+      if (error) {
+        const isNetworkError =
+          error?.message?.includes("Failed to fetch") ||
+          error?.details?.includes("Failed to fetch") ||
+          error?.message?.includes("NetworkError") ||
+          error?.message?.includes("aborted") ||
+          error?.name === "TypeError" ||
+          (typeof error === "string" && error.includes("Failed to fetch"));
+
+        if (isNetworkError) {
+          console.warn('Conexão instável ao carregar grupos no agendamento. Mantendo dados em cache.');
+          return;
+        }
+        throw error;
+      }
+
+      const groupList = (data || []) as FamilyGroup[];
+      setGroups(groupList);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(groupList));
+      } catch {
+        // Ignorar limite de armazenamento
+      }
+    } catch (error: any) {
+      const isNetworkError =
+        error?.message?.includes("Failed to fetch") ||
+        error?.details?.includes("Failed to fetch") ||
+        error?.message?.includes("NetworkError") ||
+        error?.message?.includes("aborted") ||
+        error?.name === "TypeError" ||
+        (typeof error === "string" && error.includes("Failed to fetch"));
+
+      if (isNetworkError) {
+        console.warn('Instabilidade de rede ao carregar grupos no formulário de tarefas.');
+      } else {
         console.error('Erro ao carregar grupos:', error);
       }
     }
@@ -151,8 +194,16 @@ export function ScheduledTaskForm({ initialData, onSuccess, onCancel }: Schedule
 
       setCategories(allCategories.sort().map(c => ({ label: c, value: c })));
 
-    } catch (error) {
-      if (error instanceof Error && !error.message.includes("Failed to fetch") && !error.message.includes("aborted")) {
+    } catch (error: any) {
+      const isNetworkError =
+        error?.message?.includes("Failed to fetch") ||
+        error?.details?.includes("Failed to fetch") ||
+        error?.message?.includes("NetworkError") ||
+        error?.message?.includes("aborted") ||
+        error?.name === "TypeError" ||
+        (typeof error === "string" && error.includes("Failed to fetch"));
+
+      if (!isNetworkError) {
         console.error('Erro ao carregar categorias:', error);
       }
     }

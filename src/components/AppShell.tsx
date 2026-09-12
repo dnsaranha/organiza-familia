@@ -138,7 +138,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                   <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-64 max-h-[calc(100svh-4.5rem)] overflow-y-auto overscroll-contain">
                 {user ? (
                   <>
                     <DropdownMenuLabel>Navegação</DropdownMenuLabel>
@@ -269,8 +269,8 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   const desktopView = (
     <>
       <Sidebar collapsible="icon">
-        <div className="flex h-full flex-col">
-          <SidebarHeader className="flex p-4">
+        <div className="flex h-full flex-col min-h-0 overflow-hidden">
+          <SidebarHeader className="flex p-4 flex-shrink-0">
             <NavLink to="/dashboard" className="flex items-center gap-3 justify-center">
               <div className="rounded-full p-2 bg-gradient-primary shadow-glow flex items-center gap-3 justify-center">
                 <PiggyBank className="h-6 w-6 text-primary-foreground" />
@@ -284,14 +284,13 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
             </NavLink>
             <SidebarTrigger className="items-center content-center justify-center">
               <PanelLeft className="size-5" />
-              <div className="w-[80px] h-[80px] bg-white"></div>
             </SidebarTrigger>
           </SidebarHeader>
-          <SidebarContent className="flex-1 items-start">
-            <div className="p-2 flex items-center justify-start">
+          <SidebarContent className="flex-1 min-h-0 items-start overflow-y-auto overflow-x-hidden overscroll-contain">
+            <div className="p-2 flex items-center justify-start w-full">
               <BudgetScopeSwitcher />
             </div>
-            <SidebarMenu className="justify-center items-start">
+            <SidebarMenu className="justify-center items-start w-full">
               <SidebarMenuItem>
                 <NavLink to="/dashboard" className="w-full">
                   {({ isActive }) => (
@@ -384,7 +383,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="flex-shrink-0">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -400,7 +399,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuContent className="w-60 max-h-[calc(100svh-5rem)] overflow-y-auto overscroll-contain" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">

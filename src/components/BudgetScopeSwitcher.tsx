@@ -19,16 +19,52 @@ export const BudgetScopeSwitcher = () => {
   const { state: sidebarState } = useSidebar();
 
   useEffect(() => {
+    let isMounted = true;
     const fetchGroups = async () => {
       if (!user) return;
-      const { data, error } = await (supabase as any).rpc('get_user_groups');
-      if (error) {
-        console.error("Erro ao buscar grupos para o seletor:", error);
-      } else {
-        setGroups((data as FamilyGroup[]) || []);
+
+      const cacheKey = `user_groups_${user.id}`;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached && isMounted) {
+          setGroups(JSON.parse(cached));
+        }
+      } catch {
+        // ignore cache parse issues
+      }
+
+      try {
+        const { data, error } = await (supabase as any).rpc('get_user_groups');
+        if (error) {
+          const isNetworkError =
+            error?.message?.includes('Failed to fetch') ||
+            error?.name === 'TypeError' ||
+            error?.message?.includes('aborted') ||
+            error?.message?.includes('NetworkError');
+
+          if (isNetworkError) {
+            console.warn('Conexão instável ao buscar grupos para o seletor. Mantendo cache local.');
+          } else {
+            console.warn('Aviso ao buscar grupos para o seletor:', error?.message || error);
+          }
+        } else if (isMounted && data) {
+          const groupList = (data as FamilyGroup[]) || [];
+          setGroups(groupList);
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(groupList));
+          } catch {
+            // ignore storage quota issues
+          }
+        }
+      } catch (err: any) {
+        console.warn('Instabilidade de rede ao buscar grupos familiares:', err?.message || err);
       }
     };
+
     fetchGroups();
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
   const selectedGroup = scope === 'personal'

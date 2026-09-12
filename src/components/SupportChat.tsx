@@ -20,7 +20,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { aiCalibrationService } from '@/lib/ai/aiCalibrationService';
 import { sendAIChatMessage } from '@/lib/ai/aiChatClient';
-import { AIAssistantSettings } from '@/types/ai';
+import { AIAssistantSettings, SmartDraft } from '@/types/ai';
+import { parseSmartDraft } from '@/lib/ai/smartDraftParser';
+import { SmartDraftCard } from '@/components/ai/SmartDraftCard';
+import { financialContextService } from '@/lib/ai/financialContextService';
 
 interface Message {
   id: string;
@@ -28,13 +31,16 @@ interface Message {
   is_from_admin: boolean;
   is_read: boolean;
   created_at: string;
+  draft?: SmartDraft | null;
 }
 
 const QUICK_SUGGESTIONS = [
-  'Como montar minha reserva de emergência?',
-  'Como aplicar a regra 50/30/20 no meu orçamento?',
-  'Qual a diferença entre Tesouro Selic e CDB 100% CDI?',
-  'Como organizar as contas da família sem estresse?',
+  'Faça uma análise dos meus gastos e consumo deste mês',
+  'Como está a distribuição da minha carteira de investimentos?',
+  'Onde estão meus maiores gastos e como posso economizar?',
+  'Gastei R$ 120 no mercado Pão de Açúcar no débito hoje',
+  'Comprei 10 cotas de MXRF11 a R$ 10,50',
+  'Como está o progresso das minhas metas financeiras?',
 ];
 
 // Global state for chat visibility that can be controlled from outside
@@ -123,7 +129,19 @@ export const SupportChat = () => {
         if (error) throw error;
         if (!isMounted) return;
 
-        const msgs = data || [];
+        const rawMsgs = data || [];
+        const msgs: Message[] = rawMsgs.map((m, idx, arr) => {
+          if (m.is_from_admin) {
+            const prevUserMsg = idx > 0 && !arr[idx - 1].is_from_admin ? arr[idx - 1].message : '';
+            const { cleanReply, draft } = parseSmartDraft(prevUserMsg, m.message);
+            return {
+              ...m,
+              message: cleanReply,
+              draft,
+            };
+          }
+          return m;
+        });
         setMessages(msgs);
         calculateUnread(msgs);
 
@@ -144,7 +162,13 @@ export const SupportChat = () => {
                 const newMsg = payload.new as Message;
                 setMessages((prev) => {
                   if (prev.some((m) => m.id === newMsg.id)) return prev;
-                  const next = [...prev, newMsg];
+                  let msgToAdd = newMsg;
+                  if (newMsg.is_from_admin) {
+                    const lastUserMsg = prev.filter((m) => !m.is_from_admin).slice(-1)[0]?.message || '';
+                    const { cleanReply, draft } = parseSmartDraft(lastUserMsg, newMsg.message);
+                    msgToAdd = { ...newMsg, message: cleanReply, draft };
+                  }
+                  const next = [...prev, msgToAdd];
                   try {
                     localStorage.setItem(cacheKey, JSON.stringify(next));
                   } catch {
@@ -267,53 +291,12 @@ export const SupportChat = () => {
         }
       }
 
-      // 3. Fetch light financial summary for grounding
+      // 3. Fetch full financial context (consumption, spending, investments, goals, upcoming bills)
       let financialSummary: any = undefined;
       try {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const { data: trans } = await supabase
-          .from('transactions')
-          .select('amount, type, category')
-          .eq('user_id', user.id)
-          .gte('date', startOfMonth.toISOString().split('T')[0]);
-
-        if (trans && trans.length > 0) {
-          let income = 0;
-          let expenses = 0;
-          const catMap: Record<string, number> = {};
-
-          trans.forEach((t) => {
-            const val = Number(t.amount) || 0;
-            if (t.type === 'income') {
-              income += val;
-            } else {
-              expenses += val;
-              const cat = t.category || 'Outros';
-              catMap[cat] = (catMap[cat] || 0) + val;
-            }
-          });
-
-          let topCat = 'Geral';
-          let maxVal = 0;
-          Object.entries(catMap).forEach(([k, v]) => {
-            if (v > maxVal) {
-              maxVal = v;
-              topCat = k;
-            }
-          });
-
-          financialSummary = {
-            monthlyIncome: income,
-            monthlyExpenses: expenses,
-            balance: income - expenses,
-            topCategory: topCat,
-          };
-        }
+        financialSummary = await financialContextService.buildFinancialContext(user.id);
       } catch (e) {
-        // Proceed without financial context if query is not available
+        console.warn('Falha ao coletar contexto financeiro para IA:', e);
       }
 
       // 4. Send request to server
@@ -330,6 +313,9 @@ export const SupportChat = () => {
         })),
       });
 
+      // Parse smart draft (both from AI reply format and natural language intent)
+      const { cleanReply, draft } = parseSmartDraft(userText, aiResponse.reply);
+
       // 5. Persist AI reply into support_messages
       const { data: savedReply, error: saveError } = await supabase
         .from('support_messages')
@@ -345,17 +331,38 @@ export const SupportChat = () => {
       if (saveError) throw saveError;
 
       if (savedReply) {
-        setMessages((prev) => [...prev, savedReply as Message]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...savedReply,
+            message: cleanReply,
+            draft,
+          } as Message,
+        ]);
       }
     } catch (err: any) {
-      console.error('AI Support error:', err);
+      const isNetworkErr =
+        err?.message?.includes('Failed to fetch') ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('NetworkError');
+
+      if (isNetworkErr) {
+        console.warn('Conexão instável durante atendimento do Assistente IA.');
+      } else {
+        console.warn('Aviso no atendimento do Assistente IA:', err?.message || err);
+      }
+
       // Friendly fallback notice
-      const fallbackText = 'Desculpe, ocorreu uma instabilidade momentânea na conexão com o Assistente. Sua mensagem foi anotada e nossa equipe de suporte responderá em breve.';
-      await supabase.from('support_messages').insert({
-        user_id: user.id,
-        message: fallbackText,
-        is_from_admin: true,
-      });
+      try {
+        const fallbackText = 'Desculpe, ocorreu uma instabilidade momentânea na conexão com o Assistente. Sua mensagem foi anotada e nossa equipe de suporte responderá em breve.';
+        await supabase.from('support_messages').insert({
+          user_id: user.id,
+          message: fallbackText,
+          is_from_admin: true,
+        });
+      } catch (insertErr) {
+        console.warn('Não foi possível salvar mensagem de contingência:', insertErr);
+      }
     } finally {
       setIsAITyping(false);
     }
@@ -447,15 +454,36 @@ export const SupportChat = () => {
 
     if (unreadIds.length === 0) return;
 
+    // Optimistically update local state so the badge clears immediately
+    setMessages((prev) => prev.map((m) => (unreadIds.includes(m.id) ? { ...m, is_read: true } : m)));
+    setUnreadCount(0);
+
     try {
       const { error } = await supabase.from('support_messages').update({ is_read: true }).in('id', unreadIds);
 
-      if (error) throw error;
+      if (error) {
+        const isNetworkErr =
+          error?.message?.includes('Failed to fetch') ||
+          error?.message?.includes('NetworkError') ||
+          (error as any)?.name === 'TypeError';
+        if (isNetworkErr) {
+          console.warn('Conexão instável ao sincronizar status de leitura.');
+        } else {
+          console.warn('Aviso ao sincronizar status de leitura:', error.message);
+        }
+      }
+    } catch (err: any) {
+      const isNetworkErr =
+        err?.message?.includes('Failed to fetch') ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('NetworkError') ||
+        err?.message?.includes('aborted');
 
-      setMessages((prev) => prev.map((m) => (unreadIds.includes(m.id) ? { ...m, is_read: true } : m)));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('Error marking messages as read:', err);
+      if (isNetworkErr) {
+        console.warn('Conexão instável ao marcar mensagens como lidas.');
+      } else {
+        console.warn('Aviso ao marcar mensagens como lidas:', err?.message || err);
+      }
     }
   }, [user, messages]);
 
@@ -601,6 +629,32 @@ export const SupportChat = () => {
                           </div>
                         )}
                         <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+
+                        {/* Interactive Smart Draft Card */}
+                        {msg.draft && (
+                          <SmartDraftCard
+                            draft={msg.draft}
+                            onSaved={(savedData) => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.draft
+                                    ? { ...m, draft: { ...m.draft, status: 'saved' } }
+                                    : m
+                                )
+                              );
+                            }}
+                            onDiscarded={() => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.draft
+                                    ? { ...m, draft: { ...m.draft, status: 'discarded' } }
+                                    : m
+                                )
+                              );
+                            }}
+                          />
+                        )}
+
                         <p
                           className={`text-[9px] text-right mt-1 ${
                             msg.is_from_admin ? 'text-muted-foreground' : 'text-primary-foreground/75'

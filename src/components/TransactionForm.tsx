@@ -96,16 +96,34 @@ export const TransactionForm = ({ onSave, onCancel, transactionToEdit, initialTy
 
   // Efeito para buscar os grupos do usuário
   useEffect(() => {
+    let isMounted = true;
     const fetchGroups = async () => {
       if (!user) return;
-      const { data, error } = await (supabase as any).rpc('get_user_groups');
-      if (error) {
-        console.error("Erro ao buscar grupos:", error);
-      } else {
-        setGroups((data as FamilyGroup[]) || []);
+      try {
+        const { data, error } = await (supabase as any).rpc('get_user_groups');
+        if (error) {
+          const isNetworkError =
+            error?.message?.includes('Failed to fetch') ||
+            error?.name === 'TypeError' ||
+            error?.message?.includes('aborted') ||
+            error?.message?.includes('NetworkError');
+
+          if (isNetworkError) {
+            console.warn('Conexão instável ao buscar grupos no formulário de transações.');
+          } else {
+            console.warn('Aviso ao buscar grupos:', error?.message || error);
+          }
+        } else if (isMounted && data) {
+          setGroups((data as FamilyGroup[]) || []);
+        }
+      } catch (err: any) {
+        console.warn('Instabilidade de rede ao buscar grupos familiares:', err?.message || err);
       }
     };
     fetchGroups();
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
   // Efeito para popular o formulário ao editar uma transação

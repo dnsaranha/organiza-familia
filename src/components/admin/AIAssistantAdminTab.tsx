@@ -168,9 +168,38 @@ export const AIAssistantAdminTab: React.FC<AIAssistantAdminTabProps> = ({
             monthlyIncome: 7500,
             monthlyExpenses: 5200,
             balance: 2300,
+            savingsRate: 30.6,
             activeGoalsCount: 3,
             topCategory: 'Alimentação',
             totalInvested: 28500,
+            topCategories: [
+              { category: 'Alimentação', amount: 1850, percentage: 35.6 },
+              { category: 'Moradia', amount: 1600, percentage: 30.8 },
+              { category: 'Transporte', amount: 620, percentage: 11.9 },
+              { category: 'Lazer', amount: 480, percentage: 9.2 },
+            ],
+            recentTransactions: [
+              { date: '2026-09-08', description: 'Supermercado Pão de Açúcar', category: 'Alimentação', amount: 240, type: 'expense', paymentMethod: 'Débito' },
+              { date: '2026-09-07', description: 'Posto Shell Gasolina', category: 'Transporte', amount: 180, type: 'expense', paymentMethod: 'Crédito' },
+              { date: '2026-09-05', description: 'Salário Empresa XYZ', category: 'Salário', amount: 7500, type: 'income', paymentMethod: 'Pix' },
+            ],
+            portfolioItems: [
+              { ticker: 'MXRF11', assetName: 'Maxi Renda FII', assetType: 'FIIs', quantity: 600, averagePrice: 10.20, totalCost: 6120 },
+              { ticker: 'HGLG11', assetName: 'CSHG Logística', assetType: 'FIIs', quantity: 35, averagePrice: 168.00, totalCost: 5880 },
+              { ticker: 'Tesouro Selic 2029', assetName: 'Tesouro Direto', assetType: 'Renda Fixa', quantity: 1, averagePrice: 16500, totalCost: 16500 },
+            ],
+            investmentAllocations: {
+              'Renda Fixa': { amount: 16500, percentage: 57.9 },
+              'FIIs': { amount: 12000, percentage: 42.1 },
+            },
+            goals: [
+              { title: 'Reserva de Emergência', targetAmount: 25000, currentAmount: 18000, progressPercentage: 72, deadline: '2026-12-31' },
+              { title: 'Viagem em Família', targetAmount: 8000, currentAmount: 4200, progressPercentage: 52.5, deadline: '2027-02-15' },
+            ],
+            upcomingBills: [
+              { title: 'Condomínio', amount: 650, dueDate: '2026-09-10' },
+              { title: 'Fatura do Cartão', amount: 1450, dueDate: '2026-09-15' },
+            ],
           },
         }),
       });

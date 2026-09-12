@@ -109,37 +109,97 @@ export const FamilyGroups = () => {
 
   const loadGroups = async () => {
     if (!user) return;
-    setLoadingGroups(true);
+
+    const cacheKey = `user_groups_details_${user.id}`;
+    const simpleCacheKey = `user_groups_${user.id}`;
+
+    // Tentar carregar do cache local imediatamente
+    try {
+      const cached = localStorage.getItem(cacheKey) || localStorage.getItem(simpleCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setGroups((prev) => (prev.length === 0 ? parsed : prev));
+          setLoadingGroups(false);
+        }
+      }
+    } catch {
+      // Ignorar erro de leitura de cache
+    }
 
     try {
       const { data: groupsData, error } = await (supabase as any).rpc(
         "get_user_groups",
       );
 
-      if (error) throw error;
+      if (error) {
+        const isNetworkError =
+          error?.message?.includes("Failed to fetch") ||
+          error?.details?.includes("Failed to fetch") ||
+          error?.message?.includes("NetworkError") ||
+          error?.message?.includes("aborted") ||
+          error?.name === "TypeError" ||
+          (typeof error === "string" && error.includes("Failed to fetch"));
 
+        if (isNetworkError) {
+          console.warn("Conexão instável ao carregar grupos familiares. Utilizando cache local.");
+          return;
+        }
+        throw error;
+      }
+
+      const rawGroups = (groupsData as FamilyGroup[]) || [];
       const groupsWithCounts = await Promise.all(
-        ((groupsData as FamilyGroup[]) || []).map(async (group) => {
-          const { count } = await supabase
-            .from("group_members")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", group.id);
-          return {
-            ...group,
-            is_owner: group.owner_id === user.id,
-            member_count: count || 0,
-          };
+        rawGroups.map(async (group) => {
+          try {
+            const { count, error: countError } = await supabase
+              .from("group_members")
+              .select("*", { count: "exact", head: true })
+              .eq("group_id", group.id);
+
+            if (countError) throw countError;
+
+            return {
+              ...group,
+              is_owner: group.owner_id === user.id,
+              member_count: count || 0,
+            };
+          } catch {
+            return {
+              ...group,
+              is_owner: group.owner_id === user.id,
+              member_count: (group as any).member_count || 1,
+            };
+          }
         }),
       );
 
       setGroups(groupsWithCounts);
-    } catch (error) {
-      console.error("Erro ao carregar grupos:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os grupos.",
-        variant: "destructive",
-      });
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(groupsWithCounts));
+        localStorage.setItem(simpleCacheKey, JSON.stringify(groupsWithCounts));
+      } catch {
+        // Ignorar limite de armazenamento
+      }
+    } catch (error: any) {
+      const isNetworkError =
+        error?.message?.includes("Failed to fetch") ||
+        error?.details?.includes("Failed to fetch") ||
+        error?.message?.includes("NetworkError") ||
+        error?.message?.includes("aborted") ||
+        error?.name === "TypeError" ||
+        (typeof error === "string" && error.includes("Failed to fetch"));
+
+      if (isNetworkError) {
+        console.warn("Instabilidade temporária de rede ao carregar grupos familiares.");
+      } else {
+        console.error("Erro ao carregar grupos:", error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os grupos.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoadingGroups(false);
     }

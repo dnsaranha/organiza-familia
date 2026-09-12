@@ -76,3 +76,20 @@ ON public.ai_usage_logs
 FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() = user_id OR public.is_admin());
+
+-- Allow users to update is_read on their own support messages
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'support_messages' 
+        AND policyname = 'Users can mark their messages as read'
+    ) THEN
+        CREATE POLICY "Users can mark their messages as read"
+        ON public.support_messages
+        FOR UPDATE
+        TO authenticated
+        USING (auth.uid() = user_id)
+        WITH CHECK (auth.uid() = user_id);
+    END IF;
+END $$;
