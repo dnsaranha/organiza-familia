@@ -17,8 +17,18 @@ import {
   MessageCircle, Users, Shield, Send, Loader2, RefreshCw, 
   Search, TrendingUp, CreditCard, UserPlus,
   Clock, BarChart3, DollarSign, Target, CheckCircle2,
-  ChevronLeft, ChevronRight, Activity, Sparkles
+  ChevronLeft, ChevronRight, Activity, Sparkles, Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { AIAssistantAdminTab } from '@/components/admin/AIAssistantAdminTab';
 
@@ -80,6 +90,8 @@ export default function AdminPage() {
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [supportFilter, setSupportFilter] = useState<'all' | 'unread'>('all');
+  const [clearingUser, setClearingUser] = useState<UserWithMessages | null>(null);
+  const [isClearingTicket, setIsClearingTicket] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Users and stats state
@@ -486,6 +498,29 @@ export default function AdminPage() {
     setSelectedUser(userId);
     markAsRead(userId);
     setActiveTab('support');
+  };
+
+  const handleClearTicketHistory = async () => {
+    if (!clearingUser) return;
+    setIsClearingTicket(true);
+    try {
+      const { error } = await supabase
+        .from('support_messages')
+        .delete()
+        .eq('user_id', clearingUser.user_id);
+
+      if (error) throw error;
+
+      setConversations(prev =>
+        prev.map(c => (c.user_id === clearingUser.user_id ? { ...c, messages: [], unread_count: 0 } : c))
+      );
+      toast({ title: 'Histórico da conversa limpo com sucesso' });
+      setClearingUser(null);
+    } catch (err: any) {
+      toast({ title: 'Erro ao limpar histórico', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsClearingTicket(false);
+    }
   };
 
   // Filtered lists
@@ -1025,9 +1060,22 @@ export default function AdminPage() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        Plano: {selectedConversation.plan}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          Plano: {selectedConversation.plan}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          disabled={selectedConversation.messages.length === 0}
+                          onClick={() => setClearingUser(selectedConversation)}
+                          title="Limpar histórico deste usuário"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          Limpar histórico
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <CardTitle className="text-sm font-semibold">Atendimento ao Cliente</CardTitle>
@@ -1212,6 +1260,43 @@ export default function AdminPage() {
 
         </Tabs>
       </div>
+
+      {/* Diálogo de Confirmação para Administrador Limpar Histórico do Usuário */}
+      <AlertDialog open={!!clearingUser} onOpenChange={(open) => !open && setClearingUser(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Limpar histórico desta conversa?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Deseja realmente apagar todas as mensagens trocadas com o cliente{' '}
+              <strong className="text-foreground">{clearingUser?.full_name || clearingUser?.email}</strong>?
+              Esta ação removerá o histórico do banco de dados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearingTicket}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleClearTicketHistory();
+              }}
+              disabled={isClearingTicket}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isClearingTicket ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Limpando...
+                </>
+              ) : (
+                'Limpar conversa'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

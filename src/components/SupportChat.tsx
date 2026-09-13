@@ -12,8 +12,25 @@ import {
   UserCheck, 
   HelpCircle,
   TrendingUp,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +82,8 @@ export const SupportChat = () => {
   const [sending, setSending] = useState(false);
   const [isAITyping, setIsAITyping] = useState(false);
   const [chatMode, setChatMode] = useState<'ai' | 'human'>('ai');
+  const [isClearing, setIsClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -372,6 +391,24 @@ export const SupportChat = () => {
     const textToSend = (textOverride || newMessage).trim();
     if (!textToSend || !user) return;
 
+    // Detectar comando de linguagem natural para limpar histórico
+    const normalized = textToSend.toLowerCase();
+    if (
+      normalized === 'limpar historico' ||
+      normalized === 'limpar histórico' ||
+      normalized === 'apagar histórico' ||
+      normalized === 'apagar historico' ||
+      normalized === 'limpar chat' ||
+      normalized === 'limpar conversa' ||
+      normalized === 'apagar conversa' ||
+      normalized === 'apagar mensagens' ||
+      normalized === 'resetar chat'
+    ) {
+      setNewMessage('');
+      setShowClearConfirm(true);
+      return;
+    }
+
     setSending(true);
     setNewMessage('');
 
@@ -487,6 +524,59 @@ export const SupportChat = () => {
     }
   }, [user, messages]);
 
+  // Limpar histórico completo da conversa
+  const handleClearHistory = async () => {
+    if (!user) return;
+    setIsClearing(true);
+    const cacheKey = `support_messages_cache_${user.id}`;
+
+    try {
+      const { error } = await supabase
+        .from('support_messages')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) {
+        const isNetworkErr =
+          error?.message?.includes('Failed to fetch') ||
+          error?.name === 'TypeError' ||
+          error?.message?.includes('NetworkError') ||
+          error?.message?.includes('aborted');
+
+        if (isNetworkErr) {
+          console.warn('Conexão instável ao apagar histórico no banco. Limpando localmente.');
+        } else {
+          throw error;
+        }
+      }
+
+      // Limpar cache local e estado
+      try {
+        localStorage.removeItem(cacheKey);
+      } catch {
+        // ignore
+      }
+
+      setMessages([]);
+      setUnreadCount(0);
+      setShowClearConfirm(false);
+
+      toast({
+        title: 'Histórico limpo!',
+        description: 'Todas as mensagens da conversa foram apagadas com sucesso.',
+      });
+    } catch (err: any) {
+      console.error('Erro ao limpar histórico:', err);
+      toast({
+        title: 'Erro ao limpar histórico',
+        description: err?.message || 'Não foi possível apagar o histórico de mensagens.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   const handleOpenChat = () => {
     setIsOpen(true);
     markMessagesAsRead();
@@ -566,6 +656,32 @@ export const SupportChat = () => {
                   <Sparkles className="h-3.5 w-3.5 mr-1" /> Usar IA
                 </Button>
               )}
+
+              {/* Botão para limpar histórico do chat */}
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      disabled={messages.length === 0 || isClearing || sending || isAITyping}
+                      onClick={() => setShowClearConfirm(true)}
+                      aria-label="Limpar histórico"
+                    >
+                      {isClearing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    Limpar histórico do chat
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCloseChat}>
                 <X className="h-4 w-4" />
               </Button>
@@ -609,6 +725,18 @@ export const SupportChat = () => {
                 </div>
               ) : (
                 <>
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-border/30 text-[11px] text-muted-foreground">
+                    <span className="font-medium">Histórico da conversa</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowClearConfirm(true)}
+                      disabled={isClearing || sending || isAITyping}
+                      className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Limpar histórico
+                    </button>
+                  </div>
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
@@ -718,6 +846,41 @@ export const SupportChat = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Diálogo de Confirmação para Limpar Histórico */}
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Limpar histórico do chat?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              Esta ação removerá permanentemente todas as mensagens e conversas anteriores com o assistente neste dispositivo e na sua conta. Seus dados financeiros, transações e metas não serão alterados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleClearHistory();
+              }}
+              disabled={isClearing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isClearing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Limpando...
+                </>
+              ) : (
+                'Limpar histórico'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
