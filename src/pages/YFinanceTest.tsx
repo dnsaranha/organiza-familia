@@ -179,13 +179,13 @@ const YFinanceTest = () => {
 
       // Salvar usando RPC bulk_upsert_assets com privilégios adequados
       const { error: rpcError } = await supabase.rpc("bulk_upsert_assets", {
-        assets_data: rows,
+        assets_data: rows as unknown as import("@/integrations/supabase/types").Json,
       });
 
       if (rpcError) {
         const { error } = await supabase
           .from("financial_assets")
-          .upsert(rows, { onConflict: "ticker" });
+          .upsert(rows as unknown as import("@/integrations/supabase/types").Database["public"]["Tables"]["financial_assets"]["Insert"][], { onConflict: "ticker" });
         if (error) throw error;
       }
 

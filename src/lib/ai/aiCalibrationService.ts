@@ -43,7 +43,7 @@ export const aiCalibrationService = {
   // Fetch active AI settings
   async getSettings(): Promise<AIAssistantSettings> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('ai_assistant_settings')
         .select('*')
         .order('updated_at', { ascending: false })
@@ -74,7 +74,7 @@ export const aiCalibrationService = {
 
     // Try saving to Supabase
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('ai_assistant_settings')
         .upsert({
           id: updated.id === 'default-settings' ? undefined : updated.id,
@@ -134,7 +134,7 @@ export const aiCalibrationService = {
 
     // Attempt to persist in Supabase
     try {
-      await supabase.from('ai_usage_logs').insert({
+      await (supabase as any).from('ai_usage_logs').insert({
         user_id: newLog.user_id,
         user_email: newLog.user_email,
         user_plan: newLog.user_plan,
@@ -156,7 +156,7 @@ export const aiCalibrationService = {
   // Fetch all usage logs (Admin only)
   async getUsageLogs(): Promise<AIUsageLog[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('ai_usage_logs')
         .select('*')
         .order('created_at', { ascending: false })
@@ -249,6 +249,10 @@ export const aiCalibrationService = {
     return logs.filter(
       (l) => l.user_id === userId && new Date(l.created_at) >= startOfMonth
     ).length;
+  },
+
+  async getUserUsage(userId: string): Promise<{ total_messages: number }> {
+    return { total_messages: await this.getUserMonthlyMessageCount(userId) };
   },
 
   // Calculate costs from token counts

@@ -20,7 +20,7 @@ export const financialContextService = {
       // Fetch current month transactions for totals and categories
       const { data: monthTrans } = await supabase
         .from('transactions')
-        .select('amount, type, category, date, description, payment_method')
+        .select('amount, type, category, date, description')
         .eq('user_id', userId)
         .gte('date', startOfMonth)
         .order('date', { ascending: false });
@@ -67,13 +67,12 @@ export const financialContextService = {
           category: t.category || 'Geral',
           amount: Number(t.amount) || 0,
           type: t.type as 'income' | 'expense',
-          paymentMethod: t.payment_method || undefined,
         }));
       } else {
         // If no transactions this month, fetch recent 8 transactions regardless of month
         const { data: recentTrans } = await supabase
           .from('transactions')
-          .select('amount, type, category, date, description, payment_method')
+          .select('amount, type, category, date, description')
           .eq('user_id', userId)
           .order('date', { ascending: false })
           .limit(8);
@@ -85,7 +84,6 @@ export const financialContextService = {
             category: t.category || 'Geral',
             amount: Number(t.amount) || 0,
             type: t.type as 'income' | 'expense',
-            paymentMethod: t.payment_method || undefined,
           }));
         }
       }

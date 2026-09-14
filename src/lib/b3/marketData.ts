@@ -323,8 +323,8 @@ export async function fetchDirectYahooData(
         setor: dbData.sector || (isFii ? "Fundo Imobiliário" : "B3"),
         preco_atual: Number(dbData.current_price || 0),
         dividendos_12m: Number(dbData.dividends_12m || 0),
-        historico_dividendos: dbData.dividend_history || [],
-        historico_precos: dbData.price_history || [],
+        historico_dividendos: (Array.isArray(dbData.dividend_history) ? dbData.dividend_history : []) as unknown as DirectDividendEvent[],
+        historico_precos: (Array.isArray(dbData.price_history) ? dbData.price_history : []) as unknown as DirectHistoricalPrice[],
       };
     }
   } catch (dbErr) {
