@@ -28,6 +28,25 @@ async function startServer() {
     }
   });
 
+  // Proxy for Yahoo Finance chart data (bypasses browser CORS in dev and production)
+  app.get("/api/yahoo/*all", async (req, res) => {
+    try {
+      const targetPath = req.originalUrl.replace(/^\/api\/yahoo/, "");
+      const targetUrl = `https://query1.finance.yahoo.com${targetPath}`;
+      const response = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+        },
+      });
+      const data = await response.text();
+      res.setHeader("Content-Type", response.headers.get("content-type") || "application/json");
+      res.status(response.status).send(data);
+    } catch (err: any) {
+      res.status(502).json({ error: err.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

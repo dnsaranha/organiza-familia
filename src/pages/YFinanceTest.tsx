@@ -3,6 +3,7 @@ import {
   fetchDirectYahooData,
   fetchMultipleAssetsDirectly,
   formatTickerForYahoo,
+  formatCleanAssetName,
   DirectAssetData,
   DirectDividendEvent,
 } from "@/lib/b3/marketData";
@@ -87,8 +88,11 @@ const YFinanceTest = () => {
 
   // Search a single ticker directly
   const handleSearchSingle = async (symbolToSearch?: string) => {
-    const sym = (symbolToSearch || tickerInput).trim().toUpperCase();
+    let sym = (symbolToSearch || tickerInput).trim().toUpperCase();
     if (!sym) return;
+
+    // Normaliza o input do usuário: remove prefixos como 'FII ' ou 'FUNDO ', e espaços internos
+    sym = sym.replace(/^FII\s+/i, "").replace(/^FUNDO\s+/i, "").replace(/\s+/g, "");
 
     setLoading(true);
     try {
@@ -104,14 +108,15 @@ const YFinanceTest = () => {
           variant: "destructive",
         });
       } else {
+        const cleanName = formatCleanAssetName(data.nome, data.nome, data.ticker);
         toast({
-          title: `Dados carregados para ${sym}`,
+          title: `${data.ticker.replace(".SA", "")} - ${cleanName}`,
           description: `Preço: R$ ${data.preco_atual.toFixed(2)} | Proventos: ${data.historico_dividendos.length} eventos`,
         });
       }
     } catch (err: any) {
       toast({
-        title: "Erro na busca direta",
+        title: "Erro na busca do ativo",
         description: err.message || "Falha ao consultar Yahoo Finance",
         variant: "destructive",
       });
@@ -158,16 +163,19 @@ const YFinanceTest = () => {
 
     setSaving(true);
     try {
-      const rows = assetsToSave.map((asset) => ({
-        ticker: asset.ticker,
-        name: asset.nome,
-        sector: asset.setor,
-        current_price: asset.preco_atual,
-        dividends_12m: asset.dividendos_12m,
-        price_history: asset.historico_precos || [],
-        dividend_history: asset.historico_dividendos || [],
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = assetsToSave.map((asset) => {
+        const cleanSym = asset.ticker.replace(".SA", "").toUpperCase();
+        return {
+          ticker: asset.ticker,
+          name: formatCleanAssetName(asset.nome, asset.nome, cleanSym),
+          sector: asset.setor || (cleanSym.endsWith("11") ? "Fundo Imobiliário" : "B3"),
+          current_price: asset.preco_atual,
+          dividends_12m: asset.dividendos_12m,
+          price_history: asset.historico_precos || [],
+          dividend_history: asset.historico_dividendos || [],
+          updated_at: new Date().toISOString(),
+        };
+      });
 
       // Salvar usando RPC bulk_upsert_assets com privilégios adequados
       const { error: rpcError } = await supabase.rpc("bulk_upsert_assets", {
@@ -183,7 +191,7 @@ const YFinanceTest = () => {
 
       toast({
         title: "Salvo no banco com sucesso!",
-        description: `${rows.length} ativo(s) gravado(s) na tabela financial_assets.`,
+        description: `${rows.length} ativo(s) gravado(s) na tabela financial_assets com nomes limpos.`,
       });
     } catch (err: any) {
       toast({
@@ -199,8 +207,22 @@ const YFinanceTest = () => {
   // Combine single and portfolio results for inspection
   const allCurrentAssets = useMemo(() => {
     const map = new Map<string, DirectAssetData>();
-    if (singleResult) map.set(singleResult.ticker, singleResult);
-    for (const a of portfolioResults) map.set(a.ticker, a);
+    if (singleResult) {
+      const cSym = singleResult.ticker.replace(".SA", "").toUpperCase();
+      map.set(singleResult.ticker, {
+        ...singleResult,
+        nome: formatCleanAssetName(singleResult.nome, singleResult.nome, cSym),
+        setor: singleResult.setor || (cSym.endsWith("11") ? "Fundo Imobiliário" : "B3"),
+      });
+    }
+    for (const a of portfolioResults) {
+      const cSym = a.ticker.replace(".SA", "").toUpperCase();
+      map.set(a.ticker, {
+        ...a,
+        nome: formatCleanAssetName(a.nome, a.nome, cSym),
+        setor: a.setor || (cSym.endsWith("11") ? "Fundo Imobiliário" : "B3"),
+      });
+    }
     return Array.from(map.values());
   }, [singleResult, portfolioResults]);
 
@@ -219,18 +241,20 @@ const YFinanceTest = () => {
     }> = [];
 
     for (const asset of allCurrentAssets) {
+      const cleanSym = asset.ticker.replace(".SA", "").toUpperCase();
+      const cleanName = formatCleanAssetName(asset.nome, asset.nome, cleanSym);
       for (const div of asset.historico_dividendos || []) {
         const dStr = div.date || div.paymentDate || div.recordDate || "";
         const parts = dStr.split("-");
         const year = parts[0] || "";
         const month = parts[1] || "";
         list.push({
-          ticker: asset.ticker.replace(".SA", ""),
-          nome: asset.nome,
+          ticker: cleanSym,
+          nome: cleanName,
           date: dStr,
           recordDate: div.recordDate,
           amount: div.amount,
-          type: div.type || (asset.ticker.includes("11") ? "RENDIMENTO" : "DIVIDENDO"),
+          type: div.type || (cleanSym.endsWith("11") ? "RENDIMENTO" : "DIVIDENDO"),
           year,
           month,
           isAugust: month === "08",

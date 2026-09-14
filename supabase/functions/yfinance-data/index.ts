@@ -143,9 +143,85 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   const events = result.events || {};
   const dividendEvents = events.dividends || {};
 
+  const cleanTicker = ticker.replace('.SA', '').trim().toUpperCase();
+  const isFII = cleanTicker.endsWith('11') || cleanTicker.includes('FII');
+
   const preco_atual = meta.regularMarketPrice || meta.previousClose || 0;
-  const nome = meta.shortName || meta.longName || ticker.replace('.SA', '');
-  const setor = meta.exchangeName || "N/A";
+
+  // Dicionário de ativos populares da B3 com nomes limpos e oficiais
+  const KNOWN_NAMES: Record<string, string> = {
+    "MXRF11": "Maxi Renda FII",
+    "HGLG11": "CSHG Logística FII",
+    "XPML11": "XP Malls FII",
+    "KNCR11": "Kinea Rendimentos Imobiliários FII",
+    "KNIP11": "Kinea Índice de Preços FII",
+    "BTLG11": "BTG Pactual Logística FII",
+    "VISC11": "Vinci Shopping Centers FII",
+    "XPLG11": "XP Log FII",
+    "TGAR11": "TG Ativo Real FII",
+    "CPTS11": "Capitânia Securities II FII",
+    "VGHF11": "Valora Hedge Fund FII",
+    "HGRU11": "CSHG Renda Urbana FII",
+    "HGBS11": "Hedge Brasil Shopping FII",
+    "TRXF11": "TRX Real Estate FII",
+    "RZTR11": "Riza Terrax FII",
+    "GALG11": "Guardian Real Estate FII",
+    "VGIR11": "Valora RE III FII",
+    "KNSC11": "Kinea Securities FII",
+    "IRDM11": "Iridium Recebíveis Imobiliários FII",
+    "RBRR11": "RBR Rendimento High Grade FII",
+    "RBRF11": "RBR Alpha Multiestratégia FII",
+    "VRTA11": "Fator Veritá FII",
+    "RECT11": "REC Renda Imobiliária FII",
+    "HSML11": "HSI Malls FII",
+    "LVBI11": "VBI Logística FII",
+    "PVBI11": "VBI Prime Properties FII",
+    "ALZR11": "Alianza Trust Renda Imobiliária FII",
+    "URPR11": "Urca Prime Renda FII",
+    "DEVA11": "Devant Recebíveis Imobiliários FII",
+    "BCFF11": "BTG Pactual Fundo de Fundos FII",
+    "KFOF11": "Kinea Fundo de Fundos FII",
+    "HFOF11": "Hedge Top FOFII 3 FII",
+    "OUJP11": "Ourinvest JPP FII",
+    "VINO11": "Vinci Offices FII",
+    "RBRP11": "RBR Properties FII",
+    "MCCI11": "Mauá Capital Recebíveis Imobiliários FII",
+    "BTAL11": "BTG Pactual Agro Logística FII",
+    "SNCI11": "Suno Recebíveis Imobiliários FII",
+    "SNFF11": "Suno Fundo de Fundos FII",
+    "SNAG11": "Suno Agro Fiagro",
+    "ITUB4": "Itaú Unibanco",
+    "BBDC4": "Bradesco",
+    "BBAS3": "Banco do Brasil",
+    "PETR4": "Petrobras PN",
+    "PETR3": "Petrobras ON",
+    "VALE3": "Vale",
+    "TAEE11": "Taesa",
+    "WEGE3": "WEG",
+    "ABEV3": "Ambev",
+  };
+
+  let nome = KNOWN_NAMES[cleanTicker] || meta.longName || meta.shortName || cleanTicker;
+  if (!KNOWN_NAMES[cleanTicker]) {
+    nome = nome
+      .replace(/\s+CI\s+ER\b/gi, "")
+      .replace(/\s+CI\b/gi, "")
+      .replace(/\s+ER\b/gi, "")
+      .replace(/\s+PAX\b/gi, "")
+      .replace(/\s+PN\s+EJ\s+N\d\b/gi, "")
+      .replace(/\s+ON\s+EJ\s+N\d\b/gi, "")
+      .replace(/\s+UNT\s+N\d\b/gi, "")
+      .replace(/\s+ED\s+N\d\b/gi, "")
+      .replace(/\s+N\d\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (isFII && !nome.toUpperCase().includes("FII") && !nome.toUpperCase().includes("FUNDO")) {
+      nome = `${nome} FII`;
+    }
+  }
+
+  const setor = isFII ? "Fundo Imobiliário" : (meta.exchangeName === "SAO" ? "B3" : (meta.exchangeName || "B3"));
 
   // Build price history
   const historico_precos: HistoricalPrice[] = [];
@@ -176,7 +252,6 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   }
 
   // Enrich with Brazilian sources (CVM / B3 / Brapi events)
-  const cleanTicker = ticker.replace('.SA', '').trim().toUpperCase();
   const brazilianDividends = await fetchBrazilianDividends(cleanTicker);
 
   if (brazilianDividends.length > 0) {
