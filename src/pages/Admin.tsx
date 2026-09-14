@@ -190,7 +190,7 @@ export default function AdminPage() {
       const [profilesRes, messagesRes, aiLogsRes] = await Promise.all([
         supabase.from('profiles').select('*').limit(200),
         supabase.from('support_messages').select('user_id, created_at').limit(300),
-        supabase.from('ai_usage_logs').select('user_id, user_email, user_plan, created_at').limit(300),
+        (supabase as any).from('ai_usage_logs').select('user_id, user_email, user_plan, created_at').limit(300),
       ]);
 
       const userMap = new Map<string, UserInfo>();
@@ -1158,7 +1158,7 @@ export default function AdminPage() {
               isAdmin={isAdmin}
               onOpenUserChat={(targetUserId) => {
                 setActiveTab('support');
-                setSelectedUserId(targetUserId);
+                setSelectedUser(targetUserId);
               }}
             />
           </TabsContent>

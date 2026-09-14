@@ -111,6 +111,7 @@ export interface AIChatRequest {
   userEmail?: string;
   userPlan?: string;
   message: string;
+  calibrationSettings?: Partial<AIAssistantSettings>;
   financialSummary?: AIChatFinancialContext;
   conversationHistory?: Array<{
     role: 'user' | 'assistant';

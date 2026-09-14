@@ -12,8 +12,8 @@ import {
   DirectAssetData,
 } from "@/lib/b3/marketData";
 
-const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v2";
-const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v2";
+const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v3";
+const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v3";
 
 const SESSION_CACHE_KEY_ASSETS = "b3_cache_enhanced_assets";
 const SESSION_CACHE_KEY_EVOLUTION = "b3_cache_portfolio_evolution";
@@ -371,6 +371,7 @@ export const useB3Data = () => {
     console.log(`Buscando dados e dividendos internamente para: ${formattedTickers.join(", ")}`);
 
     let fetchedAssets: any[] = [];
+    let enrichedAssets: any[] = [];
 
     // 1. Execute internally direct fetch first
     try {
@@ -379,18 +380,44 @@ export const useB3Data = () => {
       console.warn("Aviso ao buscar cotações internamente:", directErr);
     }
 
-    // 2. Fallback to Edge function if direct fetch returned empty
-    if (fetchedAssets.length === 0) {
-      try {
-        const { data, error } = await supabase.functions.invoke("yfinance-data", {
-          body: { tickers: formattedTickers, fullHistory: true },
-        });
-        if (!error && data?.assets && Array.isArray(data.assets)) {
-          fetchedAssets = data.assets;
-        }
-      } catch (edgeErr) {
-        console.info("Edge function não acessível:", edgeErr);
+    // 2. Always request the server-side enrichment. The direct Yahoo response
+    // contains historical payments, but usually omits dividends already
+    // announced by Brazilian issuers. The edge function merges both sources.
+    try {
+      const { data, error } = await supabase.functions.invoke("yfinance-data", {
+        body: { tickers: formattedTickers, fullHistory: true },
+      });
+      if (!error && data?.assets && Array.isArray(data.assets)) {
+        enrichedAssets = data.assets;
       }
+    } catch (edgeErr) {
+      console.info("Edge function não acessível:", edgeErr);
+    }
+
+    if (enrichedAssets.length > 0) {
+      const normalizeTicker = (value: string) => value.replace(".SA", "").toUpperCase();
+      const mergedByTicker = new Map(
+        fetchedAssets.map((asset) => [normalizeTicker(asset.ticker), asset]),
+      );
+
+      enrichedAssets.forEach((enriched) => {
+        const key = normalizeTicker(enriched.ticker);
+        const direct = mergedByTicker.get(key);
+        mergedByTicker.set(key, {
+          ...direct,
+          ...enriched,
+          historico_precos:
+            enriched.historico_precos?.length > 0
+              ? enriched.historico_precos
+              : direct?.historico_precos || [],
+          historico_dividendos:
+            enriched.historico_dividendos?.length > 0
+              ? enriched.historico_dividendos
+              : direct?.historico_dividendos || [],
+        });
+      });
+
+      fetchedAssets = Array.from(mergedByTicker.values());
     }
 
     // 3. Persist into Supabase financial_assets via secure RPC function

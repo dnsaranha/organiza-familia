@@ -35,7 +35,7 @@ interface AssetData {
 async function fetchBrazilianDividends(cleanTicker: string): Promise<DividendEvent[]> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const url = `https://brapi.dev/api/quote/${encodeURIComponent(cleanTicker)}?dividends=true`;
     const res = await fetch(url, {
@@ -118,7 +118,10 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
     ? Math.floor(Date.now() / 1000) - 10 * 365 * 24 * 60 * 60
     : Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
   
-  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${periodStart}&period2=${now}&interval=1mo&events=div`;
+  // Daily candles preserve the actual ex-dividend date. With monthly candles,
+  // Yahoo moves events to the first day of the month and the FII payment-date
+  // projection below cannot identify end-of-month announcements correctly.
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${periodStart}&period2=${now}&interval=1d&events=div`;
   
   console.log(`Fetching chart data from: ${chartUrl}`);
   
@@ -224,14 +227,15 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   const setor = isFII ? "Fundo Imobiliário" : (meta.exchangeName === "SAO" ? "B3" : (meta.exchangeName || "B3"));
 
   // Build price history
-  const historico_precos: HistoricalPrice[] = [];
+  const monthlyPrices = new Map<string, HistoricalPrice>();
   for (let i = 0; i < timestamps.length; i++) {
     const closePrice = quotes.close?.[i];
     if (closePrice !== null && closePrice !== undefined && !isNaN(closePrice)) {
       const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0];
-      historico_precos.push({ date, close: closePrice });
+      monthlyPrices.set(date.slice(0, 7), { date, close: closePrice });
     }
   }
+  const historico_precos = Array.from(monthlyPrices.values());
 
   // Build dividend history from Yahoo Finance
   const historico_dividendos: DividendEvent[] = [];
@@ -290,7 +294,6 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
   }
 
   // Handle Brazilian FIIs without explicit paymentDate (Yahoo puts ex-date at end of month, paid on 15th of next month)
-  const isFII = cleanTicker.endsWith('11') || cleanTicker.includes('FII');
   for (let i = 0; i < historico_dividendos.length; i++) {
     const item = historico_dividendos[i];
     if (!item.paymentDate && item.date) {
