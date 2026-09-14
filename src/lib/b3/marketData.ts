@@ -49,7 +49,6 @@ export async function fetchDirectYahooData(
   const candidateUrls = [
     `/api/yahoo/v8/finance/chart/${encodedTicker}?${chartParams}`,
     `/api/yahoo2/v8/finance/chart/${encodedTicker}?${chartParams}`,
-    `/api/yahoo/v8/finance/chart/${encodedTicker}?interval=1mo&events=div`,
     `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${encodedTicker}?${chartParams}`)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${encodedTicker}?${chartParams}`)}`,
   ];
@@ -59,7 +58,8 @@ export async function fetchDirectYahooData(
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
       });
-      if (res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      if (res.ok && !contentType.includes("text/html")) {
         const json = await res.json();
         const parsed = parseYahooChartResponse(formattedTicker, json);
         if (parsed) {
@@ -71,63 +71,76 @@ export async function fetchDirectYahooData(
     }
   }
 
-  // Final fallback: Brapi
-  try {
-    const brapiUrl = `/api/brapi/api/quote/${encodeURIComponent(cleanSym)}?dividends=true&range=10y&interval=1mo`;
-    const res = await fetch(brapiUrl);
-    if (res.ok) {
-      const bData = await res.json();
-      const item = bData?.results?.[0];
-      if (item) {
-        const preco_atual = item.regularMarketPrice || item.previousClose || 0;
-        const nome = item.shortName || item.longName || cleanSym;
-        const setor = "B3";
-        const cashDivs = item.dividendsData?.cashDividends || [];
-        const historico_dividendos: DirectDividendEvent[] = [];
-        let dividendos_12m = 0;
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  // Fallback: Brapi (with multiple endpoints / CORS proxies)
+  const brapiCandidates = [
+    `/api/brapi/api/quote/${encodeURIComponent(cleanSym)}?dividends=true&range=10y&interval=1mo`,
+    `https://brapi.dev/api/quote/${encodeURIComponent(cleanSym)}?dividends=true`,
+    `https://corsproxy.io/?${encodeURIComponent(`https://brapi.dev/api/quote/${encodeURIComponent(cleanSym)}?dividends=true`)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://brapi.dev/api/quote/${encodeURIComponent(cleanSym)}?dividends=true`)}`,
+  ];
 
-        for (const cd of cashDivs) {
-          const rawAmt = typeof cd.rate === "number" ? cd.rate : parseFloat(cd.rate);
-          if (!rawAmt || isNaN(rawAmt)) continue;
-          const pDate = cd.paymentDate || cd.lastDatePrior || cd.approvedOn;
-          if (!pDate) continue;
-          const dStr = pDate.split("T")[0];
-          const divDate = new Date(dStr);
+  for (const bUrl of brapiCandidates) {
+    try {
+      const res = await fetch(bUrl, {
+        headers: { Accept: "application/json" },
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (res.ok && !contentType.includes("text/html")) {
+        const bData = await res.json();
+        const item = bData?.results?.[0];
+        if (item) {
+          const preco_atual = item.regularMarketPrice || item.previousClose || 0;
+          const nome = item.shortName || item.longName || cleanSym;
+          const setor = "B3";
+          const cashDivs = item.dividendsData?.cashDividends || [];
+          const historico_dividendos: DirectDividendEvent[] = [];
+          let dividendos_12m = 0;
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          const todayStr = new Date().toISOString().split("T")[0];
 
-          historico_dividendos.push({
-            date: dStr,
-            amount: Number(rawAmt.toFixed(4)),
-            paymentDate: dStr,
-            recordDate: cd.lastDatePrior ? cd.lastDatePrior.split("T")[0] : dStr,
-            type: cd.label || (isFii ? "RENDIMENTO" : "DIVIDENDO"),
-            status: "paid",
-          });
+          for (const cd of cashDivs) {
+            const rawAmt = typeof cd.rate === "number" ? cd.rate : parseFloat(cd.rate);
+            if (!rawAmt || isNaN(rawAmt)) continue;
+            const pDate = cd.paymentDate || cd.lastDatePrior || cd.approvedOn;
+            if (!pDate) continue;
+            const dStr = pDate.split("T")[0];
+            const divDate = new Date(dStr);
+            const isAnnounced = (dStr >= todayStr) || (cd.lastDatePrior && cd.lastDatePrior.split("T")[0] >= todayStr);
 
-          if (divDate >= oneYearAgo) {
-            dividendos_12m += rawAmt;
+            historico_dividendos.push({
+              date: dStr,
+              amount: Number(rawAmt.toFixed(4)),
+              paymentDate: dStr,
+              recordDate: cd.lastDatePrior ? cd.lastDatePrior.split("T")[0] : dStr,
+              type: cd.label || (isFii ? "RENDIMENTO" : "DIVIDENDO"),
+              status: isAnnounced ? "announced" : "paid",
+            });
+
+            if (divDate >= oneYearAgo) {
+              dividendos_12m += rawAmt;
+            }
           }
+
+          historico_dividendos.sort((a, b) => b.date.localeCompare(a.date));
+
+          return {
+            ticker: formattedTicker,
+            nome,
+            setor,
+            preco_atual,
+            dividendos_12m: Number(dividendos_12m.toFixed(4)),
+            historico_dividendos,
+            historico_precos: (item.historicalDataPrice || []).map((hp: any) => ({
+              date: new Date(hp.date * 1000).toISOString().split("T")[0],
+              close: hp.close,
+            })),
+          };
         }
-
-        historico_dividendos.sort((a, b) => b.date.localeCompare(a.date));
-
-        return {
-          ticker: formattedTicker,
-          nome,
-          setor,
-          preco_atual,
-          dividendos_12m: Number(dividendos_12m.toFixed(4)),
-          historico_dividendos,
-          historico_precos: (item.historicalDataPrice || []).map((hp: any) => ({
-            date: new Date(hp.date * 1000).toISOString().split("T")[0],
-            close: hp.close,
-          })),
-        };
       }
+    } catch (bErr) {
+      // Continue to next brapi candidate
     }
-  } catch (bErr) {
-    console.warn(`Fallback brapi também indisponível para ${cleanSym}:`, bErr);
   }
 
   return null;
@@ -192,13 +205,16 @@ function parseYahooChartResponse(ticker: string, chartData: any): DirectAssetDat
       paymentDate = nextMonth.toISOString().split("T")[0];
     }
 
+    const todayStr = new Date().toISOString().split("T")[0];
+    const isAnnounced = (paymentDate && paymentDate >= todayStr) || (dateStr >= todayStr);
+
     historico_dividendos.push({
       date: paymentDate || dateStr,
       amount,
       paymentDate,
       recordDate: dateStr,
       type: isFii ? "RENDIMENTO" : "DIVIDEND",
-      status: "paid",
+      status: isAnnounced ? "announced" : "paid",
     });
 
     if (divDate >= oneYearAgo) {
