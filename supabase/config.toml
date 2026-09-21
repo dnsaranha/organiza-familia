@@ -66,3 +66,6 @@ verify_jwt = false
 
 [functions.google-calendar-webhook]
 verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = false
