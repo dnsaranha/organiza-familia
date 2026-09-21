@@ -13,6 +13,10 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  parseLocalDate,
+  resolveEffectivePaymentDate,
+} from "@/lib/b3/dividendUtils";
 
 interface DividendEntry {
   date: string;
@@ -180,19 +184,25 @@ const MonthlyAssetBreakdownChart = ({ data = [], userAssets = [], loading = fals
       const divs = dividendByTicker.get(ticker) || [];
       let proventos = 0;
       let proventosAcumulados = 0;
+      const seenDivs = new Set<string>();
+
       for (const d of divs) {
-        const payDateStr = (d as any).paymentDate || (d as any).payment_date || d.date;
-        const recDateStr = (d as any).recordDate || (d as any).record_date || d.date;
-        const dd = new Date(payDateStr);
-        const recDate = new Date(recDateStr);
+        const { date: dd } = resolveEffectivePaymentDate(ticker, d);
         if (dd > monthEnd) continue;
+
+        const dedupeKey = `${dd.getFullYear()}-${dd.getMonth()}-${Number(d.amount || 0).toFixed(4)}`;
+        if (seenDivs.has(dedupeKey)) continue;
+        seenDivs.add(dedupeKey);
+
+        const recDateStr = (d as any).recordDate || (d as any).record_date || (d as any).paymentDate || d.date;
+        const recDate = parseLocalDate(recDateStr);
         // qty held at record date
         let q = 0;
         if (txs.length > 0) {
-          const firstTxDate = new Date(txs[0].transaction_date);
+          const firstTxDate = parseLocalDate(txs[0].transaction_date);
           if (recDate >= firstTxDate) {
             for (const t of txs) {
-              const td = new Date(t.transaction_date);
+              const td = parseLocalDate(t.transaction_date);
               if (td > recDate) break;
               if (t.transaction_type === "buy" || t.transaction_type === "bonus" || t.transaction_type === "split") q += t.quantity;
               else if (t.transaction_type === "sell" || t.transaction_type === "grouping") q -= t.quantity;

@@ -11,6 +11,10 @@ import {
   fetchMultipleAssetsDirectly,
   DirectAssetData,
 } from "@/lib/b3/marketData";
+import {
+  parseLocalDate,
+  resolveEffectivePaymentDate,
+} from "@/lib/b3/dividendUtils";
 
 const DIVIDEND_CACHE_KEY = "dividends_last_fetch_date_v3";
 const DIVIDEND_TICKERS_KEY = "dividends_fetched_tickers_v3";
@@ -579,10 +583,17 @@ export const useB3Data = () => {
                 totalCost += pos.totalCost || ((pos.averagePrice || 0) * (pos.quantity || 0));
 
                 if (assetData && assetData.historico_dividendos && Array.isArray(assetData.historico_dividendos)) {
+                  const seenMonthDivs = new Set<string>();
                   const monthDividends = assetData.historico_dividendos
                     .filter((d: any) => {
-                      const dDate = new Date(d.date || d.paymentDate);
-                      return dDate.getMonth() === date.getMonth() && dDate.getFullYear() === date.getFullYear();
+                      const { date: dDate } = resolveEffectivePaymentDate(pos.ticker, d);
+                      if (dDate.getMonth() !== date.getMonth() || dDate.getFullYear() !== date.getFullYear()) {
+                        return false;
+                      }
+                      const dKey = `${dDate.getFullYear()}-${dDate.getMonth()}-${Number(d.amount || 0).toFixed(4)}`;
+                      if (seenMonthDivs.has(dKey)) return false;
+                      seenMonthDivs.add(dKey);
+                      return true;
                     })
                     .reduce((sum: number, d: any) => {
                       const amount = typeof d.amount === 'number' ? d.amount : parseFloat(d.amount) || 0;
@@ -817,7 +828,7 @@ export const useB3Data = () => {
               oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
               const sumFromHist = history
                 .filter((d: any) => {
-                  const dDate = new Date(d.date || d.paymentDate || d.recordDate);
+                  const dDate = parseLocalDate(d.paymentDate || d.date || d.recordDate);
                   return !isNaN(dDate.getTime()) && dDate >= oneYearAgo;
                 })
                 .reduce((sum: number, d: any) => {

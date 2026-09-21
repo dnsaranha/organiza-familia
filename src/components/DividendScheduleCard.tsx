@@ -9,6 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { mapInvestmentType } from "@/lib/investment-mapping";
 import {
+  parseLocalDate,
+  formatLocalDate,
+  resolveEffectivePaymentDate,
+} from "@/lib/b3/dividendUtils";
+import {
   PieChart,
   Pie,
   Cell,
@@ -53,8 +58,7 @@ const formatBRL = (v: number) =>
     minimumFractionDigits: 2,
   }).format(v);
 
-const formatDate = (d: Date) =>
-  `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+const formatDate = (d: Date | string) => formatLocalDate(d);
 
 // Helper to provide consistent labels for manual asset types
 const assetTypeLabels: { [key: string]: string } = {
@@ -107,15 +111,6 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
     load();
   }, [user, data]);
 
-  const monthStart = useMemo(
-    () => new Date(cursor.getFullYear(), cursor.getMonth(), 1),
-    [cursor],
-  );
-  const monthEnd = useMemo(
-    () => new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59),
-    [cursor],
-  );
-
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -126,6 +121,7 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
     const list: {
       ticker: string;
       date: Date;
+      formattedDate: string;
       value: number;
       amountPerShare: number;
       quantity: number;
@@ -133,14 +129,16 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
       type?: string;
     }[] = [];
 
+    const seenEntries = new Set<string>();
+
     data.forEach((asset) => {
       const ticker = normalize(asset.ticker);
       const txs = transactions
         .filter((t) => normalize(t.ticker) === ticker)
         .sort(
           (a, b) =>
-            new Date(a.transaction_date).getTime() -
-            new Date(b.transaction_date).getTime(),
+            parseLocalDate(a.transaction_date).getTime() -
+            parseLocalDate(b.transaction_date).getTime(),
         );
 
       // Fallback quantity from enhancedAssets if user holds current position
@@ -148,20 +146,30 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
       const fallbackQty = fallbackAsset ? Number(fallbackAsset.quantity) || 0 : 0;
 
       (asset.dividendHistory || []).forEach((d) => {
-        const payDateStr = (d as any).paymentDate || d.payment_date || d.date;
-        if (!payDateStr) return;
-        const dd = new Date(payDateStr);
-        if (dd < monthStart || dd > monthEnd) return;
+        const { date: dd, formattedDate } = resolveEffectivePaymentDate(ticker, d);
 
-        const recDateStr = (d as any).recordDate || d.record_date || payDateStr;
-        const recDate = new Date(recDateStr);
+        // Filter strictly by the current selected month without UTC offset distortion
+        if (
+          dd.getFullYear() !== cursor.getFullYear() ||
+          dd.getMonth() !== cursor.getMonth()
+        ) {
+          return;
+        }
+
+        // Deduplicate events for the same asset in the same month with identical amount
+        const dedupeKey = `${ticker}-${dd.getFullYear()}-${dd.getMonth()}-${Number(d.amount || 0).toFixed(4)}`;
+        if (seenEntries.has(dedupeKey)) return;
+        seenEntries.add(dedupeKey);
+
+        const recDateStr = (d as any).recordDate || d.record_date || (d as any).paymentDate || d.date;
+        const recDate = parseLocalDate(recDateStr);
 
         let q = 0;
         if (txs.length > 0) {
-          const firstTxDate = new Date(txs[0].transaction_date);
+          const firstTxDate = parseLocalDate(txs[0].transaction_date);
           if (recDate >= firstTxDate) {
             for (const t of txs) {
-              const td = new Date(t.transaction_date);
+              const td = parseLocalDate(t.transaction_date);
               if (td > recDate) break;
               if (
                 t.transaction_type === "buy" ||
@@ -197,6 +205,7 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
         list.push({
           ticker,
           date: dd,
+          formattedDate,
           value,
           amountPerShare: d.amount || 0,
           quantity: q,
@@ -207,7 +216,7 @@ export function DividendScheduleCard({ data = [], assets = [], loading = false }
     });
 
     return list.sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [data, transactions, assets, monthStart, monthEnd, today]);
+  }, [data, transactions, assets, cursor, today]);
 
   const totalReceived = useMemo(
     () => rows.filter((r) => !r.isAnnounced).reduce((s, r) => s + r.value, 0),

@@ -293,15 +293,18 @@ async function fetchTickerData(ticker: string, fullHistory: boolean = false): Pr
     }
   }
 
-  // Handle Brazilian FIIs without explicit paymentDate (Yahoo puts ex-date at end of month, paid on 15th of next month)
+  // Handle Brazilian FIIs without explicit paymentDate
   for (let i = 0; i < historico_dividendos.length; i++) {
     const item = historico_dividendos[i];
     if (!item.paymentDate && item.date) {
       const d = new Date(item.date);
-      if (isFII && d.getDate() >= 25) {
-        // Ex-date at end of month -> payment occurs ~14-15th of following month
-        const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 15);
-        const payStr = nextMonth.toISOString().split('T')[0];
+      if (isFII) {
+        // Ex-date on day 1..5 -> payment occurs ~14-15th of current month
+        // Ex-date on day >= 25 -> payment occurs ~14-15th of following month
+        const day = d.getDate();
+        const targetMonth = day >= 25 ? d.getMonth() + 1 : d.getMonth();
+        const payObj = new Date(d.getFullYear(), targetMonth, 14, 12, 0, 0);
+        const payStr = payObj.toISOString().split('T')[0];
         item.recordDate = item.date;
         item.paymentDate = payStr;
         item.date = payStr;

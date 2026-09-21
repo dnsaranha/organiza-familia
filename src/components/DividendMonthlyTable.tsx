@@ -23,6 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter, TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import {
+  parseLocalDate,
+  resolveEffectivePaymentDate,
+} from "@/lib/b3/dividendUtils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -208,15 +212,22 @@ export function DividendMonthlyTable({ assetsData, assets = [], loading = false 
     filteredAssetsData.forEach(asset => {
       if (!asset.dividendHistory || !Array.isArray(asset.dividendHistory)) return;
 
+      const seenDivs = new Set<string>();
+
       asset.dividendHistory.forEach(div => {
         if (!div.date || typeof div.amount !== "number") return;
 
-        const payDateStr = (div as any).paymentDate || (div as any).payment_date || div.date;
-        const recDateStr = (div as any).recordDate || (div as any).record_date || div.date;
-        const date = new Date(payDateStr);
-        const recordDate = new Date(recDateStr);
+        const { date } = resolveEffectivePaymentDate(asset.ticker, div);
         const year = date.getFullYear();
         const month = date.getMonth();
+
+        // Prevent duplicate counting of the same dividend event in the same month
+        const dedupeKey = `${year}-${month}-${Number(div.amount).toFixed(4)}`;
+        if (seenDivs.has(dedupeKey)) return;
+        seenDivs.add(dedupeKey);
+
+        const recDateStr = (div as any).recordDate || (div as any).record_date || (div as any).paymentDate || div.date;
+        const recordDate = parseLocalDate(recDateStr);
 
         // Apply period filter
         if (periodFilter === "current_year" && year !== currentYear) return;

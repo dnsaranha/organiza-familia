@@ -19,6 +19,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  parseLocalDate,
+  resolveEffectivePaymentDate,
+} from "@/lib/b3/dividendUtils";
 
 interface DividendEntry {
   date: string;
@@ -128,19 +132,29 @@ const DividendHistoryChart = ({
 
     data.forEach(asset => {
       if (!Array.isArray(asset.dividendHistory)) return;
+
+      const seenDivs = new Set<string>();
+
       asset.dividendHistory.forEach(div => {
         if (!div.date || typeof div.amount !== "number") return;
-        const payDateStr = (div as any).paymentDate || (div as any).payment_date || div.date;
-        const recDateStr = (div as any).recordDate || (div as any).record_date || div.date;
-        const date = new Date(payDateStr);
-        const recDate = new Date(recDateStr);
+
+        const { date } = resolveEffectivePaymentDate(asset.ticker, div);
         if (cutoff && date < cutoff) return;
+
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+        // Deduplicate duplicate events for the same asset in the same month
+        const dedupeKey = `${key}-${Number(div.amount).toFixed(4)}`;
+        if (seenDivs.has(dedupeKey)) return;
+        seenDivs.add(dedupeKey);
+
+        const recDateStr = (div as any).recordDate || (div as any).record_date || (div as any).paymentDate || div.date;
+        const recDate = parseLocalDate(recDateStr);
 
         const qty = getQuantityAtDate(asset.ticker, recDate);
         if (qty === 0) return;
 
         const value = div.amount * qty;
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
         const symbol = asset.ticker.replace(".SA", "");
 
         if (!monthMap.has(key)) monthMap.set(key, { total: 0, assets: {} });

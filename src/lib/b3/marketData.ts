@@ -246,7 +246,21 @@ export async function fetchDirectYahooData(
           for (const cd of cashDivs) {
             const rawAmt = typeof cd.rate === "number" ? cd.rate : parseFloat(cd.rate);
             if (!rawAmt || isNaN(rawAmt)) continue;
-            const pDate = cd.paymentDate || cd.lastDatePrior || cd.approvedOn;
+            
+            let payDate = cd.paymentDate;
+            const recDate = cd.lastDatePrior || cd.approvedOn || cd.paymentDate;
+
+            if (!payDate && isFii && recDate) {
+              const rObj = new Date(recDate);
+              if (!isNaN(rObj.getTime())) {
+                const day = rObj.getDate();
+                const targetMonth = day >= 25 ? rObj.getMonth() + 1 : rObj.getMonth();
+                const pObj = new Date(rObj.getFullYear(), targetMonth, 14, 12, 0, 0);
+                payDate = pObj.toISOString().split("T")[0];
+              }
+            }
+
+            const pDate = payDate || recDate;
             if (!pDate) continue;
             const dStr = pDate.split("T")[0];
             const divDate = new Date(dStr);
@@ -255,7 +269,7 @@ export async function fetchDirectYahooData(
             historico_dividendos.push({
               date: dStr,
               amount: Number(rawAmt.toFixed(4)),
-              paymentDate: dStr,
+              paymentDate: payDate ? payDate.split("T")[0] : dStr,
               recordDate: cd.lastDatePrior ? cd.lastDatePrior.split("T")[0] : dStr,
               type: cd.label || (isFii ? "RENDIMENTO" : "DIVIDENDO"),
               status: isAnnounced ? "announced" : "paid",
@@ -432,8 +446,10 @@ function parseYahooChartResponse(ticker: string, chartData: any): DirectAssetDat
 
     let paymentDate = dateStr;
     if (isFii) {
-      const nextMonth = new Date(divDate.getFullYear(), divDate.getMonth() + 1, 14);
-      paymentDate = nextMonth.toISOString().split("T")[0];
+      const day = divDate.getDate();
+      const targetMonth = day >= 25 ? divDate.getMonth() + 1 : divDate.getMonth();
+      const payObj = new Date(divDate.getFullYear(), targetMonth, 14, 12, 0, 0);
+      paymentDate = payObj.toISOString().split("T")[0];
     }
 
     const todayStr = new Date().toISOString().split("T")[0];
