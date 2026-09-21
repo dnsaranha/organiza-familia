@@ -284,11 +284,15 @@ export const SupportChat = () => {
       if (!settings.is_active) {
         // AI is paused by admin
         const adminPauseNotice = 'Nosso Assistente Inteligente está passando por uma breve atualização. Sua mensagem foi registrada e um atendente humano responderá em breve!';
-        await supabase.from('support_messages').insert({
+        const pauseMsg: Message = {
+          id: crypto.randomUUID(),
           user_id: user.id,
           message: adminPauseNotice,
           is_from_admin: true,
-        });
+          is_read: true,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, pauseMsg]);
         setIsAITyping(false);
         return;
       }
@@ -299,11 +303,15 @@ export const SupportChat = () => {
         const userUsage = await aiCalibrationService.getUserUsage(user.id);
         if (userUsage.total_messages >= settings.free_plan_monthly_limit) {
           const quotaExceededMsg = `⚠️ Limite Mensal Atingido: Você atingiu a cota de ${settings.free_plan_monthly_limit} mensagens do plano Gratuito este mês.\n\nPara continuar com orientações financeiras ilimitadas, faça upgrade para o plano Básico ou Pro. Sua dúvida foi gravada e um atendente humano responderá assim que possível!`;
-          await supabase.from('support_messages').insert({
+          const limitMsg: Message = {
+            id: crypto.randomUUID(),
             user_id: user.id,
             message: quotaExceededMsg,
             is_from_admin: true,
-          });
+            is_read: true,
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, limitMsg]);
           setChatMode('human');
           setIsAITyping(false);
           return;
@@ -335,53 +343,74 @@ export const SupportChat = () => {
       // Parse smart draft (both from AI reply format and natural language intent)
       const { cleanReply, draft } = parseSmartDraft(userText, aiResponse.reply);
 
-      // 5. Persist AI reply into support_messages
-      const { data: savedReply, error: saveError } = await supabase
-        .from('support_messages')
-        .insert({
-          user_id: user.id,
-          message: aiResponse.reply,
-          is_from_admin: true,
-          is_read: isOpenRef.current,
-        })
-        .select()
-        .single();
+      // 5. Instantly show the AI reply in UI
+      const aiTempId = crypto.randomUUID();
+      const aiMessage: Message = {
+        id: aiTempId,
+        user_id: user.id,
+        message: cleanReply,
+        draft,
+        is_from_admin: true,
+        is_read: true,
+        created_at: new Date().toISOString(),
+      };
 
-      if (saveError) throw saveError;
+      setMessages((prev) => [...prev, aiMessage]);
 
-      if (savedReply) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...savedReply,
-            message: cleanReply,
-            draft,
-          } as Message,
-        ]);
+      // Cache locally immediately so reload retains messages
+      try {
+        const cacheKey = `support_messages_cache_${user.id}`;
+        const currentCache = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+        localStorage.setItem(cacheKey, JSON.stringify([...currentCache, aiMessage]));
+      } catch (cacheErr) {
+        // Non-blocking
+      }
+
+      // 6. Asynchronously persist AI reply into Supabase (non-blocking for UI)
+      try {
+        const { data: rpcData, error: rpcError } = await (supabase as any).rpc('insert_ai_support_message', {
+          p_user_id: user.id,
+          p_message: aiResponse.reply,
+          p_is_read: isOpenRef.current,
+        });
+
+        if (rpcError) {
+          const { data: directData } = await supabase
+            .from('support_messages')
+            .insert({
+              user_id: user.id,
+              message: aiResponse.reply,
+              is_from_admin: true,
+              is_read: isOpenRef.current,
+            })
+            .select()
+            .maybeSingle();
+
+          if (directData?.id) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === aiTempId ? { ...(directData as Message), message: cleanReply, draft } : m))
+            );
+          }
+        } else if (rpcData?.id) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === aiTempId ? { ...(rpcData as Message), message: cleanReply, draft } : m))
+          );
+        }
+      } catch (saveError) {
+        console.warn('Persistência remota da resposta do assistente não concluiu, mantido localmente:', saveError);
       }
     } catch (err: any) {
-      const isNetworkErr =
-        err?.message?.includes('Failed to fetch') ||
-        err?.name === 'TypeError' ||
-        err?.message?.includes('NetworkError');
+      console.warn('Aviso no atendimento do Assistente IA:', err?.message || err);
 
-      if (isNetworkErr) {
-        console.warn('Conexão instável durante atendimento do Assistente IA.');
-      } else {
-        console.warn('Aviso no atendimento do Assistente IA:', err?.message || err);
-      }
-
-      // Friendly fallback notice
-      try {
-        const fallbackText = 'Desculpe, ocorreu uma instabilidade momentânea na conexão com o Assistente. Sua mensagem foi anotada e nossa equipe de suporte responderá em breve.';
-        await supabase.from('support_messages').insert({
-          user_id: user.id,
-          message: fallbackText,
-          is_from_admin: true,
-        });
-      } catch (insertErr) {
-        console.warn('Não foi possível salvar mensagem de contingência:', insertErr);
-      }
+      const fallbackMsg: Message = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        message: 'Olá! Não consegui conectar ao assistente no momento. Suas finanças continuam salvas normalmente. Se precisar de suporte imediato, clique no botão "Humano" acima!',
+        is_from_admin: true,
+        is_read: true,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
       setIsAITyping(false);
     }
