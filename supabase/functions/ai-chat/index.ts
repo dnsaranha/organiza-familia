@@ -67,35 +67,52 @@ ${financialContext}`;
     const userMessage = data.message || "Olá";
 
     // Direct Gemini REST API call (compatible with Deno Edge Functions)
-    const model = "gemini-2.5-flash";
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const candidateModels = [
+      calib.model_name && !String(calib.model_name).includes("2.5") ? String(calib.model_name) : null,
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+    ].filter(Boolean) as string[];
+    const modelsToTry = Array.from(new Set(candidateModels));
 
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userMessage }],
+    let result: any = null;
+    let model = modelsToTry[0];
+    let lastStatus = 0;
+
+    for (const candidate of modelsToTry) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`;
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemInstruction }],
           },
-        ],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-        },
-      }),
-    });
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: userMessage }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+          },
+        }),
+      });
 
-    if (!response.ok) {
+      if (response.ok) {
+        result = await response.json();
+        model = candidate;
+        break;
+      }
+
+      lastStatus = response.status;
       const errText = await response.text();
-      console.error("[Edge AI] Gemini API error:", response.status, errText);
-      throw new Error(`Gemini API returned ${response.status}`);
+      console.error("[Edge AI] Gemini API error:", candidate, response.status, errText);
     }
 
-    const result = await response.json();
+    if (!result) {
+      throw new Error(`Gemini API returned ${lastStatus}`);
+    }
     const replyText =
       result?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "Olá! Como posso te ajudar com as finanças da sua família hoje?";
