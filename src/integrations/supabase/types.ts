@@ -1231,6 +1231,10 @@ export type Database = {
         }
         Returns: Json
       }
+      insert_ai_support_message: {
+        Args: { p_is_read?: boolean; p_message: string; p_user_id: string }
+        Returns: Json
+      }
       is_admin: { Args: never; Returns: boolean }
       is_group_member: {
         Args: { _group_id: string; _user_id?: string }

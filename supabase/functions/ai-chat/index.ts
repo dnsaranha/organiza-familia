@@ -67,35 +67,97 @@ ${financialContext}`;
     const userMessage = data.message || "Olá";
 
     // Direct Gemini REST API call (compatible with Deno Edge Functions)
-    const model = "gemini-2.5-flash";
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const candidateModels = [
+      calib.model_name && !String(calib.model_name).includes("2.5") ? String(calib.model_name) : null,
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+    ].filter(Boolean) as string[];
+    const modelsToTry = Array.from(new Set(candidateModels));
 
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userMessage }],
+    let result: any = null;
+    let model = modelsToTry[0];
+    let lastStatus = 0;
+
+    for (const candidate of modelsToTry) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`;
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemInstruction }],
           },
-        ],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-        },
-      }),
-    });
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: userMessage }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+          },
+        }),
+      });
 
-    if (!response.ok) {
+      if (response.ok) {
+        result = await response.json();
+        model = candidate;
+        break;
+      }
+
+      lastStatus = response.status;
       const errText = await response.text();
-      console.error("[Edge AI] Gemini API error:", response.status, errText);
-      throw new Error(`Gemini API returned ${response.status}`);
+      console.error("[Edge AI] Gemini API error:", candidate, response.status, errText);
     }
 
-    const result = await response.json();
+    // Fallback: Lovable AI Gateway when the direct Google API is unavailable
+    if (!result) {
+      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+      if (lovableKey) {
+        const gwRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Lovable-API-Key": lovableKey,
+            "X-Lovable-AIG-SDK": "fetch",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3.8-flash",
+            messages: [
+              { role: "system", content: systemInstruction },
+              { role: "user", content: userMessage },
+            ],
+          }),
+        });
+
+        if (gwRes.ok) {
+          const gw = await gwRes.json();
+          const gwText = gw?.choices?.[0]?.message?.content;
+          if (gwText) {
+            const pT = gw?.usage?.prompt_tokens || 0;
+            const rT = gw?.usage?.completion_tokens || 0;
+            const cUsd = Number(((pT * 0.075 + rT * 0.3) / 1000000).toFixed(6));
+            return new Response(
+              JSON.stringify({
+                reply: gwText,
+                modelUsed: "lovable/google-gemini-3.8-flash",
+                usage: {
+                  promptTokens: pT,
+                  responseTokens: rT,
+                  totalTokens: pT + rT,
+                  costUsd: cUsd,
+                  costBrl: Number((cUsd * USD_BRL_RATE).toFixed(6)),
+                },
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          console.error("[Edge AI] Lovable gateway error:", gwRes.status, await gwRes.text());
+        }
+      }
+      throw new Error(`Gemini API returned ${lastStatus}`);
+    }
     const replyText =
       result?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "Olá! Como posso te ajudar com as finanças da sua família hoje?";

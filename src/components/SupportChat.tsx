@@ -48,6 +48,7 @@ interface Message {
   is_from_admin: boolean;
   is_read: boolean;
   created_at: string;
+  user_id?: string;
   draft?: SmartDraft | null;
 }
 
